@@ -210,4 +210,53 @@ describe('menu-service (e2e)', () => {
       expect(positions.size).toBe(50);
     });
   });
+
+  describe('pricing', () => {
+    it('prices lines from the database, never from the client', async () => {
+      const r = newRestaurant();
+      const cid = await category(r);
+      const item = (await http.post(`/categories/${cid}/items`).set(r.owner).send(biryani).expect(201)).body;
+      const full = item.optionGroups[0].options[1];
+
+      const res = await http
+        .post(`/restaurants/${r.id}/price`)
+        .send({ lines: [{ itemId: item.id, quantity: 2, optionIds: [full.id] }] })
+        .expect(200);
+      expect(res.body).toMatchObject({
+        restaurantId: r.id,
+        lines: [{ itemId: item.id, quantity: 2, unitPricePaisa: 80000, lineTotalPaisa: 160000 }],
+        subtotalPaisa: 160000,
+      });
+
+      await http
+        .post(`/restaurants/${r.id}/price`)
+        .send({ lines: [{ itemId: item.id, quantity: 1, optionIds: [full.id], pricePaisa: 1 }] })
+        .expect(400);
+    });
+
+    it('refuses sold-out items, missing choices and items of other restaurants with 422', async () => {
+      const r = newRestaurant();
+      const cid = await category(r);
+      const item = (await http.post(`/categories/${cid}/items`).set(r.owner).send(biryani).expect(201)).body;
+      const single = item.optionGroups[0].options[0];
+      await http.patch(`/items/${item.id}`).set(r.owner).send({ isAvailable: false }).expect(200);
+
+      const res = await http
+        .post(`/restaurants/${r.id}/price`)
+        .send({ lines: [{ itemId: item.id, quantity: 1, optionIds: [single.id] }, { itemId: item.id, quantity: 1 }] })
+        .expect(422);
+      expect(res.body.message).toEqual([
+        'lines[0]: Chicken Biryani is sold out',
+        'lines[1]: Chicken Biryani is sold out',
+        'lines[1]: choose 1 in "Choose size"',
+      ]);
+
+      const other = newRestaurant();
+      const res2 = await http
+        .post(`/restaurants/${other.id}/price`)
+        .send({ lines: [{ itemId: item.id, quantity: 1, optionIds: [single.id] }] })
+        .expect(422);
+      expect(res2.body.message).toEqual([`lines[0]: item ${item.id} is not on this menu`]);
+    });
+  });
 });

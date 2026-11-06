@@ -6,6 +6,7 @@ import { ConfigModule } from './config/config.module';
 import { HealthController } from './health/health.controller';
 import { MenuController } from './menu/menu.controller';
 import { MenuService } from './menu/menu.service';
+import { PricingController } from './pricing/pricing.controller';
 import { RestaurantAccess } from './restaurants/restaurant-access';
 
 @Module({
@@ -16,7 +17,7 @@ import { RestaurantAccess } from './restaurants/restaurant-access';
       useFactory: (config: AppConfig) => ({ drizzle, connection: config.DATABASE_URL }),
     }),
   ],
-  controllers: [HealthController, MenuController],
+  controllers: [HealthController, MenuController, PricingController],
   providers: [MenuService, RestaurantAccess],
 })
 export class AppModule {}
