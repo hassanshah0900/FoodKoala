@@ -6,6 +6,8 @@ import { ConfigModule } from './config/config.module';
 import { HealthController } from './health/health.controller';
 import { RestaurantsController } from './restaurants/restaurants.controller';
 import { RestaurantsService } from './restaurants/restaurants.service';
+import { BrowseController, ZonesController } from './zones/zones.controller';
+import { ZonesService } from './zones/zones.service';
 
 @Module({
   imports: [
@@ -16,7 +18,7 @@ import { RestaurantsService } from './restaurants/restaurants.service';
     }),
   ],
   // HealthController first: its static routes must win over `/:id`.
-  controllers: [HealthController, RestaurantsController],
-  providers: [RestaurantsService],
+  controllers: [HealthController, RestaurantsController, BrowseController, ZonesController],
+  providers: [RestaurantsService, ZonesService],
 })
 export class AppModule {}

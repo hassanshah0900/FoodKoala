@@ -48,6 +48,28 @@ const gulshan = {
   ],
 };
 
+/** A rectangle as a GeoJSON polygon. */
+const box = (minLng: number, minLat: number, maxLng: number, maxLat: number) => ({
+  type: 'Polygon',
+  coordinates: [
+    [
+      [minLng, minLat],
+      [maxLng, minLat],
+      [maxLng, maxLat],
+      [minLng, maxLat],
+      [minLng, minLat],
+    ],
+  ],
+});
+
+const zone = (area: object, deliveryFeePaisa = 9900) => ({
+  name: 'Zone',
+  area,
+  deliveryFeePaisa,
+  minimumOrderPaisa: 50000,
+  deliveryTimeMinutes: 35,
+});
+
 describe('restaurant-service (e2e)', () => {
   let app: INestApplication;
   let http: ReturnType<typeof request>;
@@ -239,6 +261,119 @@ describe('restaurant-service (e2e)', () => {
       await http.get(`/${r.id}`).expect(404);
       await http.post(`/${r.id}/status`).set(admin).send({ status: 'approved' }).expect(200);
       await http.get(`/${r.id}`).expect(200);
+    });
+  });
+
+  describe('delivery zones', () => {
+    it('are drawn, listed, changed and deleted by the owner', async () => {
+      const owner = newUser();
+      const r = await apply(owner);
+      const created = await http.post(`/${r.id}/zones`).set(owner).send({ ...zone(gulshan), name: 'Gulshan' }).expect(201);
+      expect(created.body).toMatchObject({ name: 'Gulshan', area: gulshan, deliveryFeePaisa: 9900 });
+
+      const zoneUrl = `/${r.id}/zones/${created.body.id}`;
+      await http.patch(zoneUrl).set(owner).send({ deliveryFeePaisa: 4900 }).expect(200);
+      const listed = await http.get(`/${r.id}/zones`).set(owner).expect(200);
+      expect(listed.body).toEqual([expect.objectContaining({ id: created.body.id, deliveryFeePaisa: 4900 })]);
+
+      await http.get(`/${r.id}/zones`).expect(401);
+      await http.get(`/${r.id}/zones`).set(newUser()).expect(404);
+      await http.delete(zoneUrl).set(owner).expect(204);
+      await http.delete(zoneUrl).set(owner).expect(404);
+    });
+
+    it('rejects shapes that cross themselves, as PostGIS sees them', async () => {
+      const owner = newUser();
+      const r = await apply(owner);
+      const bowtie = { type: 'Polygon', coordinates: [[[67, 24], [68, 25], [68, 24], [67, 25], [67, 24]]] };
+      const res = await http.post(`/${r.id}/zones`).set(owner).send(zone(bowtie)).expect(400);
+      expect(res.body.message).toMatch(/crosses itself/);
+
+      const ok = await http.post(`/${r.id}/zones`).set(owner).send(zone(gulshan)).expect(201);
+      await http.patch(`/${r.id}/zones/${ok.body.id}`).set(owner).send({ area: bowtie }).expect(400);
+      await http.post(`/${r.id}/zones`).set(owner).send(zone({ ...gulshan, coordinates: [gulshan.coordinates[0].slice(0, 4)] })).expect(400);
+    });
+
+    it('allows at most 10 per restaurant, even when created at once', async () => {
+      const owner = newUser();
+      const r = await apply(owner);
+      const results = await Promise.all(
+        Array.from({ length: 12 }, () => http.post(`/${r.id}/zones`).set(owner).send(zone(gulshan))),
+      );
+      expect(results.filter((res) => res.status === 201)).toHaveLength(10);
+      expect(results.filter((res) => res.status === 409)).toHaveLength(2);
+    });
+  });
+
+  describe('browsing', () => {
+    // Around Multan, away from the other tests' zones.
+    const customer = { lat: 30.2, lng: 71.47 };
+    const covering = box(71.4, 30.15, 71.55, 30.25);
+    const elsewhere = box(71.6, 30.15, 71.7, 30.25);
+
+    async function listed(owner: Record<string, string>, location: object, zones: object[], approve = true) {
+      const r = await apply(owner, { ...application, location });
+      await http.put(`/${r.id}/hours`).set(owner).send(openEveryDay).expect(200);
+      for (const z of zones) await http.post(`/${r.id}/zones`).set(owner).send(z).expect(201);
+      if (approve) await http.post(`/${r.id}/status`).set(admin).send({ status: 'approved' }).expect(200);
+      return r.id;
+    }
+
+    let far: string, near: string, outOfZone: string, pending: string;
+    beforeAll(async () => {
+      const owner = newUser();
+      far = await listed(owner, { lat: 30.24, lng: 71.53 }, [zone(covering, 9900), zone(covering, 4900)]);
+      near = await listed(owner, { lat: 30.201, lng: 71.471 }, [zone(covering)]);
+      outOfZone = await listed(owner, { lat: 30.2, lng: 71.65 }, [zone(elsewhere)]);
+      pending = await listed(owner, { lat: 30.2, lng: 71.47 }, [zone(covering)], false);
+    });
+
+    it('lists approved restaurants whose zones contain the point, nearest first', async () => {
+      const res = await http.get('/').query({ ...customer, limit: 50 }).expect(200);
+      const ids: string[] = res.body.items.map((r: { id: string }) => r.id);
+      expect(ids.indexOf(near)).toBeGreaterThanOrEqual(0);
+      expect(ids.indexOf(near)).toBeLessThan(ids.indexOf(far));
+      expect(ids).not.toContain(outOfZone);
+      expect(ids).not.toContain(pending);
+
+      const farItem = res.body.items.find((r: { id: string }) => r.id === far);
+      expect(farItem).toMatchObject({
+        name: application.name,
+        area: application.address.area,
+        openNow: true,
+        acceptingOrders: true,
+        delivery: { deliveryFeePaisa: 4900, minimumOrderPaisa: 50000, deliveryTimeMinutes: 35 },
+      });
+      expect(farItem.distanceMeters).toBeGreaterThan(6000);
+      expect(farItem.distanceMeters).toBeLessThan(8000);
+    });
+
+    it('pages through the results', async () => {
+      const first = await http.get('/').query({ ...customer, limit: 1 }).expect(200);
+      expect(first.body).toMatchObject({ page: 1, limit: 1, hasMore: true });
+      expect(first.body.items).toHaveLength(1);
+      const second = await http.get('/').query({ ...customer, limit: 1, page: 2 }).expect(200);
+      expect(second.body.items[0].id).not.toBe(first.body.items[0].id);
+    });
+
+    it('needs a point inside Pakistan', async () => {
+      await http.get('/').expect(400);
+      await http.get('/').query({ lat: 51.5, lng: -0.12 }).expect(400);
+    });
+
+    it('quotes delivery to a point', async () => {
+      const inside = await http.get(`/${far}/delivery-quote`).query(customer).expect(200);
+      expect(inside.body).toMatchObject({
+        deliverable: true,
+        acceptingOrders: true,
+        delivery: { deliveryFeePaisa: 4900 },
+      });
+
+      const outside = await http.get(`/${outOfZone}/delivery-quote`).query(customer).expect(200);
+      expect(outside.body).toMatchObject({ deliverable: false, delivery: null });
+
+      await http.get(`/${pending}/delivery-quote`).query(customer).expect(404);
+      await http.get(`/${far}/delivery-quote`).expect(400);
     });
   });
 });
