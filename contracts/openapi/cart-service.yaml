@@ -1,0 +1,285 @@
+openapi: 3.1.0
+info:
+  title: cart-service
+  version: 0.1.0
+  description: |
+    The signed-in user's cart. Like foodpanda, a cart holds items from one
+    restaurant only. Adding an item from another restaurant gets 409, unless
+    `replace: true` empties the cart first.
+
+    Prices always come from menu-service (`POST /restaurants/{id}/price`),
+    which is asked again on every read and write. A client never sends a
+    price. When the menu changes after an item was added (it sold out, or a
+    choice was removed), the cart still returns the line, with the last known
+    price, and lists the problem in `problems`. Such a cart can't be checked
+    out until the line is fixed or removed.
+
+    Carts live in Redis and expire 7 days after their last change. Every
+    endpoint needs an authenticated request (`X-User-Id` from api-gateway).
+
+    **Money** is in paisa (integer, 1 PKR = 100 paisa).
+servers:
+  - url: http://localhost:8080/api/v1/cart
+    description: Through api-gateway
+  - url: http://localhost:3005
+    description: Service directly (send the identity headers yourself)
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: cart
+    description: The signed-in user's cart
+  - name: health
+    description: Liveness and readiness probes
+
+paths:
+  /:
+    get:
+      tags: [cart]
+      operationId: getCart
+      summary: My cart, priced now
+      responses:
+        '200':
+          description: Cart (an empty cart has `restaurantId` null and no lines)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Cart' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+    delete:
+      tags: [cart]
+      operationId: clearCart
+      summary: Empty my cart
+      responses:
+        '204': { description: Emptied }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /items:
+    post:
+      tags: [cart]
+      operationId: addToCart
+      summary: Add an item
+      description: |
+        A line with the same item, the same choices and the same note is
+        merged with the new one: the quantities are added (at most 50).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AddLine' }
+            example:
+              restaurantId: e0c1d2b3-a4f5-4678-9abc-def012345678
+              itemId: 0b9d1c7e-3f5a-4c2e-9a1b-6d8e7f0a1b2c
+              quantity: 1
+              optionIds: [5e6f7a8b-9c0d-4e1f-a2b3-c4d5e6f7a8b9]
+              note: Less spicy please
+      responses:
+        '201':
+          description: Cart with the item added
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Cart' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409':
+          description: The cart holds items from another restaurant, or already has 50 lines
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '422': { $ref: '#/components/responses/NotOnMenu' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+
+  /items/{lineId}:
+    parameters:
+      - name: lineId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      tags: [cart]
+      operationId: updateCartLine
+      summary: Change a line's quantity, choices or note
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateLine' }
+            example: { quantity: 3 }
+      responses:
+        '200':
+          description: Cart
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Cart' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/NotOnMenu' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+    delete:
+      tags: [cart]
+      operationId: removeCartLine
+      summary: Remove a line (the cart is emptied when it was the last one)
+      responses:
+        '200':
+          description: Cart
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Cart' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+
+  /healthz:
+    get:
+      tags: [health]
+      operationId: liveness
+      summary: Liveness probe
+      security: []
+      responses:
+        '200': { $ref: '#/components/responses/Ok' }
+
+  /readyz:
+    get:
+      tags: [health]
+      operationId: readiness
+      summary: Readiness probe
+      description: Fails with 503 when Redis is unreachable.
+      security: []
+      responses:
+        '200': { $ref: '#/components/responses/Ok' }
+        '503': { description: Not ready }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Access token from auth-service, verified by api-gateway.
+
+  schemas:
+    AddLine:
+      type: object
+      required: [restaurantId, itemId, quantity]
+      additionalProperties: false
+      properties:
+        restaurantId: { type: string, format: uuid }
+        itemId: { type: string, format: uuid }
+        quantity: { type: integer, minimum: 1, maximum: 50 }
+        optionIds:
+          type: array
+          uniqueItems: true
+          maxItems: 50
+          default: []
+          items: { type: string, format: uuid }
+        note: { type: [string, 'null'], minLength: 1, maxLength: 200, description: 'Instructions for the kitchen, e.g. no onions' }
+        replace: { type: boolean, default: false, description: Empty a cart from another restaurant first }
+
+    UpdateLine:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        quantity: { type: integer, minimum: 1, maximum: 50 }
+        optionIds:
+          type: array
+          uniqueItems: true
+          maxItems: 50
+          items: { type: string, format: uuid }
+        note: { type: [string, 'null'], minLength: 1, maxLength: 200 }
+
+    CartLine:
+      type: object
+      required: [id, itemId, name, quantity, optionIds, options, note, unitPricePaisa, lineTotalPaisa]
+      properties:
+        id: { type: string, format: uuid }
+        itemId: { type: string, format: uuid }
+        name: { type: string }
+        quantity: { type: integer }
+        optionIds:
+          type: array
+          items: { type: string, format: uuid }
+        options:
+          type: array
+          items:
+            type: object
+            required: [id, group, name, pricePaisa]
+            properties:
+              id: { type: string, format: uuid }
+              group: { type: string }
+              name: { type: string }
+              pricePaisa: { type: integer }
+        note: { type: [string, 'null'] }
+        unitPricePaisa: { type: integer }
+        lineTotalPaisa: { type: integer }
+
+    Problem:
+      type: object
+      required: [lineId, message]
+      properties:
+        lineId: { type: [string, 'null'], format: uuid }
+        message: { type: string, examples: ['Chicken Biryani is sold out'] }
+
+    Cart:
+      type: object
+      required: [restaurantId, lines, subtotalPaisa, problems, updatedAt]
+      properties:
+        restaurantId: { type: [string, 'null'], format: uuid }
+        lines:
+          type: array
+          items: { $ref: '#/components/schemas/CartLine' }
+        subtotalPaisa: { type: integer, description: 'Sum of line totals, before delivery fee and tax' }
+        problems:
+          type: array
+          description: Lines that no longer match the menu; empty when the cart can be checked out
+          items: { $ref: '#/components/schemas/Problem' }
+        updatedAt: { type: [string, 'null'], format: date-time }
+
+    Error:
+      type: object
+      required: [statusCode, message]
+      properties:
+        statusCode: { type: integer }
+        error: { type: string }
+        message:
+          oneOf:
+            - type: string
+            - type: array
+              items: { type: string }
+
+  responses:
+    Ok:
+      description: OK
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              status: { type: string, const: ok }
+    BadRequest:
+      description: Invalid body
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unauthorized:
+      description: No authenticated user
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: No such line in my cart
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotOnMenu:
+      description: The item or its choices don't match the menu (as menu-service reports it)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unavailable:
+      description: menu-service or Redis could not be reached
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
