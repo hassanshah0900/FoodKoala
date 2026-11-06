@@ -4,6 +4,8 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { APP_CONFIG, type AppConfig } from './config/config';
 import { ConfigModule } from './config/config.module';
 import { HealthController } from './health/health.controller';
+import { RestaurantsController } from './restaurants/restaurants.controller';
+import { RestaurantsService } from './restaurants/restaurants.service';
 
 @Module({
   imports: [
@@ -14,6 +16,7 @@ import { HealthController } from './health/health.controller';
     }),
   ],
   // HealthController first: its static routes must win over `/:id`.
-  controllers: [HealthController],
+  controllers: [HealthController, RestaurantsController],
+  providers: [RestaurantsService],
 })
 export class AppModule {}
