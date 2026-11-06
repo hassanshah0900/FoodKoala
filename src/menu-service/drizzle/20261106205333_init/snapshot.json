@@ -1,0 +1,525 @@
+{
+  "type": "base",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "071f1b39-a16e-4fc1-97f8-8912d17a6158",
+  "prevIds": [
+    "00000000-0000-0000-0000-000000000000"
+  ],
+  "footprints": [
+    {
+      "statementType": "create_schema",
+      "statementTarget": [
+        "schema",
+        "menu"
+      ],
+      "writes": [
+        "s|sch|menu",
+        "n|sch|menu",
+        "e|sch|menu"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "menu",
+        "categories"
+      ],
+      "writes": [
+        "s|tbl|menu.categories",
+        "n|tbl|menu.categories",
+        "e|tbl|menu.categories",
+        "n|rel|menu.categories",
+        "n|type|menu.categories",
+        "n|rel|menu.categories_pkey"
+      ],
+      "reads": [
+        "n|sch|menu"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "menu",
+        "items"
+      ],
+      "writes": [
+        "s|tbl|menu.items",
+        "n|tbl|menu.items",
+        "e|tbl|menu.items",
+        "n|rel|menu.items",
+        "n|type|menu.items",
+        "n|rel|menu.items_pkey"
+      ],
+      "reads": [
+        "n|sch|menu"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "menu",
+        "categories",
+        "categories_restaurant_id_position_idx"
+      ],
+      "writes": [
+        "s|idx|menu.categories_restaurant_id_position_idx",
+        "n|idx|menu.categories_restaurant_id_position_idx",
+        "e|idx|menu.categories_restaurant_id_position_idx",
+        "n|rel|menu.categories_restaurant_id_position_idx"
+      ],
+      "reads": [
+        "n|tbl|menu.categories",
+        "n|sch|menu",
+        "n|col|menu.categories.restaurant_id",
+        "n|col|menu.categories.position"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "menu",
+        "items",
+        "items_category_id_position_idx"
+      ],
+      "writes": [
+        "s|idx|menu.items_category_id_position_idx",
+        "n|idx|menu.items_category_id_position_idx",
+        "e|idx|menu.items_category_id_position_idx",
+        "n|rel|menu.items_category_id_position_idx"
+      ],
+      "reads": [
+        "n|tbl|menu.items",
+        "n|sch|menu",
+        "n|col|menu.items.category_id",
+        "n|col|menu.items.position"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "menu",
+        "items",
+        "items_restaurant_id_idx"
+      ],
+      "writes": [
+        "s|idx|menu.items_restaurant_id_idx",
+        "n|idx|menu.items_restaurant_id_idx",
+        "e|idx|menu.items_restaurant_id_idx",
+        "n|rel|menu.items_restaurant_id_idx"
+      ],
+      "reads": [
+        "n|tbl|menu.items",
+        "n|sch|menu",
+        "n|col|menu.items.restaurant_id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "menu",
+        "items"
+      ],
+      "writes": [
+        "s|fk|menu.items.items_category_id_categories_id_fkey",
+        "n|fk|menu.items.items_category_id_categories_id_fkey",
+        "e|fk|menu.items.items_category_id_categories_id_fkey",
+        "n|con|menu.items.items_category_id_categories_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|menu.items",
+        "n|sch|menu",
+        "n|tbl|menu.categories",
+        "n|sch|menu",
+        "n|col|menu.items.category_id",
+        "n|col|menu.categories.id",
+        "e|uniqueness|menu.categories.id"
+      ]
+    }
+  ],
+  "ddl": [
+    {
+      "name": "menu",
+      "entityType": "schemas"
+    },
+    {
+      "schema": "menu",
+      "name": "categories",
+      "isRlsEnabled": false,
+      "entityType": "tables"
+    },
+    {
+      "schema": "menu",
+      "name": "items",
+      "isRlsEnabled": false,
+      "entityType": "tables"
+    },
+    {
+      "schema": "menu",
+      "table": "categories",
+      "name": "id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "gen_random_uuid()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "menu",
+      "table": "categories",
+      "name": "restaurant_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "menu",
+      "table": "categories",
+      "name": "name",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "menu",
+      "table": "categories",
+      "name": "description",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "menu",
+      "table": "categories",
+      "name": "position",
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "menu",
+      "table": "categories",
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "menu",
+      "table": "categories",
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "menu",
+      "table": "items",
+      "name": "id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "gen_random_uuid()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "menu",
+      "table": "items",
+      "name": "restaurant_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "menu",
+      "table": "items",
+      "name": "category_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "menu",
+      "table": "items",
+      "name": "name",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "menu",
+      "table": "items",
+      "name": "description",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "menu",
+      "table": "items",
+      "name": "image_url",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "menu",
+      "table": "items",
+      "name": "price_paisa",
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "menu",
+      "table": "items",
+      "name": "is_available",
+      "type": "boolean",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "true",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "menu",
+      "table": "items",
+      "name": "option_groups",
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'[]'",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "menu",
+      "table": "items",
+      "name": "position",
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "menu",
+      "table": "items",
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "menu",
+      "table": "items",
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "menu",
+      "table": "categories",
+      "name": "categories_restaurant_id_position_idx",
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "restaurant_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "position",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "menu",
+      "table": "items",
+      "name": "items_category_id_position_idx",
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "category_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "position",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "menu",
+      "table": "items",
+      "name": "items_restaurant_id_idx",
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "restaurant_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "menu",
+      "table": "items",
+      "name": "items_category_id_categories_id_fkey",
+      "nameExplicit": false,
+      "columns": [
+        "category_id"
+      ],
+      "schemaTo": "menu",
+      "tableTo": "categories",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "RESTRICT",
+      "entityType": "fks"
+    },
+    {
+      "schema": "menu",
+      "table": "categories",
+      "name": "categories_pkey",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "schema": "menu",
+      "table": "items",
+      "name": "items_pkey",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    }
+  ]
+}
