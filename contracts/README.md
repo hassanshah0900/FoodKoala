@@ -36,3 +36,12 @@ headers (ADR 0005). Clients can never set them; the gateway strips them.
 
 No `X-User-Id` means an anonymous request (only possible on public routes).
 The original `Authorization` header is forwarded too.
+
+## Conventions
+
+- **Money** is an integer number of paisa (1 PKR = 100 paisa), in fields
+  ending in `Paisa`, e.g. `deliveryFeePaisa: 9900` is Rs 99. Never floats.
+- **Locations** are WGS 84: `{ "lat": 24.92, "lng": 67.09 }` in bodies, and
+  GeoJSON (`[lng, lat]` order) for shapes such as delivery zones.
+- **Local time** (opening hours, schedules) is Pakistan time, Asia/Karachi
+  (UTC+5, no daylight saving). Timestamps are ISO 8601 in UTC.
