@@ -1,0 +1,769 @@
+{
+  "type": "base",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "67c0c8ed-3091-4cc3-8ea7-044bc7d8bb53",
+  "prevIds": [
+    "00000000-0000-0000-0000-000000000000"
+  ],
+  "footprints": [
+    {
+      "statementType": "create_schema",
+      "statementTarget": [
+        "schema",
+        "restaurants"
+      ],
+      "writes": [
+        "s|sch|restaurants",
+        "n|sch|restaurants",
+        "e|sch|restaurants"
+      ]
+    },
+    {
+      "statementType": "create_enum",
+      "statementTarget": [
+        "enum",
+        "restaurants",
+        "province"
+      ],
+      "writes": [
+        "s|enum|restaurants.province",
+        "n|enum|restaurants.province",
+        "e|enum|restaurants.province",
+        "n|type|restaurants.province"
+      ],
+      "reads": [
+        "n|sch|restaurants"
+      ]
+    },
+    {
+      "statementType": "create_enum",
+      "statementTarget": [
+        "enum",
+        "restaurants",
+        "restaurant_status"
+      ],
+      "writes": [
+        "s|enum|restaurants.restaurant_status",
+        "n|enum|restaurants.restaurant_status",
+        "e|enum|restaurants.restaurant_status",
+        "n|type|restaurants.restaurant_status"
+      ],
+      "reads": [
+        "n|sch|restaurants"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "restaurants",
+        "delivery_zones"
+      ],
+      "writes": [
+        "s|tbl|restaurants.delivery_zones",
+        "n|tbl|restaurants.delivery_zones",
+        "e|tbl|restaurants.delivery_zones",
+        "n|rel|restaurants.delivery_zones",
+        "n|type|restaurants.delivery_zones",
+        "n|rel|restaurants.delivery_zones_pkey"
+      ],
+      "reads": [
+        "n|sch|restaurants"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "restaurants",
+        "restaurants"
+      ],
+      "writes": [
+        "s|tbl|restaurants.restaurants",
+        "n|tbl|restaurants.restaurants",
+        "e|tbl|restaurants.restaurants",
+        "n|rel|restaurants.restaurants",
+        "n|type|restaurants.restaurants",
+        "n|rel|restaurants.restaurants_pkey"
+      ],
+      "reads": [
+        "n|sch|restaurants",
+        "n|enum|restaurants.province",
+        "n|enum|restaurants.restaurant_status"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "restaurants",
+        "delivery_zones",
+        "delivery_zones_restaurant_id_idx"
+      ],
+      "writes": [
+        "s|idx|restaurants.delivery_zones_restaurant_id_idx",
+        "n|idx|restaurants.delivery_zones_restaurant_id_idx",
+        "e|idx|restaurants.delivery_zones_restaurant_id_idx",
+        "n|rel|restaurants.delivery_zones_restaurant_id_idx"
+      ],
+      "reads": [
+        "n|tbl|restaurants.delivery_zones",
+        "n|sch|restaurants",
+        "n|col|restaurants.delivery_zones.restaurant_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "restaurants",
+        "delivery_zones",
+        "delivery_zones_area_gist_idx"
+      ],
+      "writes": [
+        "s|idx|restaurants.delivery_zones_area_gist_idx",
+        "n|idx|restaurants.delivery_zones_area_gist_idx",
+        "e|idx|restaurants.delivery_zones_area_gist_idx",
+        "n|rel|restaurants.delivery_zones_area_gist_idx"
+      ],
+      "reads": [
+        "n|tbl|restaurants.delivery_zones",
+        "n|sch|restaurants",
+        "n|col|restaurants.delivery_zones.area"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "restaurants",
+        "restaurants",
+        "restaurants_owner_id_idx"
+      ],
+      "writes": [
+        "s|idx|restaurants.restaurants_owner_id_idx",
+        "n|idx|restaurants.restaurants_owner_id_idx",
+        "e|idx|restaurants.restaurants_owner_id_idx",
+        "n|rel|restaurants.restaurants_owner_id_idx"
+      ],
+      "reads": [
+        "n|tbl|restaurants.restaurants",
+        "n|sch|restaurants",
+        "n|col|restaurants.restaurants.owner_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "restaurants",
+        "restaurants",
+        "restaurants_status_created_at_idx"
+      ],
+      "writes": [
+        "s|idx|restaurants.restaurants_status_created_at_idx",
+        "n|idx|restaurants.restaurants_status_created_at_idx",
+        "e|idx|restaurants.restaurants_status_created_at_idx",
+        "n|rel|restaurants.restaurants_status_created_at_idx"
+      ],
+      "reads": [
+        "n|tbl|restaurants.restaurants",
+        "n|sch|restaurants",
+        "n|col|restaurants.restaurants.status",
+        "n|col|restaurants.restaurants.created_at"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "restaurants",
+        "delivery_zones"
+      ],
+      "writes": [
+        "s|fk|restaurants.delivery_zones.delivery_zones_restaurant_id_restaurants_id_fkey",
+        "n|fk|restaurants.delivery_zones.delivery_zones_restaurant_id_restaurants_id_fkey",
+        "e|fk|restaurants.delivery_zones.delivery_zones_restaurant_id_restaurants_id_fkey",
+        "n|con|restaurants.delivery_zones.delivery_zones_restaurant_id_restaurants_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|restaurants.delivery_zones",
+        "n|sch|restaurants",
+        "n|tbl|restaurants.restaurants",
+        "n|sch|restaurants",
+        "n|col|restaurants.delivery_zones.restaurant_id",
+        "n|col|restaurants.restaurants.id",
+        "e|uniqueness|restaurants.restaurants.id"
+      ]
+    }
+  ],
+  "ddl": [
+    {
+      "name": "restaurants",
+      "entityType": "schemas"
+    },
+    {
+      "schema": "restaurants",
+      "name": "delivery_zones",
+      "isRlsEnabled": false,
+      "entityType": "tables"
+    },
+    {
+      "schema": "restaurants",
+      "name": "restaurants",
+      "isRlsEnabled": false,
+      "entityType": "tables"
+    },
+    {
+      "schema": "restaurants",
+      "name": "province",
+      "values": [
+        "punjab",
+        "sindh",
+        "khyber_pakhtunkhwa",
+        "balochistan",
+        "islamabad",
+        "gilgit_baltistan",
+        "azad_kashmir"
+      ],
+      "entityType": "enums"
+    },
+    {
+      "schema": "restaurants",
+      "name": "restaurant_status",
+      "values": [
+        "pending",
+        "approved",
+        "rejected",
+        "suspended"
+      ],
+      "entityType": "enums"
+    },
+    {
+      "schema": "restaurants",
+      "table": "delivery_zones",
+      "name": "id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "gen_random_uuid()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "restaurants",
+      "table": "delivery_zones",
+      "name": "restaurant_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "restaurants",
+      "table": "delivery_zones",
+      "name": "name",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "restaurants",
+      "table": "delivery_zones",
+      "name": "area",
+      "type": "geometry(Polygon,4326)",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "restaurants",
+      "table": "delivery_zones",
+      "name": "delivery_fee_paisa",
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "restaurants",
+      "table": "delivery_zones",
+      "name": "minimum_order_paisa",
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "restaurants",
+      "table": "delivery_zones",
+      "name": "delivery_time_minutes",
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "restaurants",
+      "table": "delivery_zones",
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "restaurants",
+      "table": "delivery_zones",
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "restaurants",
+      "table": "restaurants",
+      "name": "id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "gen_random_uuid()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "restaurants",
+      "table": "restaurants",
+      "name": "owner_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "restaurants",
+      "table": "restaurants",
+      "name": "name",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "restaurants",
+      "table": "restaurants",
+      "name": "description",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "restaurants",
+      "table": "restaurants",
+      "name": "cuisines",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 1,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "restaurants",
+      "table": "restaurants",
+      "name": "phone",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "restaurants",
+      "table": "restaurants",
+      "name": "line1",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "restaurants",
+      "table": "restaurants",
+      "name": "area",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "restaurants",
+      "table": "restaurants",
+      "name": "city",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "restaurants",
+      "table": "restaurants",
+      "name": "province",
+      "type": "province",
+      "typeSchema": "restaurants",
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "restaurants",
+      "table": "restaurants",
+      "name": "lat",
+      "type": "double precision",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "restaurants",
+      "table": "restaurants",
+      "name": "lng",
+      "type": "double precision",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "restaurants",
+      "table": "restaurants",
+      "name": "logo_url",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "restaurants",
+      "table": "restaurants",
+      "name": "cover_url",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "restaurants",
+      "table": "restaurants",
+      "name": "weekly_hours",
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'{}'",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "restaurants",
+      "table": "restaurants",
+      "name": "special_hours",
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'[]'",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "restaurants",
+      "table": "restaurants",
+      "name": "paused_until",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "restaurants",
+      "table": "restaurants",
+      "name": "status",
+      "type": "restaurant_status",
+      "typeSchema": "restaurants",
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'pending'",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "restaurants",
+      "table": "restaurants",
+      "name": "status_reason",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "restaurants",
+      "table": "restaurants",
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "restaurants",
+      "table": "restaurants",
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "restaurants",
+      "table": "delivery_zones",
+      "name": "delivery_zones_restaurant_id_idx",
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "restaurant_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "restaurants",
+      "table": "delivery_zones",
+      "name": "delivery_zones_area_gist_idx",
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "area",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "gist",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "restaurants",
+      "table": "restaurants",
+      "name": "restaurants_owner_id_idx",
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "owner_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "restaurants",
+      "table": "restaurants",
+      "name": "restaurants_status_created_at_idx",
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "status",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "created_at",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "restaurants",
+      "table": "delivery_zones",
+      "name": "delivery_zones_restaurant_id_restaurants_id_fkey",
+      "nameExplicit": false,
+      "columns": [
+        "restaurant_id"
+      ],
+      "schemaTo": "restaurants",
+      "tableTo": "restaurants",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "entityType": "fks"
+    },
+    {
+      "schema": "restaurants",
+      "table": "delivery_zones",
+      "name": "delivery_zones_pkey",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "schema": "restaurants",
+      "table": "restaurants",
+      "name": "restaurants_pkey",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "schema": "restaurants",
+      "table": "delivery_zones",
+      "name": "delivery_zones_area_valid",
+      "value": "ST_IsValid(\"area\")",
+      "entityType": "checks"
+    }
+  ]
+}
