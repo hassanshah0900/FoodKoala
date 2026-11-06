@@ -1,0 +1,549 @@
+{
+  "type": "base",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "098e4f8f-14e6-487d-92c9-8ae84964f5d0",
+  "prevIds": [
+    "00000000-0000-0000-0000-000000000000"
+  ],
+  "footprints": [
+    {
+      "statementType": "create_schema",
+      "statementTarget": [
+        "schema",
+        "users"
+      ],
+      "writes": [
+        "s|sch|users",
+        "n|sch|users",
+        "e|sch|users"
+      ]
+    },
+    {
+      "statementType": "create_enum",
+      "statementTarget": [
+        "enum",
+        "users",
+        "address_label"
+      ],
+      "writes": [
+        "s|enum|users.address_label",
+        "n|enum|users.address_label",
+        "e|enum|users.address_label",
+        "n|type|users.address_label"
+      ],
+      "reads": [
+        "n|sch|users"
+      ]
+    },
+    {
+      "statementType": "create_enum",
+      "statementTarget": [
+        "enum",
+        "users",
+        "language"
+      ],
+      "writes": [
+        "s|enum|users.language",
+        "n|enum|users.language",
+        "e|enum|users.language",
+        "n|type|users.language"
+      ],
+      "reads": [
+        "n|sch|users"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "users",
+        "addresses"
+      ],
+      "writes": [
+        "s|tbl|users.addresses",
+        "n|tbl|users.addresses",
+        "e|tbl|users.addresses",
+        "n|rel|users.addresses",
+        "n|type|users.addresses",
+        "n|rel|users.addresses_pkey"
+      ],
+      "reads": [
+        "n|sch|users",
+        "n|enum|users.address_label"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "users",
+        "profiles"
+      ],
+      "writes": [
+        "s|tbl|users.profiles",
+        "n|tbl|users.profiles",
+        "e|tbl|users.profiles",
+        "n|rel|users.profiles",
+        "n|type|users.profiles",
+        "n|rel|users.profiles_pkey"
+      ],
+      "reads": [
+        "n|sch|users",
+        "n|enum|users.language"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "users",
+        "addresses",
+        "addresses_user_id_idx"
+      ],
+      "writes": [
+        "s|idx|users.addresses_user_id_idx",
+        "n|idx|users.addresses_user_id_idx",
+        "e|idx|users.addresses_user_id_idx",
+        "n|rel|users.addresses_user_id_idx"
+      ],
+      "reads": [
+        "n|tbl|users.addresses",
+        "n|sch|users",
+        "n|col|users.addresses.user_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "users",
+        "addresses",
+        "addresses_one_default_per_user"
+      ],
+      "writes": [
+        "s|idx|users.addresses_one_default_per_user",
+        "n|idx|users.addresses_one_default_per_user",
+        "e|idx|users.addresses_one_default_per_user",
+        "n|rel|users.addresses_one_default_per_user"
+      ],
+      "reads": [
+        "n|tbl|users.addresses",
+        "n|sch|users",
+        "n|col|users.addresses.user_id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "users",
+        "addresses"
+      ],
+      "writes": [
+        "s|fk|users.addresses.addresses_user_id_profiles_id_fkey",
+        "n|fk|users.addresses.addresses_user_id_profiles_id_fkey",
+        "e|fk|users.addresses.addresses_user_id_profiles_id_fkey",
+        "n|con|users.addresses.addresses_user_id_profiles_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|users.addresses",
+        "n|sch|users",
+        "n|tbl|users.profiles",
+        "n|sch|users",
+        "n|col|users.addresses.user_id",
+        "n|col|users.profiles.id",
+        "e|uniqueness|users.profiles.id"
+      ]
+    }
+  ],
+  "ddl": [
+    {
+      "name": "users",
+      "entityType": "schemas"
+    },
+    {
+      "schema": "users",
+      "name": "addresses",
+      "isRlsEnabled": false,
+      "entityType": "tables"
+    },
+    {
+      "schema": "users",
+      "name": "profiles",
+      "isRlsEnabled": false,
+      "entityType": "tables"
+    },
+    {
+      "schema": "users",
+      "name": "address_label",
+      "values": [
+        "home",
+        "work",
+        "other"
+      ],
+      "entityType": "enums"
+    },
+    {
+      "schema": "users",
+      "name": "language",
+      "values": [
+        "en",
+        "ur"
+      ],
+      "entityType": "enums"
+    },
+    {
+      "schema": "users",
+      "table": "addresses",
+      "name": "id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "gen_random_uuid()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "users",
+      "table": "addresses",
+      "name": "user_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "users",
+      "table": "addresses",
+      "name": "label",
+      "type": "address_label",
+      "typeSchema": "users",
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "users",
+      "table": "addresses",
+      "name": "label_text",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "users",
+      "table": "addresses",
+      "name": "line1",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "users",
+      "table": "addresses",
+      "name": "area",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "users",
+      "table": "addresses",
+      "name": "city",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "users",
+      "table": "addresses",
+      "name": "landmark",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "users",
+      "table": "addresses",
+      "name": "instructions",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "users",
+      "table": "addresses",
+      "name": "lat",
+      "type": "double precision",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "users",
+      "table": "addresses",
+      "name": "lng",
+      "type": "double precision",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "users",
+      "table": "addresses",
+      "name": "is_default",
+      "type": "boolean",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "false",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "users",
+      "table": "addresses",
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "users",
+      "table": "addresses",
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "users",
+      "table": "profiles",
+      "name": "id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "users",
+      "table": "profiles",
+      "name": "phone",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "users",
+      "table": "profiles",
+      "name": "name",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "users",
+      "table": "profiles",
+      "name": "email",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "users",
+      "table": "profiles",
+      "name": "preferred_language",
+      "type": "language",
+      "typeSchema": "users",
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'en'",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "users",
+      "table": "profiles",
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "users",
+      "table": "profiles",
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "users",
+      "table": "addresses",
+      "name": "addresses_user_id_idx",
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "user_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "users",
+      "table": "addresses",
+      "name": "addresses_one_default_per_user",
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "user_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": true,
+      "where": "\"is_default\"",
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "users",
+      "table": "addresses",
+      "name": "addresses_user_id_profiles_id_fkey",
+      "nameExplicit": false,
+      "columns": [
+        "user_id"
+      ],
+      "schemaTo": "users",
+      "tableTo": "profiles",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "entityType": "fks"
+    },
+    {
+      "schema": "users",
+      "table": "addresses",
+      "name": "addresses_pkey",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "schema": "users",
+      "table": "profiles",
+      "name": "profiles_pkey",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    }
+  ]
+}
