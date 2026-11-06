@@ -1,0 +1,284 @@
+openapi: 3.1.0
+info:
+  title: auth-service
+  version: 0.1.0
+  description: |
+    Phone number (+92) and OTP login, token issuing and refresh.
+
+    Access tokens are RS256 JWTs (15 minutes) whose public keys are published
+    at `/.well-known/jwks.json` (ADR 0004). Refresh tokens are opaque, single
+    use and rotated on every refresh.
+
+    Phone numbers are accepted as `03001234567`, `923001234567` or
+    `+92 300 1234567` and always returned in E.164 form (`+923001234567`).
+servers:
+  - url: http://localhost:8080/api/v1/auth
+    description: Through api-gateway
+  - url: http://localhost:3001
+    description: Service directly
+
+# Every endpoint here is public: these endpoints are how a client gets a token.
+security: []
+
+tags:
+  - name: otp
+    description: Login with a one-time code sent by SMS
+  - name: tokens
+    description: Access and refresh tokens, and the keys to verify them
+  - name: health
+    description: Liveness and readiness probes
+
+paths:
+  /otp/request:
+    post:
+      tags: [otp]
+      operationId: requestOtp
+      summary: Send a 6-digit login code by SMS
+      description: |
+        Codes expire after 5 minutes. A new code can be requested 60 seconds
+        after the previous one, at most 5 times per phone number per hour.
+        Requesting a new code invalidates the previous one.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OtpRequest' }
+            example: { phone: '03001234567' }
+      responses:
+        '202':
+          description: Code sent
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OtpRequested' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /otp/verify:
+    post:
+      tags: [otp]
+      operationId: verifyOtp
+      summary: Exchange a login code for tokens
+      description: |
+        Creates the user (role `customer`) on first login. A code is
+        invalidated after 5 wrong attempts.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OtpVerify' }
+            example: { phone: '+923001234567', code: '482913' }
+      responses:
+        '200':
+          description: Logged in
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Session' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /token/refresh:
+    post:
+      tags: [tokens]
+      operationId: refreshToken
+      summary: Rotate a refresh token and get a new access token
+      description: |
+        The refresh token sent is revoked and a new one is returned. Sending a
+        refresh token that was already used revokes every token of that login
+        (token reuse detection).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RefreshTokenBody' }
+      responses:
+        '200':
+          description: New tokens
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Session' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /logout:
+    post:
+      tags: [tokens]
+      operationId: logout
+      summary: Revoke a refresh token
+      description: Always succeeds, even for unknown or already revoked tokens.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RefreshTokenBody' }
+      responses:
+        '204': { description: Logged out }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /.well-known/jwks.json:
+    get:
+      tags: [tokens]
+      operationId: getJwks
+      summary: Public keys for verifying access tokens
+      responses:
+        '200':
+          description: JSON Web Key Set
+          headers:
+            Cache-Control:
+              schema: { type: string, example: 'public, max-age=300' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Jwks' }
+
+  /healthz:
+    get:
+      tags: [health]
+      operationId: liveness
+      summary: Liveness probe
+      responses:
+        '200': { $ref: '#/components/responses/Ok' }
+
+  /readyz:
+    get:
+      tags: [health]
+      operationId: readiness
+      summary: Readiness probe
+      description: Fails with 503 when PostgreSQL or Redis is unreachable.
+      responses:
+        '200': { $ref: '#/components/responses/Ok' }
+        '503': { description: Not ready }
+
+components:
+  schemas:
+    Phone:
+      type: string
+      description: Pakistani mobile number. Returned as E.164.
+      examples: ['+923001234567']
+
+    Role:
+      type: string
+      enum: [customer, vendor, rider, admin]
+
+    OtpRequest:
+      type: object
+      required: [phone]
+      additionalProperties: false
+      properties:
+        phone: { $ref: '#/components/schemas/Phone' }
+
+    OtpRequested:
+      type: object
+      required: [phone, expiresIn, resendIn]
+      properties:
+        phone: { $ref: '#/components/schemas/Phone' }
+        expiresIn: { type: integer, description: Seconds until the code expires, examples: [300] }
+        resendIn: { type: integer, description: Seconds until a new code can be requested, examples: [60] }
+
+    OtpVerify:
+      type: object
+      required: [phone, code]
+      additionalProperties: false
+      properties:
+        phone: { $ref: '#/components/schemas/Phone' }
+        code: { type: string, pattern: '^[0-9]{6}$' }
+
+    RefreshTokenBody:
+      type: object
+      required: [refreshToken]
+      additionalProperties: false
+      properties:
+        refreshToken: { type: string, minLength: 1 }
+
+    User:
+      type: object
+      required: [id, phone, roles]
+      properties:
+        id: { type: string, format: uuid }
+        phone: { $ref: '#/components/schemas/Phone' }
+        roles:
+          type: array
+          items: { $ref: '#/components/schemas/Role' }
+
+    Session:
+      type: object
+      required: [accessToken, refreshToken, tokenType, expiresIn, user]
+      properties:
+        accessToken: { type: string, description: RS256 JWT }
+        refreshToken: { type: string, description: 'Opaque, single use' }
+        tokenType: { type: string, const: Bearer }
+        expiresIn: { type: integer, description: Access token lifetime in seconds, examples: [900] }
+        isNewUser: { type: boolean, description: Only on /otp/verify; true on first login }
+        user: { $ref: '#/components/schemas/User' }
+
+    AccessTokenClaims:
+      description: Payload of the access token (for verifiers; not returned by any endpoint).
+      type: object
+      required: [iss, aud, sub, iat, exp, phone, roles]
+      properties:
+        iss: { type: string, const: foodkoala-auth }
+        aud: { type: string, const: foodkoala }
+        sub: { type: string, format: uuid }
+        iat: { type: integer }
+        exp: { type: integer }
+        phone: { $ref: '#/components/schemas/Phone' }
+        roles:
+          type: array
+          items: { $ref: '#/components/schemas/Role' }
+
+    Jwks:
+      type: object
+      required: [keys]
+      properties:
+        keys:
+          type: array
+          items:
+            type: object
+            required: [kty, kid, alg, use, n, e]
+            properties:
+              kty: { type: string, const: RSA }
+              kid: { type: string }
+              alg: { type: string, const: RS256 }
+              use: { type: string, const: sig }
+              n: { type: string }
+              e: { type: string }
+
+    Error:
+      type: object
+      required: [statusCode, message]
+      properties:
+        statusCode: { type: integer }
+        error: { type: string }
+        message:
+          oneOf:
+            - type: string
+            - type: array
+              items: { type: string }
+
+  responses:
+    Ok:
+      description: OK
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              status: { type: string, const: ok }
+    BadRequest:
+      description: Invalid body, e.g. not a Pakistani mobile number
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unauthorized:
+      description: Wrong or expired code, or invalid refresh token
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    TooManyRequests:
+      description: Rate limited
+      headers:
+        Retry-After:
+          description: Seconds to wait
+          schema: { type: integer }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
