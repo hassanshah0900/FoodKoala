@@ -1,0 +1,22 @@
+services:
+  auth-service:
+    build: ../../src/auth-service
+    ports: ["3001:3001"]
+  user-service:
+    build: ../../src/user-service
+    ports: ["3002:3002"]
+  restaurant-service:
+    build: ../../src/restaurant-service
+    ports: ["3003:3003"]
+  menu-service:
+    build: ../../src/menu-service
+    ports: ["3004:3004"]
+  cart-service:
+    build: ../../src/cart-service
+    ports: ["3005:3005"]
+  order-service:
+    build: ../../src/order-service
+    ports: ["3006:3006"]
+  notification-service:
+    build: ../../src/notification-service
+    ports: ["3007:3007"]
