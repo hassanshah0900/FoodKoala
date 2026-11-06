@@ -1,0 +1,40 @@
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { CurrentUser, IdentityGuard, type Identity } from '../identity/identity';
+import { addLineSchema, lineIdSchema, updateLineSchema, type AddLineDto, type UpdateLineDto } from './cart.dto';
+import { CartService } from './cart.service';
+
+@Controller()
+@UseGuards(IdentityGuard)
+export class CartController {
+  constructor(private readonly cart: CartService) {}
+
+  @Get()
+  get(@CurrentUser() me: Identity) {
+    return this.cart.get(me);
+  }
+
+  @Delete()
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async clear(@CurrentUser() me: Identity) {
+    await this.cart.clear(me);
+  }
+
+  @Post('items')
+  add(@CurrentUser() me: Identity, @Body({ schema: addLineSchema }) body: AddLineDto) {
+    return this.cart.add(me, body);
+  }
+
+  @Patch('items/:lineId')
+  update(
+    @CurrentUser() me: Identity,
+    @Param('lineId', { schema: lineIdSchema }) lineId: string,
+    @Body({ schema: updateLineSchema }) body: UpdateLineDto,
+  ) {
+    return this.cart.update(me, lineId, body);
+  }
+
+  @Delete('items/:lineId')
+  remove(@CurrentUser() me: Identity, @Param('lineId', { schema: lineIdSchema }) lineId: string) {
+    return this.cart.remove(me, lineId);
+  }
+}
