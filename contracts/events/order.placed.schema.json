@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "order.placed",
+  "title": "OrderPlaced",
+  "type": "object",
+  "required": ["orderId", "customerId", "restaurantId", "items", "totals", "paymentMethod", "deliveryAddress"],
+  "properties": {
+    "orderId": { "type": "string", "format": "uuid" },
+    "customerId": { "type": "string", "format": "uuid" },
+    "restaurantId": { "type": "string", "format": "uuid" },
+    "items": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["menuItemId", "quantity", "unitPrice"],
+        "properties": {
+          "menuItemId": { "type": "string" },
+          "quantity": { "type": "integer", "minimum": 1 },
+          "unitPrice": { "type": "integer", "description": "PKR, in paisa" }
+        }
+      }
+    },
+    "totals": {
+      "type": "object",
+      "required": ["subtotal", "deliveryFee", "tax", "total"],
+      "properties": {
+        "subtotal": { "type": "integer" },
+        "deliveryFee": { "type": "integer" },
+        "tax": { "type": "integer" },
+        "total": { "type": "integer" }
+      }
+    },
+    "paymentMethod": { "enum": ["cod", "jazzcash", "easypaisa", "card", "wallet"] },
+    "deliveryAddress": {
+      "type": "object",
+      "required": ["lat", "lng"],
+      "properties": {
+        "lat": { "type": "number" },
+        "lng": { "type": "number" },
+        "text": { "type": "string" },
+        "landmark": { "type": "string" }
+      }
+    }
+  }
+}
