@@ -1,0 +1,789 @@
+openapi: 3.1.0
+info:
+  title: restaurant-service
+  version: 0.1.0
+  description: |
+    Restaurant onboarding and review, opening hours, delivery zones and the
+    province a restaurant is registered in (which decides its sales tax
+    authority).
+
+    **Who can do what.** Browsing (`GET /`, `GET /{id}`,
+    `GET /{id}/delivery-quote`) is public and only shows approved
+    restaurants. Any signed-in user can apply to list a restaurant and then
+    manages the restaurants they own. Users with the `admin` role review
+    applications and can manage any restaurant. Identity comes from the
+    gateway's headers (`contracts/README.md#identity-headers`); management
+    endpoints get 401 without them.
+
+    **Life cycle.** A new restaurant is `pending`. An admin approves it (it
+    needs opening hours and at least one delivery zone first) or rejects it
+    with a reason. The owner can fix a rejected restaurant and resubmit it
+    (`pending` again). An admin can suspend an approved restaurant and
+    reinstate it later.
+
+    **Time.** Opening hours are local Pakistan time (Asia/Karachi, UTC+5).
+    A range whose closing time is earlier than its opening time ends the next
+    day, e.g. `18:00`–`02:00`.
+
+    **Money** is in paisa (integer, 1 PKR = 100 paisa), see `contracts/README.md`.
+servers:
+  - url: http://localhost:8080/api/v1/restaurants
+    description: Through api-gateway
+  - url: http://localhost:3003
+    description: Service directly (send the identity headers yourself)
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: browse
+    description: Public restaurant listing for customers
+  - name: manage
+    description: Onboarding and management by the owner (or an admin)
+  - name: zones
+    description: Delivery zones drawn on the map
+  - name: review
+    description: Admin review of applications
+  - name: health
+    description: Liveness and readiness probes
+
+paths:
+  /:
+    get:
+      tags: [browse]
+      operationId: listRestaurantsDeliveringTo
+      summary: Approved restaurants that deliver to a point, nearest first
+      description: |
+        A restaurant is listed when the point lies inside one of its delivery
+        zones. If several of its zones contain the point, the cheapest
+        delivery fee wins. Closed restaurants are listed too, with
+        `openNow: false`, so the app can show them as closed.
+      security: [{}, { bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/Lat'
+        - $ref: '#/components/parameters/Lng'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: One page of restaurants
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, page, limit, hasMore]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/RestaurantSummary' }
+                  page: { type: integer }
+                  limit: { type: integer }
+                  hasMore: { type: boolean }
+        '400': { $ref: '#/components/responses/BadRequest' }
+    post:
+      tags: [manage]
+      operationId: applyRestaurant
+      summary: Apply to list a restaurant (starts as pending)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RestaurantCreate' }
+            example:
+              name: Karachi Biryani House
+              description: Sindhi biryani and karahi since 1998
+              cuisines: [biryani, pakistani, bbq]
+              phone: '+922134567890'
+              address: { line1: 'Shop 4, Block 13-D', area: Gulshan-e-Iqbal, city: Karachi, province: sindh }
+              location: { lat: 24.9204, lng: 67.0932 }
+      responses:
+        '201':
+          description: Application created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ManagedRestaurant' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /mine:
+    get:
+      tags: [manage]
+      operationId: listMyRestaurants
+      summary: Restaurants I own, in any status
+      responses:
+        '200':
+          description: My restaurants, newest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ManagedRestaurant' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /admin:
+    get:
+      tags: [review]
+      operationId: listRestaurantsForReview
+      summary: All restaurants with a given status (admin)
+      parameters:
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/Status' }
+          description: Defaults to `pending`. Oldest first, so applications are reviewed in order.
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: One page of restaurants
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, page, limit, hasMore]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/ManagedRestaurant' }
+                  page: { type: integer }
+                  limit: { type: integer }
+                  hasMore: { type: boolean }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /{id}:
+    parameters:
+      - $ref: '#/components/parameters/RestaurantId'
+    get:
+      tags: [browse]
+      operationId: getRestaurant
+      summary: A restaurant's details
+      description: |
+        Anyone can see an approved restaurant. The owner and admins can see
+        it in any status and get `ManagedRestaurant` (status, phone, owner).
+      security: [{}, { bearerAuth: [] }]
+      responses:
+        '200':
+          description: Restaurant
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/Restaurant'
+                  - $ref: '#/components/schemas/ManagedRestaurant'
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [manage]
+      operationId: updateRestaurant
+      summary: Change a restaurant's details (owner or admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RestaurantUpdate' }
+            example: { description: Now with home-made kheer, cuisines: [biryani, desserts] }
+      responses:
+        '200':
+          description: Updated restaurant
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ManagedRestaurant' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /{id}/hours:
+    parameters:
+      - $ref: '#/components/parameters/RestaurantId'
+    put:
+      tags: [manage]
+      operationId: setOpeningHours
+      summary: Replace the weekly hours and special hours (owner or admin)
+      description: |
+        Special hours (e.g. Ramadan, Eid) replace the weekly hours on every
+        day from `startsOn` to `endsOn`; an empty `ranges` list means closed.
+        Special hours may not overlap each other.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Hours' }
+            example:
+              weekly:
+                mon: [{ opens: '11:00', closes: '23:00' }]
+                tue: [{ opens: '11:00', closes: '23:00' }]
+                wed: [{ opens: '11:00', closes: '23:00' }]
+                thu: [{ opens: '11:00', closes: '23:00' }]
+                fri: [{ opens: '11:00', closes: '13:00' }, { opens: '14:30', closes: '01:00' }]
+                sat: [{ opens: '11:00', closes: '01:00' }]
+                sun: [{ opens: '11:00', closes: '01:00' }]
+              special:
+                - name: Ramadan
+                  startsOn: '2027-02-08'
+                  endsOn: '2027-03-09'
+                  ranges: [{ opens: '17:30', closes: '04:30' }]
+                - name: Eid ul Fitr
+                  startsOn: '2027-03-10'
+                  endsOn: '2027-03-10'
+                  ranges: []
+      responses:
+        '200':
+          description: Updated restaurant
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ManagedRestaurant' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /{id}/pause:
+    parameters:
+      - $ref: '#/components/parameters/RestaurantId'
+    put:
+      tags: [manage]
+      operationId: pauseOrders
+      summary: Stop taking orders for a while, e.g. when the kitchen is busy (owner or admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [minutes]
+              additionalProperties: false
+              properties:
+                minutes: { type: integer, minimum: 5, maximum: 1440 }
+            example: { minutes: 30 }
+      responses:
+        '200':
+          description: Paused restaurant
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ManagedRestaurant' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [manage]
+      operationId: resumeOrders
+      summary: Take orders again (owner or admin)
+      responses:
+        '200':
+          description: Restaurant
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ManagedRestaurant' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /{id}/status:
+    parameters:
+      - $ref: '#/components/parameters/RestaurantId'
+    post:
+      tags: [review]
+      operationId: changeRestaurantStatus
+      summary: Approve, reject, suspend, reinstate or resubmit
+      description: |
+        | From | To | Who | Notes |
+        |---|---|---|---|
+        | pending | approved | admin | Needs opening hours and a delivery zone |
+        | pending | rejected | admin | `reason` required |
+        | rejected | pending | owner or admin | Resubmit after fixing |
+        | approved | suspended | admin | `reason` required |
+        | suspended | approved | admin | |
+
+        Any other change gets 409.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/StatusChange' }
+            example: { status: rejected, reason: The menu photos do not match the restaurant }
+      responses:
+        '200':
+          description: Restaurant with its new status
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ManagedRestaurant' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /{id}/zones:
+    parameters:
+      - $ref: '#/components/parameters/RestaurantId'
+    get:
+      tags: [zones]
+      operationId: listZones
+      summary: A restaurant's delivery zones (owner or admin)
+      responses:
+        '200':
+          description: Zones, oldest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/DeliveryZone' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [zones]
+      operationId: createZone
+      summary: Draw a delivery zone (owner or admin; up to 10 per restaurant)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DeliveryZoneCreate' }
+            example:
+              name: Gulshan and Johar
+              area:
+                type: Polygon
+                coordinates:
+                  - [[67.07, 24.90], [67.14, 24.90], [67.14, 24.95], [67.07, 24.95], [67.07, 24.90]]
+              deliveryFeePaisa: 9900
+              minimumOrderPaisa: 50000
+              deliveryTimeMinutes: 35
+      responses:
+        '201':
+          description: Zone created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DeliveryZone' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /{id}/zones/{zoneId}:
+    parameters:
+      - $ref: '#/components/parameters/RestaurantId'
+      - name: zoneId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      tags: [zones]
+      operationId: updateZone
+      summary: Change a delivery zone (owner or admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DeliveryZoneUpdate' }
+            example: { deliveryFeePaisa: 4900 }
+      responses:
+        '200':
+          description: Updated zone
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DeliveryZone' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [zones]
+      operationId: deleteZone
+      summary: Delete a delivery zone (owner or admin)
+      responses:
+        '204': { description: Deleted }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /{id}/delivery-quote:
+    parameters:
+      - $ref: '#/components/parameters/RestaurantId'
+    get:
+      tags: [browse]
+      operationId: getDeliveryQuote
+      summary: Whether an approved restaurant delivers to a point, and for how much
+      description: Used by the app at checkout and by order-service before placing an order.
+      security: [{}, { bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/Lat'
+        - $ref: '#/components/parameters/Lng'
+      responses:
+        '200':
+          description: Quote
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DeliveryQuote' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /healthz:
+    get:
+      tags: [health]
+      operationId: liveness
+      summary: Liveness probe
+      security: []
+      responses:
+        '200': { $ref: '#/components/responses/Ok' }
+
+  /readyz:
+    get:
+      tags: [health]
+      operationId: readiness
+      summary: Readiness probe
+      description: Fails with 503 when PostgreSQL is unreachable.
+      security: []
+      responses:
+        '200': { $ref: '#/components/responses/Ok' }
+        '503': { description: Not ready }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Access token from auth-service, verified by api-gateway.
+
+  parameters:
+    RestaurantId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    Lat:
+      name: lat
+      in: query
+      required: true
+      schema: { type: number, minimum: 23.5, maximum: 37.1 }
+    Lng:
+      name: lng
+      in: query
+      required: true
+      schema: { type: number, minimum: 60.8, maximum: 77.9 }
+    Page:
+      name: page
+      in: query
+      schema: { type: integer, minimum: 1, default: 1 }
+    Limit:
+      name: limit
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+
+  schemas:
+    Status:
+      type: string
+      enum: [pending, approved, rejected, suspended]
+
+    Province:
+      type: string
+      description: |
+        Decides the sales tax authority: punjab (PRA), sindh (SRB),
+        khyber_pakhtunkhwa (KPRA), balochistan (BRA), islamabad (ICT, collected
+        by FBR), gilgit_baltistan and azad_kashmir (their own revenue boards).
+      enum: [punjab, sindh, khyber_pakhtunkhwa, balochistan, islamabad, gilgit_baltistan, azad_kashmir]
+
+    Location:
+      type: object
+      required: [lat, lng]
+      additionalProperties: false
+      description: A point inside Pakistan (WGS 84).
+      properties:
+        lat: { type: number, minimum: 23.5, maximum: 37.1 }
+        lng: { type: number, minimum: 60.8, maximum: 77.9 }
+
+    Address:
+      type: object
+      required: [line1, area, city, province]
+      additionalProperties: false
+      properties:
+        line1: { type: string, minLength: 1, maxLength: 200 }
+        area: { type: string, minLength: 1, maxLength: 100, examples: [Gulshan-e-Iqbal] }
+        city: { type: string, minLength: 1, maxLength: 60, examples: [Karachi] }
+        province: { $ref: '#/components/schemas/Province' }
+
+    Cuisines:
+      type: array
+      minItems: 1
+      maxItems: 5
+      uniqueItems: true
+      description: Lowercase tags, e.g. biryani, bbq, chinese, fast-food.
+      items: { type: string, pattern: '^[a-z][a-z-]{1,29}$' }
+
+    TimeRange:
+      type: object
+      required: [opens, closes]
+      additionalProperties: false
+      description: |
+        Local time. `closes` earlier than `opens` means the next day.
+        `00:00`–`24:00` is open all day. `opens` and `closes` must differ.
+      properties:
+        opens: { type: string, pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$', examples: ['11:00'] }
+        closes: { type: string, pattern: '^(([01][0-9]|2[0-3]):[0-5][0-9]|24:00)$', examples: ['23:30'] }
+
+    DayRanges:
+      type: array
+      maxItems: 3
+      description: Up to 3 ranges that do not overlap. Empty or missing means closed.
+      items: { $ref: '#/components/schemas/TimeRange' }
+
+    WeeklyHours:
+      type: object
+      additionalProperties: false
+      properties:
+        mon: { $ref: '#/components/schemas/DayRanges' }
+        tue: { $ref: '#/components/schemas/DayRanges' }
+        wed: { $ref: '#/components/schemas/DayRanges' }
+        thu: { $ref: '#/components/schemas/DayRanges' }
+        fri: { $ref: '#/components/schemas/DayRanges' }
+        sat: { $ref: '#/components/schemas/DayRanges' }
+        sun: { $ref: '#/components/schemas/DayRanges' }
+
+    SpecialHours:
+      type: object
+      required: [name, startsOn, endsOn, ranges]
+      additionalProperties: false
+      properties:
+        name: { type: string, minLength: 1, maxLength: 60, examples: [Ramadan] }
+        startsOn: { type: string, format: date }
+        endsOn: { type: string, format: date, description: 'On or after startsOn, at most 60 days later' }
+        ranges: { $ref: '#/components/schemas/DayRanges' }
+
+    Hours:
+      type: object
+      required: [weekly, special]
+      additionalProperties: false
+      properties:
+        weekly: { $ref: '#/components/schemas/WeeklyHours' }
+        special:
+          type: array
+          maxItems: 20
+          items: { $ref: '#/components/schemas/SpecialHours' }
+
+    RestaurantCreate:
+      type: object
+      required: [name, cuisines, phone, address, location]
+      additionalProperties: false
+      properties:
+        name: { type: string, minLength: 2, maxLength: 100 }
+        description: { type: [string, 'null'], minLength: 1, maxLength: 500 }
+        cuisines: { $ref: '#/components/schemas/Cuisines' }
+        phone:
+          type: string
+          pattern: '^\+92[0-9]{9,10}$'
+          description: Mobile or landline in E.164, for riders and support
+        address: { $ref: '#/components/schemas/Address' }
+        location: { $ref: '#/components/schemas/Location' }
+        logoUrl: { type: [string, 'null'], format: uri, pattern: '^https://' }
+        coverUrl: { type: [string, 'null'], format: uri, pattern: '^https://' }
+
+    RestaurantUpdate:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      description: Any fields of RestaurantCreate. `address` is replaced as a whole.
+      properties:
+        name: { type: string, minLength: 2, maxLength: 100 }
+        description: { type: [string, 'null'], minLength: 1, maxLength: 500 }
+        cuisines: { $ref: '#/components/schemas/Cuisines' }
+        phone: { type: string, pattern: '^\+92[0-9]{9,10}$' }
+        address: { $ref: '#/components/schemas/Address' }
+        location: { $ref: '#/components/schemas/Location' }
+        logoUrl: { type: [string, 'null'], format: uri, pattern: '^https://' }
+        coverUrl: { type: [string, 'null'], format: uri, pattern: '^https://' }
+
+    Restaurant:
+      type: object
+      required:
+        [id, name, description, cuisines, address, location, logoUrl, coverUrl, hours, openNow, pausedUntil, acceptingOrders]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        description: { type: [string, 'null'] }
+        cuisines: { type: array, items: { type: string } }
+        address: { $ref: '#/components/schemas/Address' }
+        location: { $ref: '#/components/schemas/Location' }
+        logoUrl: { type: [string, 'null'] }
+        coverUrl: { type: [string, 'null'] }
+        hours: { $ref: '#/components/schemas/Hours' }
+        openNow: { type: boolean, description: Inside today's opening hours }
+        pausedUntil:
+          type: [string, 'null']
+          format: date-time
+          description: Set while the owner has paused orders
+        acceptingOrders: { type: boolean, description: 'Approved, open now and not paused' }
+
+    ManagedRestaurant:
+      description: What the owner and admins see.
+      allOf:
+        - $ref: '#/components/schemas/Restaurant'
+        - type: object
+          required: [ownerId, phone, status, statusReason, createdAt, updatedAt]
+          properties:
+            ownerId: { type: string, format: uuid }
+            phone: { type: string }
+            status: { $ref: '#/components/schemas/Status' }
+            statusReason:
+              type: [string, 'null']
+              description: Why it was rejected or suspended
+            createdAt: { type: string, format: date-time }
+            updatedAt: { type: string, format: date-time }
+
+    Delivery:
+      type: object
+      required: [zoneId, deliveryFeePaisa, minimumOrderPaisa, deliveryTimeMinutes]
+      properties:
+        zoneId: { type: string, format: uuid }
+        deliveryFeePaisa: { type: integer, examples: [9900] }
+        minimumOrderPaisa: { type: integer, examples: [50000] }
+        deliveryTimeMinutes: { type: integer, examples: [35] }
+
+    RestaurantSummary:
+      type: object
+      required:
+        [id, name, cuisines, area, city, logoUrl, coverUrl, location, distanceMeters, openNow, pausedUntil, acceptingOrders, delivery]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        cuisines: { type: array, items: { type: string } }
+        area: { type: string }
+        city: { type: string }
+        logoUrl: { type: [string, 'null'] }
+        coverUrl: { type: [string, 'null'] }
+        location: { $ref: '#/components/schemas/Location' }
+        distanceMeters: { type: integer, description: Straight-line distance from the point }
+        openNow: { type: boolean }
+        pausedUntil: { type: [string, 'null'], format: date-time }
+        acceptingOrders: { type: boolean }
+        delivery: { $ref: '#/components/schemas/Delivery' }
+
+    DeliveryQuote:
+      type: object
+      required: [deliverable, acceptingOrders, distanceMeters, delivery]
+      properties:
+        deliverable: { type: boolean, description: The point is inside one of the delivery zones }
+        acceptingOrders: { type: boolean }
+        distanceMeters: { type: integer }
+        delivery:
+          oneOf:
+            - $ref: '#/components/schemas/Delivery'
+            - type: 'null'
+          description: The cheapest zone containing the point; null when not deliverable
+
+    GeoJsonPolygon:
+      type: object
+      required: [type, coordinates]
+      additionalProperties: false
+      description: |
+        GeoJSON Polygon (RFC 7946) with a single outer ring of [lng, lat]
+        positions inside Pakistan. The ring is closed (first position equals
+        last), has 4 to 500 positions and must not cross itself.
+      properties:
+        type: { type: string, const: Polygon }
+        coordinates:
+          type: array
+          minItems: 1
+          maxItems: 1
+          items:
+            type: array
+            minItems: 4
+            maxItems: 500
+            items:
+              type: array
+              minItems: 2
+              maxItems: 2
+              items: { type: number }
+
+    DeliveryZoneCreate:
+      type: object
+      required: [name, area, deliveryFeePaisa, minimumOrderPaisa, deliveryTimeMinutes]
+      additionalProperties: false
+      properties:
+        name: { type: string, minLength: 1, maxLength: 60 }
+        area: { $ref: '#/components/schemas/GeoJsonPolygon' }
+        deliveryFeePaisa: { type: integer, minimum: 0, maximum: 500000 }
+        minimumOrderPaisa: { type: integer, minimum: 0, maximum: 5000000 }
+        deliveryTimeMinutes: { type: integer, minimum: 5, maximum: 180 }
+
+    DeliveryZoneUpdate:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        name: { type: string, minLength: 1, maxLength: 60 }
+        area: { $ref: '#/components/schemas/GeoJsonPolygon' }
+        deliveryFeePaisa: { type: integer, minimum: 0, maximum: 500000 }
+        minimumOrderPaisa: { type: integer, minimum: 0, maximum: 5000000 }
+        deliveryTimeMinutes: { type: integer, minimum: 5, maximum: 180 }
+
+    DeliveryZone:
+      type: object
+      required: [id, name, area, deliveryFeePaisa, minimumOrderPaisa, deliveryTimeMinutes, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        area: { $ref: '#/components/schemas/GeoJsonPolygon' }
+        deliveryFeePaisa: { type: integer }
+        minimumOrderPaisa: { type: integer }
+        deliveryTimeMinutes: { type: integer }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    StatusChange:
+      type: object
+      required: [status]
+      additionalProperties: false
+      properties:
+        status: { $ref: '#/components/schemas/Status' }
+        reason: { type: string, minLength: 1, maxLength: 500, description: Required for rejected and suspended }
+
+    Error:
+      type: object
+      required: [statusCode, message]
+      properties:
+        statusCode: { type: integer }
+        error: { type: string }
+        message:
+          oneOf:
+            - type: string
+            - type: array
+              items: { type: string }
+
+  responses:
+    Ok:
+      description: OK
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              status: { type: string, const: ok }
+    BadRequest:
+      description: Invalid body or query
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unauthorized:
+      description: No authenticated user
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Forbidden:
+      description: Signed in, but not the owner or an admin
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: No such restaurant (or zone), or not visible to the caller
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Conflict:
+      description: Not allowed in the restaurant's current state, e.g. an invalid status change or too many zones
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
