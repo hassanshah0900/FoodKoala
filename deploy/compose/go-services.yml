@@ -1,0 +1,10 @@
+services:
+  api-gateway:
+    build: ../../src/api-gateway
+    ports: ["8080:8080"]
+  delivery-service:
+    build: ../../src/delivery-service
+    ports: ["8081:8081"]
+  tracking-service:
+    build: ../../src/tracking-service
+    ports: ["8082:8082"]
