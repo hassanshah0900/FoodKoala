@@ -9,6 +9,9 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
+
+	"github.com/hassanshah0900/FoodKoala/src/api-gateway/internal/auth"
 )
 
 // Upstreams maps a public route prefix (/api/v1/<name>/) to a backend service.
@@ -36,6 +39,8 @@ var envNames = map[string]string{
 type Config struct {
 	Port      string
 	Upstreams map[string]*url.URL
+	// Verifier checks access tokens; LoadConfig builds one backed by the auth-service JWKS.
+	Verifier auth.TokenVerifier
 }
 
 func LoadConfig() Config {
@@ -49,11 +54,20 @@ func LoadConfig() Config {
 		}
 		cfg.Upstreams[name] = u
 	}
+
+	jwksURL := getenv("AUTH_JWKS_URL", cfg.Upstreams["auth"].JoinPath(".well-known", "jwks.json").String())
+	cfg.Verifier = &auth.Verifier{
+		Keys:     auth.NewJWKS(jwksURL),
+		Issuer:   getenv("JWT_ISSUER", "foodkoala-auth"),
+		Audience: getenv("JWT_AUDIENCE", "foodkoala"),
+		Leeway:   30 * time.Second,
+	}
 	return cfg
 }
 
 // New returns the gateway handler: health checks plus /api/v1/<service>/... proxying.
 // The prefix is stripped, so /api/v1/orders/123 reaches order-service as /123.
+// Requests are authenticated first (auth.DefaultPolicy, ADR 0005).
 func New(cfg Config) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", ok)
@@ -76,8 +90,8 @@ func New(cfg Config) http.Handler {
 		mux.Handle(prefix+"/", proxy)
 		mux.Handle(prefix, proxy)
 	}
-	// TODO(api-gateway): JWT validation and rate limiting middleware.
-	return mux
+	// TODO(api-gateway): rate limiting middleware.
+	return auth.Middleware(cfg.Verifier, auth.DefaultPolicy, mux)
 }
 
 func ok(w http.ResponseWriter, _ *http.Request) {
