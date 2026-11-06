@@ -1,0 +1,310 @@
+openapi: 3.1.0
+info:
+  title: user-service
+  version: 0.1.0
+  description: |
+    The signed-in user's profile and saved delivery addresses.
+
+    Every endpoint except the health checks needs an authenticated request.
+    `api-gateway` verifies the access token and forwards the identity headers
+    (`X-User-Id`, `X-User-Phone`, `X-User-Roles`; see `contracts/README.md`).
+    A request reaching the service without `X-User-Id` gets 401.
+
+    The profile is created on first access, from the identity headers.
+servers:
+  - url: http://localhost:8080/api/v1/users
+    description: Through api-gateway
+  - url: http://localhost:3002
+    description: Service directly (send the identity headers yourself)
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: profile
+    description: The signed-in user's profile
+  - name: addresses
+    description: Saved delivery addresses
+  - name: health
+    description: Liveness and readiness probes
+
+paths:
+  /me:
+    get:
+      tags: [profile]
+      operationId: getMyProfile
+      summary: Get (and on first call create) my profile
+      responses:
+        '200':
+          description: Profile
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Profile' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    patch:
+      tags: [profile]
+      operationId: updateMyProfile
+      summary: Update my name, email or language
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProfileUpdate' }
+            example: { name: Ayesha Khan, preferredLanguage: ur }
+      responses:
+        '200':
+          description: Updated profile
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Profile' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /me/addresses:
+    get:
+      tags: [addresses]
+      operationId: listMyAddresses
+      summary: List my saved addresses, default first
+      responses:
+        '200':
+          description: Addresses
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Address' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [addresses]
+      operationId: createMyAddress
+      summary: Save a new address
+      description: |
+        The first address becomes the default. Sending `isDefault: true` makes
+        the new address the default. At most 10 addresses per user.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AddressCreate' }
+            example:
+              label: home
+              line1: House 12, Street 7
+              area: F-7/2
+              city: Islamabad
+              landmark: Near Jinnah Super market
+              instructions: Ring the bell twice
+              location: { lat: 33.7215, lng: 73.0433 }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Address' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409':
+          description: Address limit (10) reached
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /me/addresses/{addressId}:
+    parameters:
+      - name: addressId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [addresses]
+      operationId: getMyAddress
+      summary: Get one of my addresses
+      responses:
+        '200':
+          description: Address
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Address' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [addresses]
+      operationId: updateMyAddress
+      summary: Change an address or make it the default
+      description: |
+        `isDefault: true` makes this the default. `isDefault: false` is
+        rejected: choose another default instead. Optional text fields
+        (`labelText`, `landmark`, `instructions`) are cleared with `null`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AddressUpdate' }
+      responses:
+        '200':
+          description: Updated address
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Address' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [addresses]
+      operationId: deleteMyAddress
+      summary: Delete an address
+      description: Deleting the default makes the most recently added remaining address the default.
+      responses:
+        '204': { description: Deleted }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /healthz:
+    get:
+      tags: [health]
+      operationId: liveness
+      summary: Liveness probe
+      security: []
+      responses:
+        '200': { $ref: '#/components/responses/Ok' }
+
+  /readyz:
+    get:
+      tags: [health]
+      operationId: readiness
+      summary: Readiness probe
+      description: Fails with 503 when PostgreSQL is unreachable.
+      security: []
+      responses:
+        '200': { $ref: '#/components/responses/Ok' }
+        '503': { description: Not ready }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Access token from auth-service, verified by api-gateway.
+
+  schemas:
+    Language:
+      type: string
+      enum: [en, ur]
+
+    Profile:
+      type: object
+      required: [id, phone, name, email, preferredLanguage, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid, description: Same as the auth-service user id }
+        phone: { type: string, examples: ['+923001234567'] }
+        name: { type: [string, 'null'] }
+        email: { type: [string, 'null'], format: email }
+        preferredLanguage: { $ref: '#/components/schemas/Language' }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    ProfileUpdate:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        name: { type: [string, 'null'], minLength: 1, maxLength: 100 }
+        email: { type: [string, 'null'], format: email, maxLength: 254 }
+        preferredLanguage: { $ref: '#/components/schemas/Language' }
+
+    Location:
+      type: object
+      description: Map pin; must be inside Pakistan (lat 23.5 to 37.1, lng 60.8 to 77.9).
+      required: [lat, lng]
+      additionalProperties: false
+      properties:
+        lat: { type: number, minimum: 23.5, maximum: 37.1 }
+        lng: { type: number, minimum: 60.8, maximum: 77.9 }
+
+    AddressLabel:
+      type: string
+      enum: [home, work, other]
+
+    Address:
+      type: object
+      required: [id, label, labelText, line1, area, city, landmark, instructions, location, isDefault, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        label: { $ref: '#/components/schemas/AddressLabel' }
+        labelText: { type: [string, 'null'], description: 'Own name when label is other, e.g. "Ammi''s house"' }
+        line1: { type: string, description: 'House, flat, street' }
+        area: { type: string, description: 'Sector, block or neighbourhood, e.g. "DHA Phase 5"' }
+        city: { type: string }
+        landmark: { type: [string, 'null'], description: 'e.g. "Opposite Imtiaz"' }
+        instructions: { type: [string, 'null'], description: Notes for the rider }
+        location: { $ref: '#/components/schemas/Location' }
+        isDefault: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    AddressCreate:
+      type: object
+      required: [label, line1, area, city, location]
+      additionalProperties: false
+      properties:
+        label: { $ref: '#/components/schemas/AddressLabel' }
+        labelText: { type: [string, 'null'], minLength: 1, maxLength: 40 }
+        line1: { type: string, minLength: 1, maxLength: 200 }
+        area: { type: string, minLength: 1, maxLength: 100 }
+        city: { type: string, minLength: 1, maxLength: 60 }
+        landmark: { type: [string, 'null'], minLength: 1, maxLength: 200 }
+        instructions: { type: [string, 'null'], minLength: 1, maxLength: 300 }
+        location: { $ref: '#/components/schemas/Location' }
+        isDefault: { type: boolean }
+
+    AddressUpdate:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        label: { $ref: '#/components/schemas/AddressLabel' }
+        labelText: { type: [string, 'null'], minLength: 1, maxLength: 40 }
+        line1: { type: string, minLength: 1, maxLength: 200 }
+        area: { type: string, minLength: 1, maxLength: 100 }
+        city: { type: string, minLength: 1, maxLength: 60 }
+        landmark: { type: [string, 'null'], minLength: 1, maxLength: 200 }
+        instructions: { type: [string, 'null'], minLength: 1, maxLength: 300 }
+        location: { $ref: '#/components/schemas/Location' }
+        isDefault: { type: boolean, const: true }
+
+    Error:
+      type: object
+      required: [statusCode, message]
+      properties:
+        statusCode: { type: integer }
+        error: { type: string }
+        message:
+          oneOf:
+            - type: string
+            - type: array
+              items: { type: string }
+
+  responses:
+    Ok:
+      description: OK
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              status: { type: string, const: ok }
+    BadRequest:
+      description: Invalid body
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unauthorized:
+      description: No authenticated user
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: No such address for this user
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
