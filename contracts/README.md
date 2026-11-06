@@ -22,3 +22,17 @@ Every event on Kafka uses this envelope; `data` follows the event's schema.
 ```
 
 Topic naming: `<domain>.<event>`, e.g. `order.placed`, `payment.completed`.
+
+## Identity headers
+
+Requests that `api-gateway` has authenticated reach services with these
+headers (ADR 0005). Clients can never set them; the gateway strips them.
+
+| Header | Example | Meaning |
+|---|---|---|
+| `X-User-Id` | `7d3c8f8e-3a0e-4c55-9a6b-3f1c2b8a9d10` | `sub` of the access token |
+| `X-User-Roles` | `customer,vendor` | Comma-separated roles |
+| `X-User-Phone` | `+923001234567` | E.164 phone number |
+
+No `X-User-Id` means an anonymous request (only possible on public routes).
+The original `Authorization` header is forwarded too.
