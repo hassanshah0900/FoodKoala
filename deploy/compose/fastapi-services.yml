@@ -1,0 +1,32 @@
+# FastAPI services. Like the NestJS ones, a service that owns a Postgres
+# schema has a one-shot `<name>-migrate` container (Alembic) that must finish
+# before it starts, running the service's own image.
+
+services:
+  payment-service:
+    build: ../../src/payment-service
+    image: foodkoala/payment-service:local
+    ports: ["8001:8001"]
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-foodkoala}:${POSTGRES_PASSWORD:-foodkoala}@postgres:5432/${POSTGRES_DB:-foodkoala}
+      # Records payments from order.placed and order.status_changed
+      KAFKA_BROKERS: kafka:29092
+    depends_on:
+      payment-migrate: { condition: service_completed_successfully }
+      kafka: { condition: service_started }
+    healthcheck:
+      # The slim Python image has no curl or wget.
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/readyz', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+  payment-migrate:
+    image: foodkoala/payment-service:local
+    pull_policy: never
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-foodkoala}:${POSTGRES_PASSWORD:-foodkoala}@postgres:5432/${POSTGRES_DB:-foodkoala}
+    depends_on:
+      postgres: { condition: service_healthy }
+    restart: "no"
