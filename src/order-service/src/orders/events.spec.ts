@@ -42,6 +42,8 @@ describe('order events', () => {
       source: 'order-service',
       data: expect.objectContaining({
         orderId: order.id,
+        customerPhone: '+923001234567',
+        restaurantName: 'Karachi Broast',
         totals: { subtotalPaisa: 110000, deliveryFeePaisa: 9900, totalPaisa: 119900 },
         deliveryAddress: { lat: 24.92, lng: 67.09, text: 'House 12, Gulshan, Karachi', landmark: null },
         lines: [{ itemId: 'i1', name: 'Zinger', quantity: 2, unitPricePaisa: 55000, lineTotalPaisa: 110000 }],
@@ -56,6 +58,14 @@ describe('order events', () => {
   it('describes a status change from and to', () => {
     const at = new Date('2026-11-08T10:05:00Z');
     const event = orderStatusChanged({ ...order, status: 'accepted', prepTimeMinutes: 20 }, { from: 'placed', by: 'restaurant', reason: null, at });
-    expect(event.payload.data).toMatchObject({ from: 'placed', to: 'accepted', by: 'restaurant', prepTimeMinutes: 20, at: at.toISOString() });
+    expect(event.payload.data).toMatchObject({
+      from: 'placed',
+      to: 'accepted',
+      by: 'restaurant',
+      prepTimeMinutes: 20,
+      customerPhone: '+923001234567',
+      restaurantName: 'Karachi Broast',
+      at: at.toISOString(),
+    });
   });
 });

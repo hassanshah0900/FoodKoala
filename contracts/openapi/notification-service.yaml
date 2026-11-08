@@ -1,0 +1,186 @@
+openapi: 3.1.0
+info:
+  title: notification-service
+  version: 0.1.0
+  description: |
+    The signed-in user's notifications, and the texts sent about their orders.
+
+    Notifications come from order events (`order.placed`,
+    `order.status_changed` in `contracts/events`), one per event. Every event
+    adds an inbox entry. The ones a customer should act on or wait for are
+    also sent by SMS: the restaurant accepted (with the expected time), the
+    order is on its way, it was rejected, or someone else cancelled it.
+    Placing, ready, delivered and the customer's own cancellation stay in the
+    inbox only.
+
+    Texts are queued and sent by the service, retried with back-off when the
+    provider is unavailable, and never sent twice for one event. The API only
+    reads and marks the inbox; nothing here sends a message on request.
+
+    Every endpoint needs an authenticated request (`X-User-Id` from api-gateway).
+servers:
+  - url: http://localhost:8080/api/v1/notifications
+    description: Through api-gateway
+  - url: http://localhost:3007
+    description: Service directly (send the identity headers yourself)
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: inbox
+    description: The signed-in user's notifications
+  - name: health
+    description: Liveness and readiness probes
+
+paths:
+  /:
+    get:
+      tags: [inbox]
+      operationId: listNotifications
+      summary: My notifications, newest first, with the unread count
+      parameters:
+        - name: unread
+          in: query
+          description: Only unread ones
+          schema: { type: boolean, default: false }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+      responses:
+        '200':
+          description: Page of notifications
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NotificationPage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /read-all:
+    post:
+      tags: [inbox]
+      operationId: markAllRead
+      summary: Mark all my notifications read
+      responses:
+        '204': { description: Done }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /{id}/read:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [inbox]
+      operationId: markRead
+      summary: Mark one notification read (again is fine)
+      responses:
+        '204': { description: Done }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404':
+          description: No such notification of mine
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /healthz:
+    get:
+      tags: [health]
+      operationId: liveness
+      security: [{}]
+      summary: Liveness probe
+      responses:
+        '200': { $ref: '#/components/responses/Ok' }
+
+  /readyz:
+    get:
+      tags: [health]
+      operationId: readiness
+      security: [{}]
+      summary: Readiness probe
+      description: PostgreSQL reachable and, when Kafka is configured, the event consumer running.
+      responses:
+        '200': { $ref: '#/components/responses/Ok' }
+        '503':
+          description: PostgreSQL unreachable or the consumer stopped
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Access token from auth-service, verified by api-gateway.
+
+  responses:
+    Ok:
+      description: OK
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              status: { type: string, const: ok }
+    BadRequest:
+      description: Invalid query or id
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unauthorized:
+      description: No authenticated user
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+  schemas:
+    Kind:
+      type: string
+      enum: [order_placed, order_accepted, order_ready, order_picked_up, order_delivered, order_rejected, order_cancelled]
+
+    Notification:
+      type: object
+      required: [id, kind, title, body, data, read, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        kind: { $ref: '#/components/schemas/Kind' }
+        title: { type: string, examples: [Order accepted] }
+        body: { type: string, examples: ['Karachi Broast is preparing your order #AB12CD34. Expected around 8:05 pm.'] }
+        data:
+          type: object
+          description: What the app links to
+          additionalProperties: { type: string }
+          examples: [{ orderId: ab12cd34-0000-4000-8000-000000000000 }]
+        read: { type: boolean }
+        createdAt: { type: string, format: date-time }
+
+    NotificationPage:
+      type: object
+      required: [items, page, limit, hasMore, unreadCount]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Notification' }
+        page: { type: integer }
+        limit: { type: integer }
+        hasMore: { type: boolean }
+        unreadCount: { type: integer, description: 'All my unread notifications, not just this page' }
+
+    Error:
+      type: object
+      required: [statusCode, message]
+      properties:
+        statusCode: { type: integer }
+        error: { type: string }
+        message:
+          oneOf:
+            - type: string
+            - type: array
+              items: { type: string }

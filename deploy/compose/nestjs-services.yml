@@ -136,4 +136,24 @@ services:
 
   notification-service:
     build: ../../src/notification-service
+    image: foodkoala/notification-service:local
     ports: ["3007:3007"]
+    environment:
+      # The image defaults to production, which refuses SMS_PROVIDER=log.
+      NODE_ENV: development
+      DATABASE_URL: *postgres-url
+      # Turns order events into inbox entries and texts
+      KAFKA_BROKERS: kafka:29092
+      SMS_PROVIDER: ${SMS_PROVIDER:-log}
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
+      TWILIO_FROM: ${TWILIO_FROM:-}
+    depends_on:
+      notification-migrate: { condition: service_completed_successfully }
+      kafka: { condition: service_started }
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3007/readyz"]
+      <<: *healthcheck
+  notification-migrate:
+    <<: *migrate
+    image: foodkoala/notification-service:local
