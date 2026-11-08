@@ -21,7 +21,8 @@ const statusChangedData = z.object({
   restaurantName: z.string().min(1),
   from: statuses,
   to: statuses,
-  by: z.enum(['customer', 'restaurant', 'admin']),
+  // Any actor: a new one (like `rider`) must not turn events into "malformed" ones that get skipped.
+  by: z.string().min(1),
   reason: z.string().nullable(),
   estimatedDeliveryAt: z.iso.datetime({ offset: true }).optional(),
 });
