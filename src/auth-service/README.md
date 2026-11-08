@@ -33,7 +33,7 @@ npm run db:migrate            # apply migrations in ./drizzle
 npm run dev                   # http://localhost:3001/healthz
 ```
 
-In development `SMS_PROVIDER=log`, so the login code is printed in the log.
+In development `SMS_PROVIDER=log`, so the login code is printed in the log. For real texts set `SMS_PROVIDER=twilio` with `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` and `TWILIO_FROM` (a sender number or a Messaging Service). If a text can't be sent the request gets 503 and the user can ask again at once; the hourly limit still counts it.
 
 ## Test
 

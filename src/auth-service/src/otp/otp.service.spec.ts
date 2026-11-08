@@ -1,4 +1,4 @@
-import { UnauthorizedException } from '@nestjs/common';
+import { ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import RedisMock from 'ioredis-mock';
 import type Redis from 'ioredis';
 import { RateLimitedException } from '../common/rate-limited.exception';
@@ -10,7 +10,9 @@ const PHONE = '+923001234567';
 
 class CapturingSms extends SmsSender {
   last?: { phone: string; code: string };
+  down = false;
   async send(phone: string, message: string) {
+    if (this.down) throw new Error('Twilio answered 503');
     this.last = { phone, code: /\b(\d{6})\b/.exec(message)![1] };
   }
 }
@@ -75,5 +77,22 @@ describe('OtpService', () => {
       await expect(otp.verify(PHONE, first)).rejects.toThrow('Wrong code');
     }
     await expect(otp.verify(PHONE, sms.last!.code)).resolves.toBeUndefined();
+  });
+
+  it('answers 503 when the SMS fails, and lets the user ask again at once', async () => {
+    sms.down = true;
+    await expect(otp.request(PHONE)).rejects.toThrow(ServiceUnavailableException);
+    expect(await redis.exists(`auth:otp:code:${PHONE}`)).toBe(0);
+
+    sms.down = false;
+    await expect(otp.request(PHONE)).resolves.toMatchObject({ phone: PHONE });
+    await expect(otp.verify(PHONE, sms.last!.code)).resolves.toBeUndefined();
+  });
+
+  it('still counts failed sends towards the hourly limit', async () => {
+    sms.down = true;
+    for (let i = 0; i < 5; i++) await expect(otp.request(PHONE)).rejects.toThrow(ServiceUnavailableException);
+    sms.down = false;
+    await expect(otp.request(PHONE)).rejects.toThrow('Too many codes requested');
   });
 });
