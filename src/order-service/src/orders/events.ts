@@ -34,7 +34,9 @@ export function orderPlaced(order: OrderRow, lines: Pick<OrderLineRow, 'itemId' 
   return envelope('order.placed', order.id, order.placedAt, {
     orderId: order.id,
     customerId: order.customerId,
+    customerPhone: order.customerPhone,
     restaurantId: order.restaurantId,
+    restaurantName: order.restaurantName,
     lines: lines.map((l) => ({
       itemId: l.itemId,
       name: l.name,
@@ -55,7 +57,9 @@ export function orderStatusChanged(order: OrderRow, change: { from: Status; by: 
   return envelope('order.status_changed', order.id, change.at, {
     orderId: order.id,
     customerId: order.customerId,
+    customerPhone: order.customerPhone,
     restaurantId: order.restaurantId,
+    restaurantName: order.restaurantName,
     from: change.from,
     to: order.status,
     by: change.by,
