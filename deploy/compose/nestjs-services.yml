@@ -33,7 +33,11 @@ services:
       DATABASE_URL: *postgres-url
       REDIS_URL: redis://redis:6379
       OTP_PEPPER: ${OTP_PEPPER:-local-compose-pepper}
-      SMS_PROVIDER: log
+      # log by default; set SMS_PROVIDER=twilio and the TWILIO_* variables for real texts
+      SMS_PROVIDER: ${SMS_PROVIDER:-log}
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
+      TWILIO_FROM: ${TWILIO_FROM:-}
       JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY:-}
     depends_on:
       auth-migrate: { condition: service_completed_successfully }
