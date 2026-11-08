@@ -24,7 +24,8 @@ export const PAYMENT_METHODS = ['cod', 'card', 'jazzcash', 'easypaisa'] as const
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
 export const paymentMethodEnum = ordersSchema.enum('payment_method', PAYMENT_METHODS);
 
-export const ACTORS = ['customer', 'restaurant', 'admin'] as const;
+/** `rider` comes from delivery-service's events, never from this API. */
+export const ACTORS = ['customer', 'restaurant', 'admin', 'rider'] as const;
 export type Actor = (typeof ACTORS)[number];
 export const actorEnum = ordersSchema.enum('actor', ACTORS);
 
@@ -56,6 +57,8 @@ export const orders = ordersSchema.table(
     idempotencyKey: text('idempotency_key').notNull(),
     restaurantId: uuid('restaurant_id').notNull(),
     restaurantName: text('restaurant_name').notNull(),
+    /** Where the rider picks up. Null only for orders placed before it was recorded. */
+    restaurantLocation: jsonb('restaurant_location').$type<{ lat: number; lng: number }>(),
     deliveryZoneId: uuid('delivery_zone_id').notNull(),
     status: statusEnum('status').notNull().default('placed'),
     paymentMethod: paymentMethodEnum('payment_method').notNull(),

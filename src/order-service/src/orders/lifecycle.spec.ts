@@ -54,6 +54,15 @@ describe('decide', () => {
     expect(() => decide('picked_up', { to: 'ready' }, as('admin'))).toThrow(/picked up order cannot become ready/);
   });
 
+  it('lets the rider pick up, even before the restaurant marked the food ready, and deliver', () => {
+    expect(decide('accepted', { to: 'picked_up' }, as('rider'))).toBe('rider');
+    expect(decide('ready', { to: 'picked_up' }, as('rider'))).toBe('rider');
+    expect(decide('picked_up', { to: 'delivered' }, as('rider'))).toBe('rider');
+    expect(() => decide('accepted', { to: 'picked_up' }, as('admin'))).toThrow(
+      new ForbiddenException('Only the rider can mark picked up this order'),
+    );
+  });
+
   it('walks the happy path', () => {
     expect(decide('accepted', { to: 'ready' }, as('restaurant'))).toBe('restaurant');
     expect(decide('ready', { to: 'picked_up' }, as('admin'))).toBe('admin');

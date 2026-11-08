@@ -6,7 +6,7 @@ export interface Order {
   status: Status;
   customerId: string;
   customerPhone: string;
-  restaurant: { id: string; name: string };
+  restaurant: { id: string; name: string; location: { lat: number; lng: number } | null };
   lines: {
     itemId: string;
     name: string;
@@ -43,7 +43,7 @@ export function toOrder(row: OrderRow, lines: OrderLineRow[], history: StatusHis
     status: row.status,
     customerId: row.customerId,
     customerPhone: row.customerPhone,
-    restaurant: { id: row.restaurantId, name: row.restaurantName },
+    restaurant: { id: row.restaurantId, name: row.restaurantName, location: row.restaurantLocation },
     lines: lines
       .filter((l) => l.orderId === row.id)
       .sort((a, b) => a.position - b.position)

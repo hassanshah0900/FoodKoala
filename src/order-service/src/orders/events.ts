@@ -37,6 +37,7 @@ export function orderPlaced(order: OrderRow, lines: Pick<OrderLineRow, 'itemId' 
     customerPhone: order.customerPhone,
     restaurantId: order.restaurantId,
     restaurantName: order.restaurantName,
+    restaurantLocation: order.restaurantLocation,
     lines: lines.map((l) => ({
       itemId: l.itemId,
       name: l.name,

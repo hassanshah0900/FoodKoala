@@ -7,6 +7,7 @@ import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import request from 'supertest';
 import { AppModule } from './app.module';
+import { DeliveryEventConsumer } from './delivery/delivery-event-consumer';
 import type { Cart } from './clients/clients';
 import type { Database } from './db/database';
 import { orders, outbox } from './db/schema';
@@ -62,7 +63,7 @@ function fakeServices(): Server {
         });
       }
       const owner = userId === r.ownerId || String(req.headers['x-user-roles']).split(',').includes('admin');
-      return send(200, { id: rest[0], name: r.name, ...(owner ? { ownerId: r.ownerId } : {}) });
+      return send(200, { id: rest[0], name: r.name, location: { lat: 24.93, lng: 67.1 }, ...(owner ? { ownerId: r.ownerId } : {}) });
     }
     send(404);
   });
@@ -179,7 +180,11 @@ describe('order-service (e2e)', () => {
     const events = await db.select().from(outbox).where(eq(outbox.key, res.body.id));
     expect(events).toHaveLength(1);
     expect(events[0]).toMatchObject({ topic: 'order.placed', publishedAt: null });
-    expect(events[0].payload).toMatchObject({ type: 'order.placed', data: { orderId: res.body.id, totals: { totalPaisa: 99900 } } });
+    expect(events[0].payload).toMatchObject({
+      type: 'order.placed',
+      data: { orderId: res.body.id, totals: { totalPaisa: 99900 }, restaurantLocation: { lat: 24.93, lng: 67.1 } },
+    });
+    expect(res.body.restaurant.location).toEqual({ lat: 24.93, lng: 67.1 });
   });
 
   it('returns the first order when a checkout is retried with the same key, even concurrently', async () => {
@@ -326,5 +331,80 @@ describe('order-service (e2e)', () => {
     expect([accept.status, cancel.status].sort()).toEqual([200, 409]);
     const final = await http.get(`/${order.id}`).set(s.customer).expect(200);
     expect(final.body.timeline).toHaveLength(2);
+  });
+
+  describe('rider events from delivery-service', () => {
+    const rider = randomUUID();
+    const event = (type: 'delivery.picked_up' | 'delivery.delivered', orderId: string) => ({
+      value: Buffer.from(
+        JSON.stringify({
+          id: randomUUID(),
+          type,
+          version: 1,
+          occurredAt: new Date().toISOString(),
+          source: 'delivery-service',
+          data: { deliveryId: randomUUID(), orderId, riderId: rider, at: new Date().toISOString() },
+        }),
+      ),
+      offset: '0',
+    });
+    const consume = (type: 'delivery.picked_up' | 'delivery.delivered', orderId: string) =>
+      app.get(DeliveryEventConsumer).handle(type, 0, event(type, orderId));
+    const timeline = async (s: ReturnType<typeof scenario>, id: string) =>
+      (await http.get(`/${id}`).set(s.customer).expect(200)).body.timeline.map((t: { status: string; by: string }) => `${t.status}:${t.by}`);
+
+    it('moves the order when the rider picks up and delivers, once even if replayed', async () => {
+      const s = scenario();
+      const order = await place(s);
+      await http.post(`/${order.id}/status`).set(s.owner).send({ status: 'accepted', prepTimeMinutes: 15 }).expect(200);
+
+      await consume('delivery.picked_up', order.id); // the restaurant never marked it ready
+      await consume('delivery.picked_up', order.id);
+      await consume('delivery.delivered', order.id);
+      await consume('delivery.delivered', order.id);
+
+      expect(await timeline(s, order.id)).toEqual(['placed:customer', 'accepted:restaurant', 'picked_up:rider', 'delivered:rider']);
+      const events = await db.select().from(outbox).where(eq(outbox.key, order.id)).orderBy(outbox.id);
+      expect(events.at(-1)!.payload).toMatchObject({ data: { to: 'delivered', by: 'rider' } });
+      const [history] = await db.select().from(orders).where(eq(orders.id, order.id));
+      expect(history.status).toBe('delivered');
+    });
+
+    it('records the pickup too when the drop-off arrives first', async () => {
+      const s = scenario();
+      const order = await place(s);
+      await http.post(`/${order.id}/status`).set(s.owner).send({ status: 'accepted', prepTimeMinutes: 15 }).expect(200);
+      await http.post(`/${order.id}/status`).set(s.owner).send({ status: 'ready' }).expect(200);
+
+      await consume('delivery.delivered', order.id);
+      await consume('delivery.picked_up', order.id); // late, nothing left to do
+      expect(await timeline(s, order.id)).toEqual([
+        'placed:customer',
+        'accepted:restaurant',
+        'ready:restaurant',
+        'picked_up:rider',
+        'delivered:rider',
+      ]);
+    });
+
+    it('ignores rider events for cancelled, not yet accepted or unknown orders, and malformed ones', async () => {
+      const s = scenario();
+      const order = await place(s);
+      await consume('delivery.picked_up', order.id); // still only placed
+      await http.post(`/${order.id}/status`).set(s.customer).send({ status: 'cancelled' }).expect(200);
+      await consume('delivery.delivered', order.id);
+      expect(await timeline(s, order.id)).toEqual(['placed:customer', 'cancelled:customer']);
+
+      await consume('delivery.delivered', randomUUID());
+      await app.get(DeliveryEventConsumer).handle('delivery.delivered', 0, { value: Buffer.from('{}'), offset: '1' });
+    });
+
+    it('still keeps riders out of the HTTP API', async () => {
+      const s = scenario();
+      const order = await place(s);
+      await http.post(`/${order.id}/status`).set(s.owner).send({ status: 'accepted', prepTimeMinutes: 15 }).expect(200);
+      const res = await http.post(`/${order.id}/status`).set(admin).send({ status: 'picked_up' }).expect(403);
+      expect(res.body.message).toBe('Only the rider can mark picked up this order');
+    });
   });
 });

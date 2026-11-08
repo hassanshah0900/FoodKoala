@@ -39,7 +39,7 @@ const quote = (over: Partial<DeliveryQuote> = {}): DeliveryQuote => ({
   delivery: { zoneId: 'z1', deliveryFeePaisa: 9900, minimumOrderPaisa: 50000, deliveryTimeMinutes: 35 },
   ...over,
 });
-const restaurant = { id: restaurantId, name: 'Karachi Broast' };
+const restaurant = { id: restaurantId, name: 'Karachi Broast', location: { lat: 31.47, lng: 74.4 } };
 const now = new Date('2026-11-08T10:00:00Z');
 
 const messages = (fn: () => unknown) => {
@@ -81,6 +81,7 @@ describe('draftOrder', () => {
     expect(draft).toMatchObject({
       restaurantId,
       restaurantName: 'Karachi Broast',
+      restaurantLocation: { lat: 31.47, lng: 74.4 },
       deliveryZoneId: 'z1',
       subtotalPaisa: 110000,
       deliveryFeePaisa: 9900,
