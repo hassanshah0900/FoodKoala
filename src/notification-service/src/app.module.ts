@@ -4,6 +4,7 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { APP_CONFIG, type AppConfig } from './config/config';
 import { ConfigModule } from './config/config.module';
 import { HealthController } from './health/health.controller';
+import { InboxController, InboxService } from './inbox/inbox';
 import { InboxWriter } from './orders/inbox-writer';
 import { OrderEventConsumer } from './orders/order-event-consumer';
 import { SmsDispatcher } from './sms/sms-dispatcher';
@@ -17,8 +18,9 @@ import { LogSmsSender, SMS_SENDER, TwilioSmsSender } from './sms/sms-sender';
       useFactory: (config: AppConfig) => ({ drizzle, connection: config.DATABASE_URL }),
     }),
   ],
-  controllers: [HealthController],
+  controllers: [HealthController, InboxController],
   providers: [
+    InboxService,
     InboxWriter,
     OrderEventConsumer,
     SmsDispatcher,
