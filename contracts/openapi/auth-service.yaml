@@ -52,6 +52,11 @@ paths:
               schema: { $ref: '#/components/schemas/OtpRequested' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503':
+          description: The SMS could not be sent. No code is pending, so the user can ask again right away.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
 
   /otp/verify:
     post:
