@@ -6,6 +6,9 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
 COPY app ./app
 COPY log-config.json ./
+# Migrations, applied with `alembic upgrade head` as a release step
+COPY alembic.ini ./
+COPY migrations ./migrations
 
 FROM python:3.13-slim
 RUN useradd --system --uid 10001 app
