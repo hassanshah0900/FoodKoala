@@ -1,0 +1,194 @@
+openapi: 3.1.0
+info:
+  title: payment-service
+  version: 0.1.0
+  description: |
+    What each order costs the customer and whether it has been paid.
+
+    **Cash on delivery** is the only method for now. A payment is created
+    `pending` when `order.placed` arrives (the amount is the order's
+    `totalPaisa`). It becomes `collected` when the order is delivered (the
+    rider takes the cash at the door), or `cancelled` when the order is
+    rejected or cancelled first. A settled payment never changes again.
+
+    Payments are written only from order events (`contracts/events`), read
+    from Kafka at least once and applied once per envelope id (ADR 0007).
+    The API is read-only.
+
+    **Who sees what.** The customer sees the payment of their own order,
+    admins see every payment. Others get 404.
+
+    **Money** is in paisa (integer, 1 PKR = 100 paisa).
+servers:
+  - url: http://localhost:8080/api/v1/payments
+    description: Through api-gateway
+  - url: http://localhost:8001
+    description: Service directly (send the identity headers yourself)
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: payments
+    description: Payments of orders
+  - name: health
+    description: Liveness and readiness probes
+
+paths:
+  /:
+    get:
+      tags: [payments]
+      operationId: listPayments
+      summary: All payments, newest first (admin)
+      description: e.g. `status=pending` for the cash still to be collected.
+      parameters:
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/Status' }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+      responses:
+        '200':
+          description: Page of payments
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaymentPage' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: Not an admin
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '422': { $ref: '#/components/responses/Invalid' }
+
+  /orders/{orderId}:
+    parameters:
+      - name: orderId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [payments]
+      operationId: getOrderPayment
+      summary: The payment of an order
+      description: |
+        404 also right after checkout, until order.placed has been
+        consumed (usually well under a second).
+      responses:
+        '200':
+          description: Payment
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Payment' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404':
+          description: No payment for this order, or not one the caller can see
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '422': { $ref: '#/components/responses/Invalid' }
+
+  /healthz:
+    get:
+      tags: [health]
+      operationId: liveness
+      security: [{}]
+      summary: Liveness probe
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, const: ok }
+
+  /readyz:
+    get:
+      tags: [health]
+      operationId: readiness
+      security: [{}]
+      summary: Readiness probe
+      description: PostgreSQL reachable, and the order-event consumer running when Kafka is configured.
+      responses:
+        '200':
+          description: Ready
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, const: ok }
+        '503':
+          description: PostgreSQL unreachable or the consumer stopped
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, const: unavailable }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Access token from auth-service, verified by api-gateway.
+
+  responses:
+    Unauthorized:
+      description: No authenticated user
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Invalid:
+      description: Invalid id or query (FastAPI validation error)
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              detail: { type: array, items: { type: object } }
+
+  schemas:
+    Status:
+      type: string
+      enum: [pending, collected, cancelled]
+
+    Payment:
+      type: object
+      required: [id, orderId, customerId, restaurantId, method, status, amountPaisa, createdAt, collectedAt, cancelledAt]
+      properties:
+        id: { type: string, format: uuid }
+        orderId: { type: string, format: uuid }
+        customerId: { type: string, format: uuid }
+        restaurantId: { type: string, format: uuid }
+        method: { type: string, enum: [cod, card, jazzcash, easypaisa] }
+        status: { $ref: '#/components/schemas/Status' }
+        amountPaisa: { type: integer, description: The order total }
+        createdAt: { type: string, format: date-time, description: When the order was placed }
+        collectedAt: { type: [string, 'null'], format: date-time }
+        cancelledAt: { type: [string, 'null'], format: date-time }
+
+    PaymentPage:
+      type: object
+      required: [items, page, limit, hasMore]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Payment' }
+        page: { type: integer }
+        limit: { type: integer }
+        hasMore: { type: boolean }
+
+    Error:
+      type: object
+      required: [detail]
+      properties:
+        detail: { type: string }
