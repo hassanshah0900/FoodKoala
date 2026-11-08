@@ -1,4 +1,4 @@
-import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import { Inject, Injectable, Logger, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import { createHmac, randomInt, timingSafeEqual } from 'node:crypto';
 import type Redis from 'ioredis';
 import { RateLimitedException } from '../common/rate-limited.exception';
@@ -18,15 +18,23 @@ const keys = {
   hourly: (phone: string) => `auth:otp:hourly:${phone}`,
 };
 
+/** +92300***4567: enough to find a user's request in the logs, not enough to read the number. */
+export const maskPhone = (phone: string) => `${phone.slice(0, 6)}***${phone.slice(-4)}`;
+
 @Injectable()
 export class OtpService {
+  private readonly logger = new Logger(OtpService.name);
+
   constructor(
     @Inject(REDIS) private readonly redis: Redis,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
     private readonly sms: SmsSender,
   ) {}
 
-  /** Generates a code, stores its hash and sends it. Throws RateLimitedException when asked too often. */
+  /**
+   * Generates a code, stores its hash and sends it. Throws RateLimitedException
+   * when asked too often, and 503 when the SMS could not be sent.
+   */
   async request(phone: string): Promise<OtpRequested> {
     const { OTP_TTL_SECONDS, OTP_RESEND_SECONDS, OTP_MAX_PER_HOUR } = this.config;
 
@@ -58,7 +66,15 @@ export class OtpService {
       .expire(keys.code(phone), OTP_TTL_SECONDS)
       .exec();
 
-    await this.sms.send(phone, `${code} is your FoodKoala login code. It expires in ${Math.round(OTP_TTL_SECONDS / 60)} minutes.`);
+    try {
+      await this.sms.send(phone, `${code} is your FoodKoala login code. It expires in ${Math.round(OTP_TTL_SECONDS / 60)} minutes.`);
+    } catch (err) {
+      // The code never arrived: drop it and the cooldown so the user can ask again right away.
+      // The hourly count stays, so failures can't be used to send unlimited codes.
+      await this.redis.del(keys.code(phone), keys.cooldown(phone));
+      this.logger.error(`Sending a login code to ${maskPhone(phone)} failed: ${String(err)}`);
+      throw new ServiceUnavailableException('Could not send the code; try again');
+    }
 
     return { phone, expiresIn: OTP_TTL_SECONDS, resendIn: OTP_RESEND_SECONDS };
   }
