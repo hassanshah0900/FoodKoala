@@ -7,6 +7,8 @@ import { CartClient, RestaurantClient, UserClient } from './clients/clients';
 import { HealthController } from './health/health.controller';
 import { OrdersController } from './orders/orders.controller';
 import { OrdersService } from './orders/orders.service';
+import { OutboxRelay } from './outbox/outbox-relay';
+import { EVENT_PUBLISHER, KafkaPublisher } from './outbox/publisher';
 
 @Module({
   imports: [
@@ -17,6 +19,18 @@ import { OrdersService } from './orders/orders.service';
     }),
   ],
   controllers: [HealthController, OrdersController],
-  providers: [OrdersService, CartClient, UserClient, RestaurantClient],
+  providers: [
+    OrdersService,
+    CartClient,
+    UserClient,
+    RestaurantClient,
+    OutboxRelay,
+    {
+      provide: EVENT_PUBLISHER,
+      inject: [APP_CONFIG],
+      useFactory: (config: AppConfig) =>
+        config.KAFKA_BROKERS ? new KafkaPublisher(config.KAFKA_BROKERS, config.KAFKA_CLIENT_ID) : null,
+    },
+  ],
 })
 export class AppModule {}
