@@ -1,0 +1,1115 @@
+{
+  "type": "base",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "d1f7ca14-7a24-4857-9053-4789a3366d20",
+  "prevIds": [
+    "00000000-0000-0000-0000-000000000000"
+  ],
+  "footprints": [
+    {
+      "statementType": "create_schema",
+      "statementTarget": [
+        "schema",
+        "orders"
+      ],
+      "writes": [
+        "s|sch|orders",
+        "n|sch|orders",
+        "e|sch|orders"
+      ]
+    },
+    {
+      "statementType": "create_enum",
+      "statementTarget": [
+        "enum",
+        "orders",
+        "actor"
+      ],
+      "writes": [
+        "s|enum|orders.actor",
+        "n|enum|orders.actor",
+        "e|enum|orders.actor",
+        "n|type|orders.actor"
+      ],
+      "reads": [
+        "n|sch|orders"
+      ]
+    },
+    {
+      "statementType": "create_enum",
+      "statementTarget": [
+        "enum",
+        "orders",
+        "payment_method"
+      ],
+      "writes": [
+        "s|enum|orders.payment_method",
+        "n|enum|orders.payment_method",
+        "e|enum|orders.payment_method",
+        "n|type|orders.payment_method"
+      ],
+      "reads": [
+        "n|sch|orders"
+      ]
+    },
+    {
+      "statementType": "create_enum",
+      "statementTarget": [
+        "enum",
+        "orders",
+        "order_status"
+      ],
+      "writes": [
+        "s|enum|orders.order_status",
+        "n|enum|orders.order_status",
+        "e|enum|orders.order_status",
+        "n|type|orders.order_status"
+      ],
+      "reads": [
+        "n|sch|orders"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "orders",
+        "order_lines"
+      ],
+      "writes": [
+        "s|tbl|orders.order_lines",
+        "n|tbl|orders.order_lines",
+        "e|tbl|orders.order_lines",
+        "n|rel|orders.order_lines",
+        "n|type|orders.order_lines",
+        "n|rel|orders.order_lines_order_id_position_key"
+      ],
+      "reads": [
+        "n|sch|orders"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "orders",
+        "order_status_history"
+      ],
+      "writes": [
+        "s|tbl|orders.order_status_history",
+        "n|tbl|orders.order_status_history",
+        "e|tbl|orders.order_status_history",
+        "n|rel|orders.order_status_history",
+        "n|type|orders.order_status_history",
+        "n|rel|orders.order_status_history_pkey"
+      ],
+      "reads": [
+        "n|sch|orders",
+        "n|enum|orders.order_status",
+        "n|enum|orders.actor"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "orders",
+        "orders"
+      ],
+      "writes": [
+        "s|tbl|orders.orders",
+        "n|tbl|orders.orders",
+        "e|tbl|orders.orders",
+        "n|rel|orders.orders",
+        "n|type|orders.orders",
+        "n|rel|orders.orders_pkey",
+        "n|rel|orders.orders_customer_id_idempotency_key_key"
+      ],
+      "reads": [
+        "n|sch|orders",
+        "n|enum|orders.order_status",
+        "n|enum|orders.payment_method"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "orders",
+        "outbox"
+      ],
+      "writes": [
+        "s|tbl|orders.outbox",
+        "n|tbl|orders.outbox",
+        "e|tbl|orders.outbox",
+        "n|rel|orders.outbox",
+        "n|type|orders.outbox",
+        "n|rel|orders.outbox_pkey",
+        "n|rel|orders.outbox_event_id_key"
+      ],
+      "reads": [
+        "n|sch|orders"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "orders",
+        "order_status_history",
+        "order_status_history_order_id_idx"
+      ],
+      "writes": [
+        "s|idx|orders.order_status_history_order_id_idx",
+        "n|idx|orders.order_status_history_order_id_idx",
+        "e|idx|orders.order_status_history_order_id_idx",
+        "n|rel|orders.order_status_history_order_id_idx"
+      ],
+      "reads": [
+        "n|tbl|orders.order_status_history",
+        "n|sch|orders",
+        "n|col|orders.order_status_history.order_id",
+        "n|col|orders.order_status_history.id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "orders",
+        "orders",
+        "orders_customer_id_placed_at_idx"
+      ],
+      "writes": [
+        "s|idx|orders.orders_customer_id_placed_at_idx",
+        "n|idx|orders.orders_customer_id_placed_at_idx",
+        "e|idx|orders.orders_customer_id_placed_at_idx",
+        "n|rel|orders.orders_customer_id_placed_at_idx"
+      ],
+      "reads": [
+        "n|tbl|orders.orders",
+        "n|sch|orders",
+        "n|col|orders.orders.customer_id",
+        "n|col|orders.orders.placed_at"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "orders",
+        "orders",
+        "orders_restaurant_id_placed_at_idx"
+      ],
+      "writes": [
+        "s|idx|orders.orders_restaurant_id_placed_at_idx",
+        "n|idx|orders.orders_restaurant_id_placed_at_idx",
+        "e|idx|orders.orders_restaurant_id_placed_at_idx",
+        "n|rel|orders.orders_restaurant_id_placed_at_idx"
+      ],
+      "reads": [
+        "n|tbl|orders.orders",
+        "n|sch|orders",
+        "n|col|orders.orders.restaurant_id",
+        "n|col|orders.orders.placed_at"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "orders",
+        "outbox",
+        "outbox_unpublished_idx"
+      ],
+      "writes": [
+        "s|idx|orders.outbox_unpublished_idx",
+        "n|idx|orders.outbox_unpublished_idx",
+        "e|idx|orders.outbox_unpublished_idx",
+        "n|rel|orders.outbox_unpublished_idx"
+      ],
+      "reads": [
+        "n|tbl|orders.outbox",
+        "n|sch|orders",
+        "n|col|orders.outbox.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "orders",
+        "order_lines"
+      ],
+      "writes": [
+        "s|fk|orders.order_lines.order_lines_order_id_orders_id_fkey",
+        "n|fk|orders.order_lines.order_lines_order_id_orders_id_fkey",
+        "e|fk|orders.order_lines.order_lines_order_id_orders_id_fkey",
+        "n|con|orders.order_lines.order_lines_order_id_orders_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|orders.order_lines",
+        "n|sch|orders",
+        "n|tbl|orders.orders",
+        "n|sch|orders",
+        "n|col|orders.order_lines.order_id",
+        "n|col|orders.orders.id",
+        "e|uniqueness|orders.orders.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "orders",
+        "order_status_history"
+      ],
+      "writes": [
+        "s|fk|orders.order_status_history.order_status_history_order_id_orders_id_fkey",
+        "n|fk|orders.order_status_history.order_status_history_order_id_orders_id_fkey",
+        "e|fk|orders.order_status_history.order_status_history_order_id_orders_id_fkey",
+        "n|con|orders.order_status_history.order_status_history_order_id_orders_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|orders.order_status_history",
+        "n|sch|orders",
+        "n|tbl|orders.orders",
+        "n|sch|orders",
+        "n|col|orders.order_status_history.order_id",
+        "n|col|orders.orders.id",
+        "e|uniqueness|orders.orders.id"
+      ]
+    }
+  ],
+  "ddl": [
+    {
+      "name": "orders",
+      "entityType": "schemas"
+    },
+    {
+      "schema": "orders",
+      "name": "order_lines",
+      "isRlsEnabled": false,
+      "entityType": "tables"
+    },
+    {
+      "schema": "orders",
+      "name": "order_status_history",
+      "isRlsEnabled": false,
+      "entityType": "tables"
+    },
+    {
+      "schema": "orders",
+      "name": "orders",
+      "isRlsEnabled": false,
+      "entityType": "tables"
+    },
+    {
+      "schema": "orders",
+      "name": "outbox",
+      "isRlsEnabled": false,
+      "entityType": "tables"
+    },
+    {
+      "schema": "orders",
+      "name": "actor",
+      "values": [
+        "customer",
+        "restaurant",
+        "admin"
+      ],
+      "entityType": "enums"
+    },
+    {
+      "schema": "orders",
+      "name": "payment_method",
+      "values": [
+        "cod",
+        "card",
+        "jazzcash",
+        "easypaisa"
+      ],
+      "entityType": "enums"
+    },
+    {
+      "schema": "orders",
+      "name": "order_status",
+      "values": [
+        "placed",
+        "accepted",
+        "ready",
+        "picked_up",
+        "delivered",
+        "rejected",
+        "cancelled"
+      ],
+      "entityType": "enums"
+    },
+    {
+      "schema": "orders",
+      "table": "order_lines",
+      "name": "order_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "orders",
+      "table": "order_lines",
+      "name": "position",
+      "type": "smallint",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "orders",
+      "table": "order_lines",
+      "name": "item_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "orders",
+      "table": "order_lines",
+      "name": "name",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "orders",
+      "table": "order_lines",
+      "name": "quantity",
+      "type": "smallint",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "orders",
+      "table": "order_lines",
+      "name": "options",
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "orders",
+      "table": "order_lines",
+      "name": "note",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "orders",
+      "table": "order_lines",
+      "name": "unit_price_paisa",
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "orders",
+      "table": "order_lines",
+      "name": "line_total_paisa",
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "orders",
+      "table": "order_status_history",
+      "name": "id",
+      "type": "bigserial",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "orders",
+      "table": "order_status_history",
+      "name": "order_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "orders",
+      "table": "order_status_history",
+      "name": "status",
+      "type": "order_status",
+      "typeSchema": "orders",
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "orders",
+      "table": "order_status_history",
+      "name": "actor",
+      "type": "actor",
+      "typeSchema": "orders",
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "orders",
+      "table": "order_status_history",
+      "name": "actor_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "orders",
+      "table": "order_status_history",
+      "name": "reason",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "orders",
+      "table": "order_status_history",
+      "name": "at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "orders",
+      "table": "orders",
+      "name": "id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "gen_random_uuid()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "orders",
+      "table": "orders",
+      "name": "customer_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "orders",
+      "table": "orders",
+      "name": "customer_phone",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "orders",
+      "table": "orders",
+      "name": "idempotency_key",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "orders",
+      "table": "orders",
+      "name": "restaurant_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "orders",
+      "table": "orders",
+      "name": "restaurant_name",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "orders",
+      "table": "orders",
+      "name": "delivery_zone_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "orders",
+      "table": "orders",
+      "name": "status",
+      "type": "order_status",
+      "typeSchema": "orders",
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'placed'",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "orders",
+      "table": "orders",
+      "name": "payment_method",
+      "type": "payment_method",
+      "typeSchema": "orders",
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "orders",
+      "table": "orders",
+      "name": "delivery_address",
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "orders",
+      "table": "orders",
+      "name": "note",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "orders",
+      "table": "orders",
+      "name": "subtotal_paisa",
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "orders",
+      "table": "orders",
+      "name": "delivery_fee_paisa",
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "orders",
+      "table": "orders",
+      "name": "total_paisa",
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "orders",
+      "table": "orders",
+      "name": "prep_time_minutes",
+      "type": "smallint",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "orders",
+      "table": "orders",
+      "name": "estimated_delivery_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "orders",
+      "table": "orders",
+      "name": "placed_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "orders",
+      "table": "orders",
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "orders",
+      "table": "outbox",
+      "name": "id",
+      "type": "bigserial",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "orders",
+      "table": "outbox",
+      "name": "event_id",
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "orders",
+      "table": "outbox",
+      "name": "topic",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "orders",
+      "table": "outbox",
+      "name": "key",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "orders",
+      "table": "outbox",
+      "name": "payload",
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "orders",
+      "table": "outbox",
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "orders",
+      "table": "outbox",
+      "name": "published_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "orders",
+      "table": "order_status_history",
+      "name": "order_status_history_order_id_idx",
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "order_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "orders",
+      "table": "orders",
+      "name": "orders_customer_id_placed_at_idx",
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "customer_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "placed_at",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "orders",
+      "table": "orders",
+      "name": "orders_restaurant_id_placed_at_idx",
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "restaurant_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "placed_at",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "orders",
+      "table": "outbox",
+      "name": "outbox_unpublished_idx",
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": "\"published_at\" is null",
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "entityType": "indexes"
+    },
+    {
+      "schema": "orders",
+      "table": "order_lines",
+      "name": "order_lines_order_id_orders_id_fkey",
+      "nameExplicit": false,
+      "columns": [
+        "order_id"
+      ],
+      "schemaTo": "orders",
+      "tableTo": "orders",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "entityType": "fks"
+    },
+    {
+      "schema": "orders",
+      "table": "order_status_history",
+      "name": "order_status_history_order_id_orders_id_fkey",
+      "nameExplicit": false,
+      "columns": [
+        "order_id"
+      ],
+      "schemaTo": "orders",
+      "tableTo": "orders",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "entityType": "fks"
+    },
+    {
+      "schema": "orders",
+      "table": "order_status_history",
+      "name": "order_status_history_pkey",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "schema": "orders",
+      "table": "orders",
+      "name": "orders_pkey",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "schema": "orders",
+      "table": "outbox",
+      "name": "outbox_pkey",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "schema": "orders",
+      "table": "order_lines",
+      "name": "order_lines_order_id_position_key",
+      "nameExplicit": true,
+      "columns": [
+        "order_id",
+        "position"
+      ],
+      "nullsNotDistinct": false,
+      "entityType": "uniques"
+    },
+    {
+      "schema": "orders",
+      "table": "orders",
+      "name": "orders_customer_id_idempotency_key_key",
+      "nameExplicit": true,
+      "columns": [
+        "customer_id",
+        "idempotency_key"
+      ],
+      "nullsNotDistinct": false,
+      "entityType": "uniques"
+    },
+    {
+      "schema": "orders",
+      "table": "outbox",
+      "name": "outbox_event_id_key",
+      "nameExplicit": false,
+      "columns": [
+        "event_id"
+      ],
+      "nullsNotDistinct": false,
+      "entityType": "uniques"
+    },
+    {
+      "schema": "orders",
+      "table": "order_lines",
+      "name": "order_lines_quantity_positive",
+      "value": "\"quantity\" > 0",
+      "entityType": "checks"
+    },
+    {
+      "schema": "orders",
+      "table": "order_lines",
+      "name": "order_lines_total_adds_up",
+      "value": "\"line_total_paisa\" = \"unit_price_paisa\" * \"quantity\"",
+      "entityType": "checks"
+    },
+    {
+      "schema": "orders",
+      "table": "orders",
+      "name": "orders_total_adds_up",
+      "value": "\"total_paisa\" = \"subtotal_paisa\" + \"delivery_fee_paisa\"",
+      "entityType": "checks"
+    },
+    {
+      "schema": "orders",
+      "table": "orders",
+      "name": "orders_money_not_negative",
+      "value": "\"subtotal_paisa\" >= 0 and \"delivery_fee_paisa\" >= 0",
+      "entityType": "checks"
+    }
+  ]
+}

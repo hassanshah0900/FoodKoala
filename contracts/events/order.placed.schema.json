@@ -2,45 +2,49 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "order.placed",
   "title": "OrderPlaced",
+  "description": "`data` of the order.placed event, published by order-service when a checkout succeeds. Keyed by orderId. Money is in paisa.",
   "type": "object",
-  "required": ["orderId", "customerId", "restaurantId", "items", "totals", "paymentMethod", "deliveryAddress"],
+  "required": ["orderId", "customerId", "restaurantId", "lines", "totals", "paymentMethod", "deliveryAddress", "estimatedDeliveryAt", "placedAt"],
   "properties": {
     "orderId": { "type": "string", "format": "uuid" },
     "customerId": { "type": "string", "format": "uuid" },
     "restaurantId": { "type": "string", "format": "uuid" },
-    "items": {
+    "lines": {
       "type": "array",
       "minItems": 1,
       "items": {
         "type": "object",
-        "required": ["menuItemId", "quantity", "unitPrice"],
+        "required": ["itemId", "name", "quantity", "unitPricePaisa", "lineTotalPaisa"],
         "properties": {
-          "menuItemId": { "type": "string" },
+          "itemId": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
           "quantity": { "type": "integer", "minimum": 1 },
-          "unitPrice": { "type": "integer", "description": "PKR, in paisa" }
+          "unitPricePaisa": { "type": "integer", "description": "Item price plus its options" },
+          "lineTotalPaisa": { "type": "integer" }
         }
       }
     },
     "totals": {
       "type": "object",
-      "required": ["subtotal", "deliveryFee", "tax", "total"],
+      "required": ["subtotalPaisa", "deliveryFeePaisa", "totalPaisa"],
       "properties": {
-        "subtotal": { "type": "integer" },
-        "deliveryFee": { "type": "integer" },
-        "tax": { "type": "integer" },
-        "total": { "type": "integer" }
+        "subtotalPaisa": { "type": "integer" },
+        "deliveryFeePaisa": { "type": "integer" },
+        "totalPaisa": { "type": "integer", "description": "Menu prices include sales tax" }
       }
     },
-    "paymentMethod": { "enum": ["cod", "jazzcash", "easypaisa", "card", "wallet"] },
+    "paymentMethod": { "enum": ["cod", "card", "jazzcash", "easypaisa"] },
     "deliveryAddress": {
       "type": "object",
-      "required": ["lat", "lng"],
+      "required": ["lat", "lng", "text"],
       "properties": {
         "lat": { "type": "number" },
         "lng": { "type": "number" },
-        "text": { "type": "string" },
-        "landmark": { "type": "string" }
+        "text": { "type": "string", "description": "line1, area, city" },
+        "landmark": { "type": ["string", "null"] }
       }
-    }
+    },
+    "estimatedDeliveryAt": { "type": "string", "format": "date-time" },
+    "placedAt": { "type": "string", "format": "date-time" }
   }
 }

@@ -1,0 +1,431 @@
+openapi: 3.1.0
+info:
+  title: order-service
+  version: 0.1.0
+  description: |
+    Checkout and the life of an order, from placing it to delivery.
+
+    **Checkout.** `POST /` turns the caller's cart into an order. The
+    service asks cart-service for the cart (priced by menu-service just
+    then), user-service for the delivery address and restaurant-service
+    whether the restaurant is taking orders and delivers there, and for how
+    much. A client never sends a price or a fee. Once the order is saved the
+    cart is emptied. Send an `Idempotency-Key` with every checkout: retrying
+    with the same key returns the order made the first time instead of a
+    second one.
+
+    **Life cycle.**
+
+    | From | To | Who |
+    |---|---|---|
+    | `placed` | `accepted` | the restaurant, with a prep time |
+    | `placed` | `rejected` | the restaurant or an admin, with a reason |
+    | `placed` | `cancelled` | the customer, or an admin with a reason |
+    | `accepted` | `ready` | the restaurant, when the food is ready for pickup |
+    | `accepted`, `ready` | `cancelled` | an admin, with a reason |
+    | `ready` | `picked_up` | an admin (riders, once delivery-service assigns them) |
+    | `picked_up` | `delivered` | an admin (riders, once delivery-service assigns them) |
+
+    `delivered`, `rejected` and `cancelled` are final. "The restaurant"
+    means its owner, checked with restaurant-service (ADR 0006).
+
+    **Who sees what.** Customers see their own orders. Restaurant owners
+    see the orders of their restaurants. Admins see every order. Anyone else
+    gets 404.
+
+    **Events.** Every order placed and every status change is written to an
+    outbox in the same transaction as the change, for publishing to Kafka as
+    `order.placed` and `order.status_changed` (`contracts/events`).
+
+    **Money** is in paisa (integer, 1 PKR = 100 paisa). Menu prices include
+    sales tax.
+servers:
+  - url: http://localhost:8080/api/v1/orders
+    description: Through api-gateway
+  - url: http://localhost:3006
+    description: Service directly (send the identity headers yourself)
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: checkout
+    description: Turning the cart into an order
+  - name: orders
+    description: Reading orders and moving them along
+  - name: restaurant
+    description: A restaurant's incoming orders
+  - name: health
+    description: Liveness and readiness probes
+
+paths:
+  /:
+    post:
+      tags: [checkout]
+      operationId: checkout
+      summary: Place an order from my cart
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          description: A new random value (e.g. a UUID) per checkout attempt, reused on retries
+          schema: { type: string, minLength: 8, maxLength: 64, pattern: '^[A-Za-z0-9_-]+$' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Checkout' }
+      responses:
+        '201':
+          description: Order placed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Order' }
+        '200':
+          description: Retry of a checkout that already placed this order
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Order' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409':
+          description: The cart is empty, or the restaurant is not taking orders right now
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '422':
+          description: |
+            The order can't be placed as it is: a cart line has a problem, the
+            address is unknown, the restaurant doesn't deliver there, the
+            subtotal is under the minimum order, or the payment method isn't
+            available yet. `message` lists every reason.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+    get:
+      tags: [orders]
+      operationId: listMyOrders
+      summary: My orders, newest first
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Page of orders
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OrderPage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /restaurants/{restaurantId}/orders:
+    parameters:
+      - name: restaurantId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [restaurant]
+      operationId: listRestaurantOrders
+      summary: A restaurant's orders, newest first (owner or admin)
+      parameters:
+        - name: status
+          in: query
+          description: 'Only orders in these statuses, comma separated, e.g. `placed,accepted,ready`'
+          schema: { type: string, examples: ['placed,accepted,ready'] }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Page of orders
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OrderPage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+
+  /{id}:
+    parameters:
+      - $ref: '#/components/parameters/OrderId'
+    get:
+      tags: [orders]
+      operationId: getOrder
+      summary: One order, with its timeline
+      responses:
+        '200':
+          description: Order
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Order' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+
+  /{id}/status:
+    parameters:
+      - $ref: '#/components/parameters/OrderId'
+    post:
+      tags: [orders]
+      operationId: changeOrderStatus
+      summary: Accept, reject, mark ready, pick up, deliver or cancel
+      description: See the life cycle table above for who may make which change.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/StatusChange' }
+      responses:
+        '200':
+          description: Order after the change
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Order' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: The order is not in a status that allows this change
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+
+  /healthz:
+    get:
+      tags: [health]
+      operationId: liveness
+      security: [{}]
+      summary: Liveness probe
+      responses:
+        '200': { $ref: '#/components/responses/Ok' }
+
+  /readyz:
+    get:
+      tags: [health]
+      operationId: readiness
+      security: [{}]
+      summary: Readiness probe
+      responses:
+        '200': { $ref: '#/components/responses/Ok' }
+        '503':
+          description: PostgreSQL is unreachable
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Access token from auth-service, verified by api-gateway.
+
+  parameters:
+    OrderId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    Page:
+      name: page
+      in: query
+      schema: { type: integer, minimum: 1, default: 1 }
+    Limit:
+      name: limit
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+
+  responses:
+    Ok:
+      description: OK
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              status: { type: string, const: ok }
+    BadRequest:
+      description: Invalid body, query, header or id
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unauthorized:
+      description: No authenticated user
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Forbidden:
+      description: Signed in, but not allowed to make this change or see this restaurant's orders
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: No such order or restaurant, or not one the caller can see
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unavailable:
+      description: cart-service, user-service or restaurant-service could not be reached
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+  schemas:
+    Status:
+      type: string
+      enum: [placed, accepted, ready, picked_up, delivered, rejected, cancelled]
+
+    PaymentMethod:
+      type: string
+      enum: [cod, card, jazzcash, easypaisa]
+      description: Only `cod` (cash on delivery) is accepted until payment-service takes payments.
+
+    Location:
+      type: object
+      required: [lat, lng]
+      properties:
+        lat: { type: number }
+        lng: { type: number }
+
+    Checkout:
+      type: object
+      required: [addressId, paymentMethod]
+      additionalProperties: false
+      properties:
+        addressId: { type: string, format: uuid, description: One of my saved addresses (user-service) }
+        paymentMethod: { $ref: '#/components/schemas/PaymentMethod' }
+        note: { type: [string, 'null'], minLength: 1, maxLength: 500, description: 'For the restaurant, e.g. "no cutlery"' }
+
+    StatusChange:
+      type: object
+      required: [status]
+      additionalProperties: false
+      properties:
+        status: { $ref: '#/components/schemas/Status' }
+        reason: { type: string, minLength: 1, maxLength: 500, description: 'Needed to reject, and for an admin to cancel' }
+        prepTimeMinutes: { type: integer, minimum: 5, maximum: 120, description: Needed to accept }
+
+    OrderLine:
+      type: object
+      required: [itemId, name, quantity, options, note, unitPricePaisa, lineTotalPaisa]
+      properties:
+        itemId: { type: string, format: uuid }
+        name: { type: string }
+        quantity: { type: integer }
+        options:
+          type: array
+          items:
+            type: object
+            required: [id, group, name, pricePaisa]
+            properties:
+              id: { type: string, format: uuid }
+              group: { type: string }
+              name: { type: string }
+              pricePaisa: { type: integer }
+        note: { type: [string, 'null'] }
+        unitPricePaisa: { type: integer }
+        lineTotalPaisa: { type: integer }
+
+    DeliveryAddress:
+      type: object
+      description: A copy of the saved address as it was at checkout
+      required: [label, line1, area, city, landmark, instructions, location]
+      properties:
+        label: { type: string, examples: [home] }
+        line1: { type: string }
+        area: { type: string }
+        city: { type: string }
+        landmark: { type: [string, 'null'] }
+        instructions: { type: [string, 'null'], description: Notes for the rider }
+        location: { $ref: '#/components/schemas/Location' }
+
+    TimelineEntry:
+      type: object
+      required: [status, at, by, reason]
+      properties:
+        status: { $ref: '#/components/schemas/Status' }
+        at: { type: string, format: date-time }
+        by: { type: string, enum: [customer, restaurant, admin] }
+        reason: { type: [string, 'null'] }
+
+    Order:
+      type: object
+      required:
+        - id
+        - status
+        - customerId
+        - customerPhone
+        - restaurant
+        - lines
+        - subtotalPaisa
+        - deliveryFeePaisa
+        - totalPaisa
+        - paymentMethod
+        - deliveryAddress
+        - note
+        - prepTimeMinutes
+        - estimatedDeliveryAt
+        - timeline
+        - placedAt
+        - updatedAt
+      properties:
+        id: { type: string, format: uuid }
+        status: { $ref: '#/components/schemas/Status' }
+        customerId: { type: string, format: uuid }
+        customerPhone: { type: string, description: For the restaurant and rider to call }
+        restaurant:
+          type: object
+          required: [id, name]
+          properties:
+            id: { type: string, format: uuid }
+            name: { type: string }
+        lines:
+          type: array
+          items: { $ref: '#/components/schemas/OrderLine' }
+        subtotalPaisa: { type: integer }
+        deliveryFeePaisa: { type: integer }
+        totalPaisa: { type: integer, description: subtotalPaisa + deliveryFeePaisa }
+        paymentMethod: { $ref: '#/components/schemas/PaymentMethod' }
+        deliveryAddress: { $ref: '#/components/schemas/DeliveryAddress' }
+        note: { type: [string, 'null'] }
+        prepTimeMinutes: { type: [integer, 'null'], description: Set when the restaurant accepts }
+        estimatedDeliveryAt:
+          type: string
+          format: date-time
+          description: From the delivery zone's time at checkout, pushed later if the prep time needs it
+        timeline:
+          type: array
+          description: Every status the order has had, oldest first
+          items: { $ref: '#/components/schemas/TimelineEntry' }
+        placedAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    OrderPage:
+      type: object
+      required: [items, page, limit, hasMore]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Order' }
+        page: { type: integer }
+        limit: { type: integer }
+        hasMore: { type: boolean }
+
+    Error:
+      type: object
+      required: [statusCode, message]
+      properties:
+        statusCode: { type: integer }
+        error: { type: string }
+        message:
+          oneOf:
+            - type: string
+            - type: array
+              items: { type: string }

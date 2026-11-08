@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "order.status_changed",
+  "title": "OrderStatusChanged",
+  "description": "`data` of the order.status_changed event, published by order-service after every status change. Keyed by orderId, so changes to one order stay in order.",
+  "type": "object",
+  "required": ["orderId", "customerId", "restaurantId", "from", "to", "by", "reason", "at"],
+  "properties": {
+    "orderId": { "type": "string", "format": "uuid" },
+    "customerId": { "type": "string", "format": "uuid" },
+    "restaurantId": { "type": "string", "format": "uuid" },
+    "from": { "$ref": "#/$defs/status" },
+    "to": { "$ref": "#/$defs/status" },
+    "by": { "enum": ["customer", "restaurant", "admin"] },
+    "reason": { "type": ["string", "null"] },
+    "prepTimeMinutes": { "type": ["integer", "null"], "description": "Set when the order is accepted" },
+    "estimatedDeliveryAt": { "type": "string", "format": "date-time" },
+    "at": { "type": "string", "format": "date-time" }
+  },
+  "$defs": {
+    "status": { "enum": ["placed", "accepted", "ready", "picked_up", "delivered", "rejected", "cancelled"] }
+  }
+}
