@@ -14,6 +14,7 @@
     "db:migrate": "node --env-file-if-exists=.env dist/db/migrate.js"
   },
   "dependencies": {
+    "@confluentinc/kafka-javascript": "^1.11.0",
     "@nestjs/common": "^12.4.0",
     "@nestjs/core": "^12.4.0",
     "@nestjs/drizzle": "^0.0.2",

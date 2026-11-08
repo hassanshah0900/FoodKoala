@@ -20,3 +20,23 @@ describe('loadConfig', () => {
     expect(() => loadConfig({ DATABASE_URL: 'postgres://u:p@h/db', CART_SERVICE_URL: 'cart' })).toThrow(/CART_SERVICE_URL/);
   });
 });
+
+describe('loadConfig: Kafka', () => {
+  const base = { DATABASE_URL: 'postgres://u:p@h/db' };
+
+  it('leaves Kafka off when KAFKA_BROKERS is unset', () => {
+    expect(loadConfig(base).KAFKA_BROKERS).toBeUndefined();
+  });
+
+  it('treats an empty KAFKA_BROKERS as unset', () => {
+    expect(loadConfig({ ...base, KAFKA_BROKERS: ' ' }).KAFKA_BROKERS).toBeUndefined();
+  });
+
+  it('splits the broker list', () => {
+    expect(loadConfig({ ...base, KAFKA_BROKERS: 'kafka:29092, kafka-2:29092' }).KAFKA_BROKERS).toEqual(['kafka:29092', 'kafka-2:29092']);
+  });
+
+  it('rejects a broker without a port', () => {
+    expect(() => loadConfig({ ...base, KAFKA_BROKERS: 'kafka' })).toThrow(/KAFKA_BROKERS/);
+  });
+});
