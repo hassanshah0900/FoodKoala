@@ -111,7 +111,25 @@ services:
 
   order-service:
     build: ../../src/order-service
+    image: foodkoala/order-service:local
     ports: ["3006:3006"]
+    environment:
+      DATABASE_URL: *postgres-url
+      # Checkout reads the cart, the saved address and a delivery quote
+      CART_SERVICE_URL: http://cart-service:3005
+      USER_SERVICE_URL: http://user-service:3002
+      RESTAURANT_SERVICE_URL: http://restaurant-service:3003
+    depends_on:
+      order-migrate: { condition: service_completed_successfully }
+      cart-service: { condition: service_started }
+      user-service: { condition: service_started }
+      restaurant-service: { condition: service_started }
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3006/readyz"]
+      <<: *healthcheck
+  order-migrate:
+    <<: *migrate
+    image: foodkoala/order-service:local
 
   notification-service:
     build: ../../src/notification-service
