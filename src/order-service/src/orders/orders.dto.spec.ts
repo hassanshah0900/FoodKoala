@@ -1,0 +1,46 @@
+import { checkoutSchema, idempotencyKeySchema, restaurantOrdersQuerySchema } from './orders.dto';
+
+describe('idempotencyKeySchema', () => {
+  it.each(['3f1c2b8a-9d10-4c55', 'checkout_12345678'])('accepts %s', (key) => {
+    expect(idempotencyKeySchema.safeParse(key).success).toBe(true);
+  });
+
+  it.each(['short', 'has space in it', 'x'.repeat(65), undefined])('rejects %s', (key) => {
+    expect(idempotencyKeySchema.safeParse(key).success).toBe(false);
+  });
+});
+
+describe('checkoutSchema', () => {
+  const addressId = '7d3c8f8e-3a0e-4c55-9a6b-3f1c2b8a9d10';
+
+  it('defaults the note to null and trims it', () => {
+    expect(checkoutSchema.parse({ addressId, paymentMethod: 'cod' }).note).toBeNull();
+    expect(checkoutSchema.parse({ addressId, paymentMethod: 'cod', note: '  no cutlery ' }).note).toBe('no cutlery');
+  });
+
+  it('rejects prices and unknown fields', () => {
+    expect(checkoutSchema.safeParse({ addressId, paymentMethod: 'cod', totalPaisa: 1 }).success).toBe(false);
+  });
+
+  it('rejects an unknown payment method', () => {
+    expect(checkoutSchema.safeParse({ addressId, paymentMethod: 'bitcoin' }).success).toBe(false);
+  });
+});
+
+describe('restaurantOrdersQuerySchema', () => {
+  it('splits and de-duplicates statuses', () => {
+    expect(restaurantOrdersQuerySchema.parse({ status: 'placed, accepted,placed' })).toEqual({
+      status: ['placed', 'accepted'],
+      page: 1,
+      limit: 20,
+    });
+  });
+
+  it('leaves the status filter out when not given', () => {
+    expect(restaurantOrdersQuerySchema.parse({}).status).toBeUndefined();
+  });
+
+  it.each(['cooking', ',', 'placed,eaten'])('rejects status=%s', (status) => {
+    expect(restaurantOrdersQuerySchema.safeParse({ status }).success).toBe(false);
+  });
+});
