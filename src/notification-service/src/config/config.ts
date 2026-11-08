@@ -2,6 +2,9 @@ import { z } from 'zod';
 
 export const APP_CONFIG = Symbol('APP_CONFIG');
 
+/** An empty variable (e.g. `TWILIO_FROM=` from compose) counts as unset. */
+const optional = <T extends z.ZodType>(schema: T) => z.preprocess((v) => (v === '' ? undefined : v), schema.optional());
+
 const configSchema = z
   .object({
     NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
@@ -20,10 +23,10 @@ const configSchema = z
 
     /** `log` prints messages instead of sending them; refused in production. */
     SMS_PROVIDER: z.enum(['log', 'twilio']).default('log'),
-    TWILIO_ACCOUNT_SID: z.string().regex(/^AC[0-9a-f]{32}$/).optional(),
-    TWILIO_AUTH_TOKEN: z.string().min(1).optional(),
+    TWILIO_ACCOUNT_SID: optional(z.string().regex(/^AC[0-9a-f]{32}$/)),
+    TWILIO_AUTH_TOKEN: optional(z.string().min(1)),
     /** A Messaging Service (MG...) or a sender number in E.164. */
-    TWILIO_FROM: z.string().regex(/^(MG[0-9a-f]{32}|\+\d{8,15})$/).optional(),
+    TWILIO_FROM: optional(z.string().regex(/^(MG[0-9a-f]{32}|\+\d{8,15})$/)),
     TWILIO_API_URL: z.url().default('https://api.twilio.com'),
     SMS_TIMEOUT_MS: z.coerce.number().int().positive().default(5000),
     /** How often the sender looks for queued messages. */
