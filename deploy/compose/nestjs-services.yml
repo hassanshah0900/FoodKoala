@@ -1,22 +1,118 @@
+# NestJS services. Each one that owns a Postgres schema has a one-shot
+# `<name>-migrate` container that applies its migrations (the release step)
+# and must finish before the service starts. It runs the service's own image.
+
+x-postgres-url: &postgres-url postgres://${POSTGRES_USER:-foodkoala}:${POSTGRES_PASSWORD:-foodkoala}@postgres:5432/${POSTGRES_DB:-foodkoala}
+
+x-migrate: &migrate
+  command: ["node", "dist/db/migrate.js"]
+  environment:
+    DATABASE_URL: *postgres-url
+  depends_on:
+    postgres: { condition: service_healthy }
+  # Built by the service next to it; never pulled.
+  pull_policy: never
+  restart: "no"
+
+# /readyz checks the service's own database or Redis.
+x-healthcheck: &healthcheck
+  interval: 10s
+  timeout: 3s
+  retries: 10
+  start_period: 10s
+
 services:
   auth-service:
     build: ../../src/auth-service
+    image: foodkoala/auth-service:local
     ports: ["3001:3001"]
+    environment:
+      # The image defaults to production, which refuses SMS_PROVIDER=log and
+      # needs a fixed JWT_PRIVATE_KEY. Locally a fresh signing key per start is fine.
+      NODE_ENV: development
+      DATABASE_URL: *postgres-url
+      REDIS_URL: redis://redis:6379
+      OTP_PEPPER: ${OTP_PEPPER:-local-compose-pepper}
+      SMS_PROVIDER: log
+      JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY:-}
+    depends_on:
+      auth-migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/readyz"]
+      <<: *healthcheck
+  auth-migrate:
+    <<: *migrate
+    image: foodkoala/auth-service:local
+
   user-service:
     build: ../../src/user-service
+    image: foodkoala/user-service:local
     ports: ["3002:3002"]
+    environment:
+      DATABASE_URL: *postgres-url
+    depends_on:
+      user-migrate: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3002/readyz"]
+      <<: *healthcheck
+  user-migrate:
+    <<: *migrate
+    image: foodkoala/user-service:local
+
   restaurant-service:
     build: ../../src/restaurant-service
+    image: foodkoala/restaurant-service:local
     ports: ["3003:3003"]
+    environment:
+      # Needs PostGIS, which the postgis/postgis image in infra.yml has.
+      DATABASE_URL: *postgres-url
+    depends_on:
+      restaurant-migrate: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3003/readyz"]
+      <<: *healthcheck
+  restaurant-migrate:
+    <<: *migrate
+    image: foodkoala/restaurant-service:local
+
   menu-service:
     build: ../../src/menu-service
+    image: foodkoala/menu-service:local
     ports: ["3004:3004"]
+    environment:
+      DATABASE_URL: *postgres-url
+      # Asked who owns a restaurant before menu changes (ADR 0006)
+      RESTAURANT_SERVICE_URL: http://restaurant-service:3003
+    depends_on:
+      menu-migrate: { condition: service_completed_successfully }
+      restaurant-service: { condition: service_started }
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3004/readyz"]
+      <<: *healthcheck
+  menu-migrate:
+    <<: *migrate
+    image: foodkoala/menu-service:local
+
   cart-service:
     build: ../../src/cart-service
+    image: foodkoala/cart-service:local
     ports: ["3005:3005"]
+    environment:
+      REDIS_URL: redis://redis:6379
+      # Prices every cart line
+      MENU_SERVICE_URL: http://menu-service:3004
+    depends_on:
+      redis: { condition: service_healthy }
+      menu-service: { condition: service_started }
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3005/readyz"]
+      <<: *healthcheck
+
   order-service:
     build: ../../src/order-service
     ports: ["3006:3006"]
+
   notification-service:
     build: ../../src/notification-service
     ports: ["3007:3007"]
