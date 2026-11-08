@@ -119,8 +119,11 @@ services:
       CART_SERVICE_URL: http://cart-service:3005
       USER_SERVICE_URL: http://user-service:3002
       RESTAURANT_SERVICE_URL: http://restaurant-service:3003
+      # Publishes orders.outbox (ADR 0007); retries on its own until Kafka is up
+      KAFKA_BROKERS: kafka:29092
     depends_on:
       order-migrate: { condition: service_completed_successfully }
+      kafka: { condition: service_started }
       cart-service: { condition: service_started }
       user-service: { condition: service_started }
       restaurant-service: { condition: service_started }
