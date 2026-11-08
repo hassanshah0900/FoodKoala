@@ -4,11 +4,13 @@
   "title": "OrderPlaced",
   "description": "`data` of the order.placed event, published by order-service when a checkout succeeds. Keyed by orderId. Money is in paisa.",
   "type": "object",
-  "required": ["orderId", "customerId", "restaurantId", "lines", "totals", "paymentMethod", "deliveryAddress", "estimatedDeliveryAt", "placedAt"],
+  "required": ["orderId", "customerId", "customerPhone", "restaurantId", "restaurantName", "lines", "totals", "paymentMethod", "deliveryAddress", "estimatedDeliveryAt", "placedAt"],
   "properties": {
     "orderId": { "type": "string", "format": "uuid" },
     "customerId": { "type": "string", "format": "uuid" },
+    "customerPhone": { "type": "string", "description": "E.164, e.g. +923001234567, for messages about the order" },
     "restaurantId": { "type": "string", "format": "uuid" },
+    "restaurantName": { "type": "string" },
     "lines": {
       "type": "array",
       "minItems": 1,
