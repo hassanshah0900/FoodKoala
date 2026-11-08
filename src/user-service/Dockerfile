@@ -12,6 +12,8 @@ WORKDIR /app
 COPY --from=build --chown=node:node /app/node_modules ./node_modules
 COPY --from=build --chown=node:node /app/dist ./dist
 COPY --chown=node:node package.json ./
+# SQL migrations, applied by dist/db/migrate.js (npm run db:migrate) as a release step
+COPY --chown=node:node drizzle ./drizzle
 USER node
 EXPOSE 3002
 CMD ["node", "dist/main.js"]
