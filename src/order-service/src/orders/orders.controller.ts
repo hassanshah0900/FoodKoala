@@ -1,4 +1,17 @@
-import { BadRequestException, Body, Controller, Get, Headers, HttpStatus, Param, Post, Query, Res, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Headers,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Post,
+  Query,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
 import type { Response } from 'express';
 import { CurrentUser, IdentityGuard, type Identity } from '../identity/identity';
 import {
@@ -7,9 +20,11 @@ import {
   idSchema,
   pageQuerySchema,
   restaurantOrdersQuerySchema,
+  statusChangeSchema,
   type CheckoutDto,
   type PageQuery,
   type RestaurantOrdersQuery,
+  type StatusChangeDto,
 } from './orders.dto';
 import { OrdersService } from './orders.service';
 
@@ -50,5 +65,15 @@ export class OrdersController {
   @Get(':id')
   get(@CurrentUser() me: Identity, @Param('id', { schema: idSchema }) id: string) {
     return this.orders.get(me, id);
+  }
+
+  @Post(':id/status')
+  @HttpCode(HttpStatus.OK)
+  changeStatus(
+    @CurrentUser() me: Identity,
+    @Param('id', { schema: idSchema }) id: string,
+    @Body({ schema: statusChangeSchema }) body: StatusChangeDto,
+  ) {
+    return this.orders.changeStatus(me, id, body);
   }
 }

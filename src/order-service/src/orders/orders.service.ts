@@ -1,13 +1,15 @@
-import { ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectDrizzle } from '@nestjs/drizzle';
 import { and, desc, eq, inArray, type SQL } from 'drizzle-orm';
 import { CartClient, RestaurantClient, UserClient } from '../clients/clients';
+import { APP_CONFIG, type AppConfig } from '../config/config';
 import type { Database, Tx } from '../db/database';
-import { orderLines, orders, orderStatusHistory, outbox, type OrderRow } from '../db/schema';
+import { orderLines, orders, orderStatusHistory, outbox, type Actor, type OrderRow } from '../db/schema';
 import { isAdmin, type Identity } from '../identity/identity';
 import { checkCart, draftOrder } from './checkout';
-import { orderPlaced } from './events';
-import type { CheckoutDto, PageQuery, RestaurantOrdersQuery } from './orders.dto';
+import { orderPlaced, orderStatusChanged } from './events';
+import { decide, estimateOnAccept, LABEL, needsOwnership } from './lifecycle';
+import type { CheckoutDto, PageQuery, RestaurantOrdersQuery, StatusChangeDto } from './orders.dto';
 import { toOrder, type Order, type Page } from './order.view';
 
 const IDEMPOTENCY_CONSTRAINT = 'orders_customer_id_idempotency_key_key';
@@ -30,6 +32,7 @@ export class OrdersService {
     private readonly cart: CartClient,
     private readonly users: UserClient,
     private readonly restaurants: RestaurantClient,
+    @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 
   /**
@@ -41,11 +44,19 @@ export class OrdersService {
     if (previous) return { order: previous, created: false };
 
     const [cart, address] = await Promise.all([this.cart.get(me), this.users.address(me, dto.addressId)]);
-    checkCart(cart, dto.paymentMethod);
+    try {
+      checkCart(cart, dto.paymentMethod);
+    } catch (err) {
+      // A retry that read the cart just after the first attempt emptied it: answer with that order.
+      const first = err instanceof ConflictException ? await this.findByKey(me.userId, key) : null;
+      if (first) return { order: first, created: false };
+      throw err;
+    }
     const [restaurant, quote] = address
       ? await Promise.all([this.restaurants.get(cart.restaurantId), this.restaurants.quote(cart.restaurantId, address.location)])
       : [null, null];
-    const draft = draftOrder({ cart, address, restaurant, quote, now: new Date() });
+    const now = new Date();
+    const draft = draftOrder({ cart, address, restaurant, quote, now });
 
     let orderId: string;
     try {
@@ -60,6 +71,9 @@ export class OrdersService {
             idempotencyKey: key,
             paymentMethod: dto.paymentMethod,
             note: dto.note,
+            // The same instant the promised delivery time was counted from.
+            placedAt: now,
+            updatedAt: now,
           })
           .returning();
         await tx.insert(orderLines).values(lines.map((l, position) => ({ ...l, orderId: order.id, position })));
@@ -108,6 +122,47 @@ export class OrdersService {
     if (order.customerId === me.userId || isAdmin(me)) return order;
     if (await this.restaurants.isOwner(me, order.restaurant.id)) return order;
     throw new NotFoundException('Order not found');
+  }
+
+  /**
+   * Moves the order along its life cycle (lifecycle.ts). Ownership is checked
+   * before the transaction, so no row stays locked while restaurant-service
+   * answers; the update then only applies if the status is still the one we
+   * judged, otherwise 409.
+   */
+  async changeStatus(me: Identity, id: string, { status: to, reason, prepTimeMinutes }: StatusChangeDto): Promise<Order> {
+    const [row] = await this.db.select().from(orders).where(eq(orders.id, id));
+    if (!row) throw new NotFoundException('Order not found');
+    const from = row.status;
+
+    const roles = new Set<Actor>();
+    if (row.customerId === me.userId) roles.add('customer');
+    if (isAdmin(me)) roles.add('admin');
+    if (needsOwnership(from, to, roles) && (await this.restaurants.isOwner(me, row.restaurantId))) roles.add('restaurant');
+    const by = decide(from, { to, reason, prepTimeMinutes }, roles);
+
+    const now = new Date();
+    const accepted =
+      to === 'accepted'
+        ? {
+            prepTimeMinutes,
+            estimatedDeliveryAt: estimateOnAccept(row.estimatedDeliveryAt, now, prepTimeMinutes!, this.config.RIDE_MINUTES),
+          }
+        : {};
+    return this.db.transaction(async (tx) => {
+      const [updated] = await tx
+        .update(orders)
+        .set({ status: to, ...accepted, updatedAt: now })
+        .where(and(eq(orders.id, id), eq(orders.status, from)))
+        .returning();
+      if (!updated) {
+        const [current] = await tx.select({ status: orders.status }).from(orders).where(eq(orders.id, id));
+        throw new ConflictException(`The order changed meanwhile and is ${LABEL[current.status]} now`);
+      }
+      await tx.insert(orderStatusHistory).values({ orderId: id, status: to, actor: by, actorId: me.userId, reason: reason ?? null, at: now });
+      await tx.insert(outbox).values(orderStatusChanged(updated, { from, by, reason: reason ?? null, at: now }));
+      return this.load(tx, id);
+    });
   }
 
   private async findByKey(customerId: string, key: string): Promise<Order | null> {

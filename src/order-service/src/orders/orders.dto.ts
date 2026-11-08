@@ -15,6 +15,13 @@ export const checkoutSchema = z.strictObject({
 });
 export type CheckoutDto = z.output<typeof checkoutSchema>;
 
+export const statusChangeSchema = z.strictObject({
+  status: z.enum(STATUSES),
+  reason: text(500).optional(),
+  prepTimeMinutes: z.int().min(5).max(120).optional(),
+});
+export type StatusChangeDto = z.output<typeof statusChangeSchema>;
+
 export const pageQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(50).default(20),
