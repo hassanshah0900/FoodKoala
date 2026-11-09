@@ -3,15 +3,15 @@ import { Inject, Injectable, Logger, type OnApplicationBootstrap, type OnApplica
 import { setTimeout as sleep } from 'node:timers/promises';
 import { APP_CONFIG, type AppConfig } from '../config/config';
 import { InboxWriter } from './inbox-writer';
-import { messageFor } from './messages';
+import { messagesFor } from './messages';
 import { ORDER_TOPICS, orderEventSchema } from './order-events';
 
 const RETRY_MS = 5000;
 
 /**
- * Reads order events and turns them into notifications. An offset is
- * committed only after its event was recorded; a replay is a no-op because
- * the inbox is unique per event id (ADR 0007). While the database is down the
+ * Reads order events (and delivery.assigned) and turns them into notifications.
+ * An offset is committed only after its event was recorded; a replay is a no-op
+ * because the inbox is unique per event and person (ADR 0007). While the database is down the
  * same event is retried, holding back its partition, so nothing is skipped.
  */
 @Injectable()
@@ -66,11 +66,11 @@ export class OrderEventConsumer implements OnApplicationBootstrap, OnApplication
       this.logger.error(`Skipping malformed event at ${topic}[${partition}]@${message.offset}: ${String(err)}`);
       return;
     }
-    const m = messageFor(event);
-    if (!m) return;
+    const messages = messagesFor(event);
+    if (!messages.length) return;
     for (;;) {
       try {
-        await this.inbox.record(event.id, new Date(event.occurredAt), m);
+        await this.inbox.record(event.id, new Date(event.occurredAt), messages);
         return;
       } catch (err) {
         if (this.stopping) throw err; // leave the offset uncommitted; the next run retries it

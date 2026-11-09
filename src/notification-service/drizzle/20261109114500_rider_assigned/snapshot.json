@@ -1,0 +1,107 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "bb5d6d9d-6b42-4126-9e0a-e1fc5aef6c7d",
+  "prevIds": [
+    "dd65b4e0-f86e-4013-806e-e9a74dd1c361"
+  ],
+  "footprints": [
+    {
+      "statementType": "alter_enum",
+      "statementTarget": [
+        "enum",
+        "notifications",
+        "notification_kind"
+      ],
+      "writes": [
+        "s|enum|notifications.notification_kind"
+      ],
+      "reads": [
+        "n|sch|notifications"
+      ]
+    },
+    {
+      "statementType": "drop_unique",
+      "statementTarget": [
+        "table",
+        "notifications",
+        "notifications"
+      ],
+      "writes": [
+        "s|uq|notifications.notifications.notifications_event_id_key",
+        "n|uq|notifications.notifications.notifications_event_id_key",
+        "e|uq|notifications.notifications.notifications_event_id_key",
+        "n|con|notifications.notifications.notifications_event_id_key",
+        "n|rel|notifications.notifications_event_id_key"
+      ],
+      "reads": [
+        "n|tbl|notifications.notifications",
+        "n|sch|notifications",
+        "e|col|notifications.notifications.event_id"
+      ],
+      "sharedWrites": [
+        "e|uniqueness|notifications.notifications.event_id"
+      ]
+    },
+    {
+      "statementType": "add_unique",
+      "statementTarget": [
+        "table",
+        "notifications",
+        "notifications"
+      ],
+      "writes": [
+        "s|uq|notifications.notifications.notifications_event_id_user_id_key",
+        "n|uq|notifications.notifications.notifications_event_id_user_id_key",
+        "e|uq|notifications.notifications.notifications_event_id_user_id_key",
+        "n|con|notifications.notifications.notifications_event_id_user_id_key",
+        "n|rel|notifications.notifications_event_id_user_id_key"
+      ],
+      "reads": [
+        "n|tbl|notifications.notifications",
+        "n|sch|notifications",
+        "n|col|notifications.notifications.event_id",
+        "n|col|notifications.notifications.user_id"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "notifications",
+        "table": "notifications",
+        "name": "notifications_event_id_user_id_key",
+        "nameExplicit": true,
+        "columns": [
+          "event_id",
+          "user_id"
+        ],
+        "nullsNotDistinct": false,
+        "entityType": "uniques"
+      }
+    },
+    {
+      "op": "drop",
+      "key": "uniques\u0000[\"notifications\",\"notifications\",\"notifications_event_id_key\"]"
+    },
+    {
+      "op": "alter",
+      "key": "enums\u0000[\"notifications\",\"notification_kind\"]",
+      "set": {
+        "values": [
+          "order_placed",
+          "order_accepted",
+          "order_ready",
+          "order_picked_up",
+          "order_delivered",
+          "order_rejected",
+          "order_cancelled",
+          "rider_assigned",
+          "delivery_assigned"
+        ]
+      }
+    }
+  ]
+}
