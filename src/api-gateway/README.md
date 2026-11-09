@@ -11,6 +11,7 @@ Per [ADR 0005](../../docs/adr/0005-gateway-authenticates-services-authorize.md),
 - `Authorization: Bearer <token>` is verified against auth-service's JWKS (`AUTH_JWKS_URL`, cached 5 min, refetched on an unknown `kid`). Only `RS256` is accepted, and `exp`, `nbf`, `iss` and `aud` are checked.
 - Valid tokens reach services as `X-User-Id`, `X-User-Roles` and `X-User-Phone` ([contracts](../../contracts/README.md#identity-headers)). Those headers are always stripped from client requests.
 - `auth`, `restaurants`, `menus` and `search` are public. Every other route returns 401 without a valid token. `auth` ignores the `Authorization` header entirely.
+- WebSockets (browsers can't set `Authorization` on them) may send the token as the subprotocol `bearer.<token>` instead ([contracts](../../contracts/README.md#websockets)). The gateway always removes it from `Sec-WebSocket-Protocol` before proxying; the upgrade itself passes through.
 
 ## Run
 
