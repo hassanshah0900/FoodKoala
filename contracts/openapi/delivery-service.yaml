@@ -1,0 +1,520 @@
+openapi: 3.1.0
+info:
+  title: delivery-service
+  version: 0.1.0
+  description: |
+    Riders, their shifts, and getting each order from the restaurant to the door.
+
+    **Riders.** Any signed-in user can apply to ride. An admin approves
+    them. Approved riders go online with their location and keep sending it
+    while on shift. They can't go offline while carrying an order.
+
+    **Deliveries** come from order events. `order.placed` creates one
+    (`waiting`); when the restaurant accepts it starts `searching`. The
+    service then gives it to the nearest approved, online, free rider within
+    5 km of the restaurant whose location is fresh (`assigned`). The rider
+    picks it up (`picked_up`) and drops it off (`delivered`); each step is
+    published as a `delivery.*` event, which order-service applies to the
+    order. A rider can decline an assigned delivery; it goes to someone else
+    and is never offered to them again. A rejected or cancelled order cancels
+    its delivery and frees the rider.
+
+    **Who sees what.** Riders see and act on their own deliveries. The
+    customer sees their order's delivery and rider. Admins see everything.
+
+    Locations are WGS 84 inside Pakistan; money is in paisa.
+servers:
+  - url: http://localhost:8080/api/v1/delivery
+    description: Through api-gateway
+  - url: http://localhost:8081
+    description: Service directly (send the identity headers yourself)
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: riders
+    description: Rider sign-up, shifts and location
+  - name: deliveries
+    description: Deliveries and the rider's steps
+  - name: admin
+    description: Rider review and delivery overview
+  - name: health
+    description: Liveness and readiness probes
+
+paths:
+  /riders:
+    post:
+      tags: [riders]
+      operationId: applyToRide
+      summary: Apply to become a rider (starts pending)
+      description: The phone number is the one the caller signed in with.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Application' }
+      responses:
+        '201':
+          description: Application received
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Rider' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    get:
+      tags: [admin]
+      operationId: listRiders
+      summary: Riders with a status, oldest application first (admin)
+      parameters:
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/RiderStatus' }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Page of riders
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RiderPage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /riders/me:
+    get:
+      tags: [riders]
+      operationId: getMyRider
+      summary: My rider account
+      responses:
+        '200':
+          description: Rider
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Rider' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /riders/me/online:
+    post:
+      tags: [riders]
+      operationId: goOnline
+      summary: Start a shift (approved riders only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [location]
+              additionalProperties: false
+              properties:
+                location: { $ref: '#/components/schemas/Location' }
+      responses:
+        '200':
+          description: Online
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Rider' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /riders/me/offline:
+    post:
+      tags: [riders]
+      operationId: goOffline
+      summary: End a shift (not while carrying an order)
+      responses:
+        '200':
+          description: Offline
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Rider' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /riders/me/location:
+    put:
+      tags: [riders]
+      operationId: updateMyLocation
+      summary: Where I am now (while online); send every few seconds
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Location' }
+      responses:
+        '204': { description: Recorded }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /riders/me/delivery:
+    get:
+      tags: [deliveries]
+      operationId: getMyDelivery
+      summary: The delivery I'm carrying or on my way to collect
+      responses:
+        '200':
+          description: Delivery
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Delivery' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /riders/{userId}/status:
+    parameters:
+      - name: userId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [admin]
+      operationId: setRiderStatus
+      summary: Approve, suspend or return a rider to pending (admin)
+      description: Suspending or returning to pending ends the shift; not while the rider carries an order.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              additionalProperties: false
+              properties:
+                status: { $ref: '#/components/schemas/RiderStatus' }
+      responses:
+        '200':
+          description: Rider after the change
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Rider' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /deliveries:
+    get:
+      tags: [admin]
+      operationId: listDeliveries
+      summary: Deliveries with a status, newest first (admin)
+      parameters:
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/DeliveryStatus' }
+          description: Defaults to `searching`
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Page of deliveries
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DeliveryPage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /deliveries/orders/{orderId}:
+    parameters:
+      - name: orderId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [deliveries]
+      operationId: getOrderDelivery
+      summary: An order's delivery and rider (its customer, its rider, admins)
+      responses:
+        '200':
+          description: Delivery
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Delivery' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /deliveries/{id}/pickup:
+    parameters:
+      - $ref: '#/components/parameters/DeliveryId'
+    post:
+      tags: [deliveries]
+      operationId: pickUp
+      summary: I have the food (the assigned rider)
+      responses:
+        '200':
+          description: Delivery, now picked_up
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Delivery' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /deliveries/{id}/dropoff:
+    parameters:
+      - $ref: '#/components/parameters/DeliveryId'
+    post:
+      tags: [deliveries]
+      operationId: dropOff
+      summary: The customer has the food, and the cash is collected (the assigned rider)
+      responses:
+        '200':
+          description: Delivery, now delivered
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Delivery' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /deliveries/{id}/decline:
+    parameters:
+      - $ref: '#/components/parameters/DeliveryId'
+    post:
+      tags: [deliveries]
+      operationId: decline
+      summary: Hand an assigned delivery back before pickup (the assigned rider)
+      responses:
+        '204': { description: Declined; it goes to another rider }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /healthz:
+    get:
+      tags: [health]
+      operationId: liveness
+      security: [{}]
+      summary: Liveness probe
+      responses:
+        '200': { $ref: '#/components/responses/Ok' }
+
+  /readyz:
+    get:
+      tags: [health]
+      operationId: readiness
+      security: [{}]
+      summary: Readiness probe
+      description: PostgreSQL reachable and, when Kafka is configured, the order-event consumer running.
+      responses:
+        '200': { $ref: '#/components/responses/Ok' }
+        '503':
+          description: Not ready
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, const: unavailable }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Access token from auth-service, verified by api-gateway.
+
+  parameters:
+    DeliveryId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    Page:
+      name: page
+      in: query
+      schema: { type: integer, minimum: 1, default: 1 }
+    Limit:
+      name: limit
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+
+  responses:
+    Ok:
+      description: OK
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              status: { type: string, const: ok }
+    BadRequest:
+      description: Invalid body, query or id
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unauthorized:
+      description: No authenticated user
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Forbidden:
+      description: Not an admin, or a rider account that isn't approved
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: No such rider or delivery, or not one the caller can see
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Conflict:
+      description: Not possible in the current state (already applied, carrying an order, cancelled, wrong step)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+  schemas:
+    Location:
+      type: object
+      required: [lat, lng]
+      additionalProperties: false
+      properties:
+        lat: { type: number, minimum: 23.5, maximum: 37.1 }
+        lng: { type: number, minimum: 60.8, maximum: 77.9 }
+
+    Vehicle:
+      type: string
+      enum: [motorbike, bicycle, car]
+
+    RiderStatus:
+      type: string
+      enum: [pending, approved, suspended]
+
+    DeliveryStatus:
+      type: string
+      enum: [waiting, searching, assigned, picked_up, delivered, cancelled]
+
+    Application:
+      type: object
+      required: [name, vehicle, city]
+      additionalProperties: false
+      properties:
+        name: { type: string, minLength: 2, maxLength: 80 }
+        vehicle: { $ref: '#/components/schemas/Vehicle' }
+        city: { type: string, minLength: 2, maxLength: 60 }
+
+    Rider:
+      type: object
+      required: [userId, name, phone, vehicle, city, status, online, location, locatedAt, createdAt, updatedAt]
+      properties:
+        userId: { type: string, format: uuid }
+        name: { type: string }
+        phone: { type: string }
+        vehicle: { $ref: '#/components/schemas/Vehicle' }
+        city: { type: string }
+        status: { $ref: '#/components/schemas/RiderStatus' }
+        online: { type: boolean }
+        location:
+          oneOf:
+            - $ref: '#/components/schemas/Location'
+            - type: 'null'
+        locatedAt: { type: [string, 'null'], format: date-time }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    Delivery:
+      type: object
+      required:
+        - id
+        - orderId
+        - status
+        - restaurant
+        - dropoff
+        - customerPhone
+        - cashToCollectPaisa
+        - deliveryFeePaisa
+        - rider
+        - foodReadyAt
+        - assignedAt
+        - pickedUpAt
+        - deliveredAt
+        - cancelledAt
+        - createdAt
+      properties:
+        id: { type: string, format: uuid }
+        orderId: { type: string, format: uuid }
+        status: { $ref: '#/components/schemas/DeliveryStatus' }
+        restaurant:
+          type: object
+          required: [id, name, location]
+          properties:
+            id: { type: string, format: uuid }
+            name: { type: string }
+            location: { $ref: '#/components/schemas/Location' }
+        dropoff:
+          type: object
+          required: [location, text, landmark]
+          properties:
+            location: { $ref: '#/components/schemas/Location' }
+            text: { type: string }
+            landmark: { type: [string, 'null'] }
+        customerPhone: { type: string }
+        cashToCollectPaisa: { type: integer, description: 'The order total for cash on delivery, else 0' }
+        deliveryFeePaisa: { type: integer, description: What the rider earns for it }
+        rider:
+          description: Null until a rider is assigned
+          oneOf:
+            - type: object
+              required: [userId, name, phone, vehicle, location]
+              properties:
+                userId: { type: string, format: uuid }
+                name: { type: string }
+                phone: { type: string }
+                vehicle: { $ref: '#/components/schemas/Vehicle' }
+                location:
+                  oneOf:
+                    - $ref: '#/components/schemas/Location'
+                    - type: 'null'
+            - type: 'null'
+        foodReadyAt: { type: [string, 'null'], format: date-time }
+        assignedAt: { type: [string, 'null'], format: date-time }
+        pickedUpAt: { type: [string, 'null'], format: date-time }
+        deliveredAt: { type: [string, 'null'], format: date-time }
+        cancelledAt: { type: [string, 'null'], format: date-time }
+        createdAt: { type: string, format: date-time }
+
+    RiderPage:
+      type: object
+      required: [items, page, limit, hasMore]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Rider' }
+        page: { type: integer }
+        limit: { type: integer }
+        hasMore: { type: boolean }
+
+    DeliveryPage:
+      type: object
+      required: [items, page, limit, hasMore]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Delivery' }
+        page: { type: integer }
+        limit: { type: integer }
+        hasMore: { type: boolean }
+
+    Error:
+      type: object
+      required: [statusCode, message]
+      properties:
+        statusCode: { type: integer }
+        error: { type: string }
+        message: { type: string }

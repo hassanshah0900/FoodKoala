@@ -4,7 +4,31 @@ services:
     ports: ["8080:8080"]
   delivery-service:
     build: ../../src/delivery-service
+    image: foodkoala/delivery-service:local
     ports: ["8081:8081"]
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-foodkoala}:${POSTGRES_PASSWORD:-foodkoala}@postgres:5432/${POSTGRES_DB:-foodkoala}
+      # Order events in, delivery events out
+      KAFKA_BROKERS: kafka:29092
+    depends_on:
+      delivery-migrate: { condition: service_completed_successfully }
+      kafka: { condition: service_started }
+    healthcheck:
+      # The distroless image has no shell or wget; the binary checks its own /readyz.
+      test: ["CMD", "/server", "healthcheck"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+  delivery-migrate:
+    image: foodkoala/delivery-service:local
+    pull_policy: never
+    command: ["migrate"]
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-foodkoala}:${POSTGRES_PASSWORD:-foodkoala}@postgres:5432/${POSTGRES_DB:-foodkoala}
+    depends_on:
+      postgres: { condition: service_healthy }
+    restart: "no"
   tracking-service:
     build: ../../src/tracking-service
     ports: ["8082:8082"]
