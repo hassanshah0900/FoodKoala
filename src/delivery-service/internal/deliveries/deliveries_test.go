@@ -195,6 +195,13 @@ func TestAssignsTheNearestFreeRiderInRange(t *testing.T) {
 	if got := f.topics(first); len(got) != 1 || got[0] != "delivery.assigned" {
 		t.Fatalf("expected delivery.assigned, got %v", got)
 	}
+	var data map[string]any
+	if err := f.db.QueryRow(f.ctx, `SELECT payload->'data' FROM delivery.outbox WHERE key = $1`, first).Scan(&data); err != nil {
+		t.Fatal(err)
+	}
+	if data["riderId"] != best.UserID || data["customerPhone"] != "+923001112233" || data["restaurantName"] != "Karachi Broast" || data["customerId"] == "" {
+		t.Fatalf("delivery.assigned data: %v", data)
+	}
 }
 
 func TestRiderPicksUpAndDropsOff(t *testing.T) {
