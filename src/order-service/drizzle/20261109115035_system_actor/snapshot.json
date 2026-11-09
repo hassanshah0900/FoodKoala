@@ -1,0 +1,65 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "7ad883ed-c8f4-48b7-b47c-231f8d60951b",
+  "prevIds": [
+    "cea72c7f-46c7-4525-8466-150e7a6e8838"
+  ],
+  "footprints": [
+    {
+      "statementType": "alter_enum",
+      "statementTarget": [
+        "enum",
+        "orders",
+        "actor"
+      ],
+      "writes": [
+        "s|enum|orders.actor"
+      ],
+      "reads": [
+        "n|sch|orders"
+      ]
+    },
+    {
+      "statementType": "alter_column",
+      "statementTarget": [
+        "column",
+        "orders",
+        "order_status_history",
+        "actor_id"
+      ],
+      "writes": [
+        "s|colprop|orders.order_status_history.actor_id.notNull"
+      ],
+      "reads": [
+        "n|tbl|orders.order_status_history",
+        "n|sch|orders",
+        "n|col|orders.order_status_history.actor_id"
+      ],
+      "sqlHash": "e2d782c4df2619cd"
+    }
+  ],
+  "deltas": [
+    {
+      "op": "alter",
+      "key": "enums\u0000[\"orders\",\"actor\"]",
+      "set": {
+        "values": [
+          "customer",
+          "restaurant",
+          "admin",
+          "rider",
+          "system"
+        ]
+      }
+    },
+    {
+      "op": "alter",
+      "key": "columns\u0000[\"orders\",\"order_status_history\",\"actor_id\"]",
+      "set": {
+        "notNull": false
+      }
+    }
+  ]
+}

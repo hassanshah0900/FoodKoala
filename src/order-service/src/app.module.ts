@@ -6,6 +6,7 @@ import { ConfigModule } from './config/config.module';
 import { CartClient, RestaurantClient, UserClient } from './clients/clients';
 import { DeliveryEventConsumer } from './delivery/delivery-event-consumer';
 import { HealthController } from './health/health.controller';
+import { AcceptTimeouts } from './orders/accept-timeouts';
 import { OrdersController } from './orders/orders.controller';
 import { OrdersService } from './orders/orders.service';
 import { OutboxRelay } from './outbox/outbox-relay';
@@ -22,6 +23,7 @@ import { EVENT_PUBLISHER, KafkaPublisher } from './outbox/publisher';
   controllers: [HealthController, OrdersController],
   providers: [
     OrdersService,
+    AcceptTimeouts,
     CartClient,
     UserClient,
     RestaurantClient,

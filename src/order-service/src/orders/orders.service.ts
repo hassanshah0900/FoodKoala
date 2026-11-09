@@ -1,6 +1,6 @@
 import { ConflictException, ForbiddenException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectDrizzle } from '@nestjs/drizzle';
-import { and, desc, eq, inArray, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, lt, type SQL } from 'drizzle-orm';
 import { CartClient, RestaurantClient, UserClient } from '../clients/clients';
 import { APP_CONFIG, type AppConfig } from '../config/config';
 import type { Database, Tx } from '../db/database';
@@ -11,6 +11,9 @@ import { orderPlaced, orderStatusChanged } from './events';
 import { decide, estimateOnAccept, LABEL, needsOwnership, ruleFor } from './lifecycle';
 import type { CheckoutDto, PageQuery, RestaurantOrdersQuery, StatusChangeDto } from './orders.dto';
 import { toOrder, type Order, type Page } from './order.view';
+
+/** How many unanswered orders one transaction rejects. */
+export const REJECT_BATCH = 50;
 
 const IDEMPOTENCY_CONSTRAINT = 'orders_customer_id_idempotency_key_key';
 
@@ -176,10 +179,35 @@ export class OrdersService {
     });
   }
 
+  /**
+   * Rejects up to `limit` orders still `placed` that were placed before
+   * `cutoff`: the restaurant never answered. Rows are locked with SKIP LOCKED,
+   * so replicas share the work and a restaurant accepting at the same moment
+   * either wins (the order is no longer placed) or waits and gets 409.
+   * Returns the ids rejected.
+   */
+  async rejectUnanswered(cutoff: Date, now: Date, limit = REJECT_BATCH): Promise<string[]> {
+    return this.db.transaction(async (tx) => {
+      const stale = await tx
+        .select({ id: orders.id })
+        .from(orders)
+        .where(and(eq(orders.status, 'placed'), lt(orders.placedAt, cutoff)))
+        .orderBy(asc(orders.placedAt))
+        .limit(limit)
+        .for('update', { skipLocked: true });
+      const minutes = this.config.ACCEPT_TIMEOUT_MINUTES;
+      const reason = `Not accepted within ${minutes} minute${minutes === 1 ? '' : 's'}`;
+      for (const { id } of stale) {
+        await this.move(tx, { id, from: 'placed', to: 'rejected', by: 'system', actorId: null, reason, at: now, fields: {} });
+      }
+      return stale.map((r) => r.id);
+    });
+  }
+
   /** One status change with its timeline entry and event; 409 if the order moved on meanwhile. */
   private async move(
     tx: Tx,
-    c: { id: string; from: Status; to: Status; by: Actor; actorId: string; reason: string | null; at: Date; fields: Partial<OrderRow> },
+    c: { id: string; from: Status; to: Status; by: Actor; actorId: string | null; reason: string | null; at: Date; fields: Partial<OrderRow> },
   ): Promise<void> {
     const [updated] = await tx
       .update(orders)

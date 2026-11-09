@@ -63,6 +63,13 @@ describe('decide', () => {
     );
   });
 
+  it('lets the system reject an unanswered order without naming it to callers', () => {
+    expect(decide('placed', { to: 'rejected', reason: 'Not accepted within 10 minutes' }, as('system'))).toBe('system');
+    expect(() => decide('placed', { to: 'rejected', reason: 'x' }, as('customer'))).toThrow(
+      new ForbiddenException('Only the restaurant or an admin can reject this order'),
+    );
+  });
+
   it('walks the happy path', () => {
     expect(decide('accepted', { to: 'ready' }, as('restaurant'))).toBe('restaurant');
     expect(decide('ready', { to: 'picked_up' }, as('admin'))).toBe('admin');
