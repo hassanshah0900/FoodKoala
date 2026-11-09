@@ -1,0 +1,218 @@
+openapi: 3.1.0
+info:
+  title: tracking-service
+  version: 0.1.0
+  description: |
+    Where the rider is, live, and when the food should arrive.
+
+    The service follows each order from its events: `order.placed` gives
+    the restaurant and the door, `delivery.assigned` the rider,
+    `delivery.picked_up` and `delivery.delivered` the steps, and
+    `rider.location` the rider's position every few seconds. A cancelled or
+    rejected order (`order.status_changed`) ends the tracking.
+
+    **Arrival time.** On every position the service counts the distance
+    still to ride (to the restaurant and then the door before pickup, to
+    the door after) as the crow flies times 1.35 for the roads, at a
+    typical city speed for the rider's vehicle (motorbike 25 km/h, car 20,
+    bicycle 12).
+
+    **Live updates.** `GET /orders/{orderId}/live` is a WebSocket. It sends
+    the current tracking at once and again on every change, each message a
+    whole `Tracking`; a `version` lower than one already seen is stale and
+    can be ignored. The server closes the socket (1000) after the final
+    message of a delivered or cancelled order. Through api-gateway send the
+    access token as the subprotocol `bearer.<token>` next to
+    `foodkoala.tracking.v1` (contracts/README.md#websockets).
+
+    **Who sees what.** The customer who placed the order, the rider
+    carrying it and admins. Anyone else gets 404.
+servers:
+  - url: http://localhost:8080/api/v1/tracking
+    description: Through api-gateway
+  - url: http://localhost:8082
+    description: Service directly (send the identity headers yourself)
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: tracking
+    description: Live rider location and arrival time
+  - name: health
+    description: Liveness and readiness probes
+
+paths:
+  /orders/{orderId}:
+    get:
+      tags: [tracking]
+      operationId: getTracking
+      summary: Where the order is now
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      responses:
+        '200':
+          description: Tracking
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Tracking' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /orders/{orderId}/live:
+    get:
+      tags: [tracking]
+      operationId: watchTracking
+      summary: WebSocket of the order's tracking, sent on every change
+      description: |
+        Upgrade with subprotocol `foodkoala.tracking.v1`. Every text
+        message is a `Tracking` as JSON. The server pings every 30 seconds.
+        The checks below are answered before the upgrade, as plain HTTP.
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      responses:
+        '101':
+          description: Switching to the WebSocket; messages are Tracking
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Tracking' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '426':
+          description: Not a WebSocket upgrade
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /healthz:
+    get:
+      tags: [health]
+      operationId: healthz
+      summary: Liveness
+      security: []
+      responses:
+        '200': { $ref: '#/components/responses/Ok' }
+  /readyz:
+    get:
+      tags: [health]
+      operationId: readyz
+      summary: Readiness (Redis answers, the event consumer runs)
+      security: []
+      responses:
+        '200': { $ref: '#/components/responses/Ok' }
+        '503':
+          description: Not ready
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Access token from auth-service, verified by api-gateway.
+
+  parameters:
+    OrderId:
+      name: orderId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+
+  responses:
+    Ok:
+      description: OK
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              status: { type: string, const: ok }
+    BadRequest:
+      description: The order id is not a UUID
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unauthorized:
+      description: No authenticated user
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: No tracking for this order, or not one the caller can see
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+  schemas:
+    Location:
+      type: object
+      required: [lat, lng]
+      properties:
+        lat: { type: number }
+        lng: { type: number }
+
+    Tracking:
+      type: object
+      required: [orderId, status, restaurant, dropoff, rider, riderLocation, remainingMeters, eta, version, updatedAt]
+      properties:
+        orderId: { type: string, format: uuid }
+        status:
+          type: string
+          enum: [waiting_for_rider, to_restaurant, to_customer, delivered, cancelled]
+          description: |
+            `waiting_for_rider` until one is assigned, `to_restaurant` while
+            they ride to collect, `to_customer` once they have the food.
+        restaurant:
+          description: Where the food is collected
+          oneOf:
+            - $ref: '#/components/schemas/Location'
+            - type: 'null'
+        dropoff:
+          description: The customer's door
+          oneOf:
+            - $ref: '#/components/schemas/Location'
+            - type: 'null'
+        rider:
+          oneOf:
+            - type: 'null'
+            - type: object
+              required: [id, name, phone, vehicle]
+              properties:
+                id: { type: string, format: uuid }
+                name: { type: string }
+                phone: { type: string, description: E.164 }
+                vehicle: { type: string, enum: [motorbike, bicycle, car] }
+        riderLocation:
+          description: The rider's last reported position
+          oneOf:
+            - type: 'null'
+            - type: object
+              required: [lat, lng, at]
+              properties:
+                lat: { type: number }
+                lng: { type: number }
+                at: { type: string, format: date-time }
+        remainingMeters:
+          description: Road distance the rider still has to ride; null before their first position
+          type: [integer, 'null']
+        eta:
+          description: When the rider should reach the door; null before their first position and once finished
+          type: [string, 'null']
+          format: date-time
+        version:
+          type: integer
+          description: Goes up with every change
+        updatedAt: { type: string, format: date-time }
+
+    Error:
+      type: object
+      required: [statusCode, message]
+      properties:
+        statusCode: { type: integer }
+        error: { type: string }
+        message: { type: string }

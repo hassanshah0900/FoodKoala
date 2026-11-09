@@ -37,6 +37,19 @@ headers (ADR 0005). Clients can never set them; the gateway strips them.
 No `X-User-Id` means an anonymous request (only possible on public routes).
 The original `Authorization` header is forwarded too.
 
+### WebSockets
+
+Browsers can't set `Authorization` on a WebSocket, so the gateway also takes
+the access token as a subprotocol, `bearer.<token>`, offered next to the real
+one:
+
+```js
+new WebSocket(url, ['foodkoala.tracking.v1', `bearer.${accessToken}`]);
+```
+
+The gateway removes the token from `Sec-WebSocket-Protocol` before the
+request goes on, so services only ever see (and pick) the real subprotocol.
+
 ## Conventions
 
 - **Money** is an integer number of paisa (1 PKR = 100 paisa), in fields

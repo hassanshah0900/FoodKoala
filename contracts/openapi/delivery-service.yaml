@@ -143,6 +143,7 @@ paths:
       tags: [riders]
       operationId: updateMyLocation
       summary: Where I am now (while online); send every few seconds
+      description: While the rider carries an order the position is also published as `rider.location`, which tracking-service shows the customer.
       requestBody:
         required: true
         content:
