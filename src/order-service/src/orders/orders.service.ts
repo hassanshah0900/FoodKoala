@@ -4,11 +4,11 @@ import { and, desc, eq, inArray, type SQL } from 'drizzle-orm';
 import { CartClient, RestaurantClient, UserClient } from '../clients/clients';
 import { APP_CONFIG, type AppConfig } from '../config/config';
 import type { Database, Tx } from '../db/database';
-import { orderLines, orders, orderStatusHistory, outbox, type Actor, type OrderRow } from '../db/schema';
+import { orderLines, orders, orderStatusHistory, outbox, type Actor, type OrderRow, type Status } from '../db/schema';
 import { isAdmin, type Identity } from '../identity/identity';
 import { checkCart, draftOrder } from './checkout';
 import { orderPlaced, orderStatusChanged } from './events';
-import { decide, estimateOnAccept, LABEL, needsOwnership } from './lifecycle';
+import { decide, estimateOnAccept, LABEL, needsOwnership, ruleFor } from './lifecycle';
 import type { CheckoutDto, PageQuery, RestaurantOrdersQuery, StatusChangeDto } from './orders.dto';
 import { toOrder, type Order, type Page } from './order.view';
 
@@ -150,19 +150,50 @@ export class OrdersService {
           }
         : {};
     return this.db.transaction(async (tx) => {
-      const [updated] = await tx
-        .update(orders)
-        .set({ status: to, ...accepted, updatedAt: now })
-        .where(and(eq(orders.id, id), eq(orders.status, from)))
-        .returning();
-      if (!updated) {
-        const [current] = await tx.select({ status: orders.status }).from(orders).where(eq(orders.id, id));
-        throw new ConflictException(`The order changed meanwhile and is ${LABEL[current.status]} now`);
-      }
-      await tx.insert(orderStatusHistory).values({ orderId: id, status: to, actor: by, actorId: me.userId, reason: reason ?? null, at: now });
-      await tx.insert(outbox).values(orderStatusChanged(updated, { from, by, reason: reason ?? null, at: now }));
+      await this.move(tx, { id, from, to, by, actorId: me.userId, reason: reason ?? null, at: now, fields: accepted });
       return this.load(tx, id);
     });
+  }
+
+  /**
+   * Applies a rider's pickup or drop-off from delivery-service. A drop-off for
+   * an order not yet picked up records both steps, since the two events travel
+   * on separate topics and may arrive in either order. Returns false when there
+   * was nothing to do: unknown order, already applied, or cancelled meanwhile.
+   */
+  async applyRiderEvent(orderId: string, to: 'picked_up' | 'delivered', riderId: string, at: Date): Promise<boolean> {
+    return this.db.transaction(async (tx) => {
+      const [row] = await tx.select().from(orders).where(eq(orders.id, orderId)).for('update');
+      if (!row) return false;
+      const steps: Status[] = to === 'delivered' && row.status !== 'picked_up' ? ['picked_up', 'delivered'] : [to];
+      let from = row.status;
+      for (const step of steps) {
+        if (!ruleFor(from, step)?.by.includes('rider')) return false;
+        await this.move(tx, { id: orderId, from, to: step, by: 'rider', actorId: riderId, reason: null, at, fields: {} });
+        from = step;
+      }
+      return true;
+    });
+  }
+
+  /** One status change with its timeline entry and event; 409 if the order moved on meanwhile. */
+  private async move(
+    tx: Tx,
+    c: { id: string; from: Status; to: Status; by: Actor; actorId: string; reason: string | null; at: Date; fields: Partial<OrderRow> },
+  ): Promise<void> {
+    const [updated] = await tx
+      .update(orders)
+      .set({ ...c.fields, status: c.to, updatedAt: c.at })
+      .where(and(eq(orders.id, c.id), eq(orders.status, c.from)))
+      .returning();
+    if (!updated) {
+      const [current] = await tx.select({ status: orders.status }).from(orders).where(eq(orders.id, c.id));
+      throw new ConflictException(`The order changed meanwhile and is ${LABEL[current.status]} now`);
+    }
+    await tx
+      .insert(orderStatusHistory)
+      .values({ orderId: c.id, status: c.to, actor: c.by, actorId: c.actorId, reason: c.reason, at: c.at });
+    await tx.insert(outbox).values(orderStatusChanged(updated, { from: c.from, by: c.by, reason: c.reason, at: c.at }));
   }
 
   private async findByKey(customerId: string, key: string): Promise<Order | null> {

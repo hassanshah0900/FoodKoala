@@ -16,9 +16,11 @@ export const TRANSITIONS: Readonly<Partial<Record<`${Status}>${Status}`, Rule>>>
   'accepted>ready': { by: ['restaurant'] },
   'accepted>cancelled': { by: ['admin'], reasonFrom: ['admin'] },
   'ready>cancelled': { by: ['admin'], reasonFrom: ['admin'] },
-  // Until delivery-service assigns riders, an admin records pickup and delivery.
-  'ready>picked_up': { by: ['admin'] },
-  'picked_up>delivered': { by: ['admin'] },
+  // The rider's pickups and drop-offs arrive as delivery events; an admin can still record them by hand.
+  // A rider may pick up an order the restaurant forgot to mark ready.
+  'accepted>picked_up': { by: ['rider'] },
+  'ready>picked_up': { by: ['rider', 'admin'] },
+  'picked_up>delivered': { by: ['rider', 'admin'] },
 };
 
 export const FINAL: readonly Status[] = ['delivered', 'rejected', 'cancelled'];
@@ -74,7 +76,7 @@ export function decide(from: Status, change: Change, roles: ReadonlySet<Actor>):
   }
   const actor = rule.by.find((a) => roles.has(a));
   if (!actor) {
-    const who = rule.by.map((a) => (a === 'customer' ? 'the customer' : a === 'admin' ? 'an admin' : 'the restaurant'));
+    const who = rule.by.map((a) => ({ customer: 'the customer', admin: 'an admin', restaurant: 'the restaurant', rider: 'the rider' })[a]);
     throw new ForbiddenException(`Only ${who.join(' or ')} can ${VERB[change.to]} this order`);
   }
   if (rule.reasonFrom?.includes(actor) && !change.reason) {

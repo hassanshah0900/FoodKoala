@@ -38,6 +38,7 @@ export interface Address {
 export interface Restaurant {
   id: string;
   name: string;
+  location: { lat: number; lng: number };
   /** Only present when the caller owns the restaurant or is an admin. */
   ownerId?: string;
 }

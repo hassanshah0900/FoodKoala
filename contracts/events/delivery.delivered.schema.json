@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "delivery.delivered",
+  "title": "DeliveryDelivered",
+  "description": "`data` of the delivery.delivered event: the rider handed the order over. order-service moves the order to delivered. Keyed by orderId.",
+  "type": "object",
+  "required": ["deliveryId", "orderId", "riderId", "at"],
+  "properties": {
+    "deliveryId": { "type": "string", "format": "uuid" },
+    "orderId": { "type": "string", "format": "uuid" },
+    "riderId": { "type": "string", "format": "uuid" },
+    "at": { "type": "string", "format": "date-time" }
+  }
+}

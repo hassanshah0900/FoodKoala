@@ -1,5 +1,5 @@
 import { clock, messageFor, ref, rupees } from './messages';
-import type { OrderEvent } from './order-events';
+import { orderEventSchema, type OrderEvent } from './order-events';
 
 const orderId = 'ab12cd34-0000-4000-8000-000000000000';
 const customerId = '7d3c8f8e-3a0e-4c55-9a6b-3f1c2b8a9d10';
@@ -48,7 +48,7 @@ describe('messageFor', () => {
   });
 
   it('texts when the order is on its way, not when it is ready or delivered', () => {
-    expect(messageFor(changed('picked_up', { from: 'ready', by: 'admin' }))?.sms?.body).toBe(
+    expect(messageFor(changed('picked_up', { from: 'ready', by: 'rider' }))?.sms?.body).toBe(
       'FoodKoala: Your order #AB12CD34 from Karachi Broast is on its way.',
     );
     expect(messageFor(changed('ready', { from: 'accepted' }))?.sms).toBeNull();
@@ -68,5 +68,10 @@ describe('messageFor', () => {
     expect(theirs?.sms?.body).toBe(
       'FoodKoala: Your order #AB12CD34 from Karachi Broast was cancelled: Rider unavailable. You have not been charged.',
     );
+  });
+
+  it('reads events from actors it does not know yet', () => {
+    const event = { id: crypto.randomUUID(), type: 'order.status_changed', occurredAt: new Date().toISOString(), data: { ...common, from: 'picked_up', to: 'delivered', by: 'rider', reason: null } };
+    expect(orderEventSchema.parse(event).data).toMatchObject({ by: 'rider' });
   });
 });

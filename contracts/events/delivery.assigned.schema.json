@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "delivery.assigned",
+  "title": "DeliveryAssigned",
+  "description": "`data` of the delivery.assigned event, published by delivery-service when a rider is given an order (again after a reassignment). Keyed by orderId.",
+  "type": "object",
+  "required": ["deliveryId", "orderId", "riderId", "riderName", "riderPhone", "vehicle", "at"],
+  "properties": {
+    "deliveryId": { "type": "string", "format": "uuid" },
+    "orderId": { "type": "string", "format": "uuid" },
+    "riderId": { "type": "string", "format": "uuid", "description": "auth-service user id of the rider" },
+    "riderName": { "type": "string" },
+    "riderPhone": { "type": "string", "description": "E.164, for the customer and restaurant to call" },
+    "vehicle": { "enum": ["motorbike", "bicycle", "car"] },
+    "at": { "type": "string", "format": "date-time" }
+  }
+}

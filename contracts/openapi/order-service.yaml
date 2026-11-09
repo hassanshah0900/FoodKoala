@@ -23,11 +23,14 @@ info:
     | `placed` | `cancelled` | the customer, or an admin with a reason |
     | `accepted` | `ready` | the restaurant, when the food is ready for pickup |
     | `accepted`, `ready` | `cancelled` | an admin, with a reason |
-    | `ready` | `picked_up` | an admin (riders, once delivery-service assigns them) |
-    | `picked_up` | `delivered` | an admin (riders, once delivery-service assigns them) |
+    | `accepted`, `ready` | `picked_up` | the assigned rider (via `delivery.picked_up`), or an admin from `ready` |
+    | `picked_up` | `delivered` | the assigned rider (via `delivery.delivered`), or an admin |
 
     `delivered`, `rejected` and `cancelled` are final. "The restaurant"
-    means its owner, checked with restaurant-service (ADR 0006).
+    means its owner, checked with restaurant-service (ADR 0006). Riders
+    don't call this API: delivery-service publishes their pickups and
+    drop-offs, and order-service applies them (recorded as `rider`). A rider
+    may pick up an order the restaurant forgot to mark ready.
 
     **Who sees what.** Customers see their own orders. Restaurant owners
     see the orders of their restaurants. Admins see every order. Anyone else
@@ -35,7 +38,8 @@ info:
 
     **Events.** Every order placed and every status change is written to an
     outbox in the same transaction as the change, for publishing to Kafka as
-    `order.placed` and `order.status_changed` (`contracts/events`).
+    `order.placed` and `order.status_changed` (`contracts/events`). It reads
+    `delivery.picked_up` and `delivery.delivered`.
 
     **Money** is in paisa (integer, 1 PKR = 100 paisa). Menu prices include
     sales tax.
@@ -352,7 +356,7 @@ components:
       properties:
         status: { $ref: '#/components/schemas/Status' }
         at: { type: string, format: date-time }
-        by: { type: string, enum: [customer, restaurant, admin] }
+        by: { type: string, enum: [customer, restaurant, admin, rider] }
         reason: { type: [string, 'null'] }
 
     Order:
@@ -382,10 +386,15 @@ components:
         customerPhone: { type: string, description: For the restaurant and rider to call }
         restaurant:
           type: object
-          required: [id, name]
+          required: [id, name, location]
           properties:
             id: { type: string, format: uuid }
             name: { type: string }
+            location:
+              description: Where the rider picks up; null for orders placed before it was recorded
+              oneOf:
+                - $ref: '#/components/schemas/Location'
+                - type: 'null'
         lines:
           type: array
           items: { $ref: '#/components/schemas/OrderLine' }

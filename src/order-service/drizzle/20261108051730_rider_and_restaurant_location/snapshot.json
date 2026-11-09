@@ -1,0 +1,73 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "cea72c7f-46c7-4525-8466-150e7a6e8838",
+  "prevIds": [
+    "d1f7ca14-7a24-4857-9053-4789a3366d20"
+  ],
+  "footprints": [
+    {
+      "statementType": "alter_enum",
+      "statementTarget": [
+        "enum",
+        "orders",
+        "actor"
+      ],
+      "writes": [
+        "s|enum|orders.actor"
+      ],
+      "reads": [
+        "n|sch|orders"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "orders",
+        "orders",
+        "restaurant_location"
+      ],
+      "writes": [
+        "s|col|orders.orders.restaurant_location",
+        "n|col|orders.orders.restaurant_location",
+        "e|col|orders.orders.restaurant_location"
+      ],
+      "reads": [
+        "n|tbl|orders.orders",
+        "n|sch|orders"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "orders",
+        "table": "orders",
+        "name": "restaurant_location",
+        "type": "jsonb",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "alter",
+      "key": "enums\u0000[\"orders\",\"actor\"]",
+      "set": {
+        "values": [
+          "customer",
+          "restaurant",
+          "admin",
+          "rider"
+        ]
+      }
+    }
+  ]
+}

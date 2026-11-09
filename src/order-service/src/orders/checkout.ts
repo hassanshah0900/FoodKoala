@@ -12,6 +12,7 @@ export const rupees = (paisa: number) => `Rs ${paisa % 100 === 0 ? paisa / 100 :
 export interface OrderDraft {
   restaurantId: string;
   restaurantName: string;
+  restaurantLocation: { lat: number; lng: number };
   deliveryZoneId: string;
   deliveryAddress: DeliveryAddress;
   lines: {
@@ -79,6 +80,7 @@ export function draftOrder(input: {
   return {
     restaurantId: cart.restaurantId,
     restaurantName: restaurant.name,
+    restaurantLocation: { lat: restaurant.location.lat, lng: restaurant.location.lng },
     deliveryZoneId: delivery.zoneId,
     deliveryAddress: {
       label: address.labelText ?? address.label,

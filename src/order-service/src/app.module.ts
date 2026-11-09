@@ -4,6 +4,7 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { APP_CONFIG, type AppConfig } from './config/config';
 import { ConfigModule } from './config/config.module';
 import { CartClient, RestaurantClient, UserClient } from './clients/clients';
+import { DeliveryEventConsumer } from './delivery/delivery-event-consumer';
 import { HealthController } from './health/health.controller';
 import { OrdersController } from './orders/orders.controller';
 import { OrdersService } from './orders/orders.service';
@@ -25,6 +26,7 @@ import { EVENT_PUBLISHER, KafkaPublisher } from './outbox/publisher';
     UserClient,
     RestaurantClient,
     OutboxRelay,
+    DeliveryEventConsumer,
     {
       provide: EVENT_PUBLISHER,
       inject: [APP_CONFIG],

@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "delivery.picked_up",
+  "title": "DeliveryPickedUp",
+  "description": "`data` of the delivery.picked_up event: the rider has the food. order-service moves the order to picked_up. Keyed by orderId.",
+  "type": "object",
+  "required": ["deliveryId", "orderId", "riderId", "at"],
+  "properties": {
+    "deliveryId": { "type": "string", "format": "uuid" },
+    "orderId": { "type": "string", "format": "uuid" },
+    "riderId": { "type": "string", "format": "uuid" },
+    "at": { "type": "string", "format": "date-time" }
+  }
+}
