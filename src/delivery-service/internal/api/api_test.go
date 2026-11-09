@@ -2,6 +2,7 @@ package api_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -133,4 +134,53 @@ func TestDeliveryRoutesCheckIdsAndCallers(t *testing.T) {
 		t.Fatalf("list: %v", list)
 	}
 	c.expect(400, "GET", "/deliveries?limit=500", admin, nil)
+}
+
+type sent struct {
+	topic, key string
+	data       map[string]any
+}
+
+type recorder struct{ events []sent }
+
+func (r *recorder) Send(_ context.Context, topic, key string, _ time.Time, data any) {
+	r.events = append(r.events, sent{topic, key, data.(map[string]any)})
+}
+
+func TestLocationOfARiderCarryingAnOrderIsPublished(t *testing.T) {
+	pool := testdb.Open(t)
+	rec := &recorder{}
+	c := client{t: t, h: api.New(api.Deps{
+		DB:         pool,
+		Riders:     riders.Service{DB: pool, Locations: rec},
+		Deliveries: deliveries.Service{DB: pool, MaxPickupMeters: 5000, LocationFreshFor: 5 * time.Minute},
+	})}
+	me := newUser("customer")
+	admin := newUser("customer,admin")
+	c.expect(201, "POST", "/riders", me, map[string]string{"name": "Ali", "vehicle": "motorbike", "city": "Karachi"})
+	c.expect(200, "POST", "/riders/"+me["X-User-Id"]+"/status", admin, map[string]string{"status": "approved"})
+	c.expect(200, "POST", "/riders/me/online", me, map[string]any{"location": karachi})
+
+	c.expect(204, "PUT", "/riders/me/location", me, karachi)
+	if len(rec.events) != 0 {
+		t.Fatalf("published without an order: %v", rec.events)
+	}
+
+	deliveryID, orderID := outbox.NewID(), outbox.NewID()
+	if _, err := pool.Exec(context.Background(), `INSERT INTO delivery.deliveries
+		(id, order_id, customer_id, customer_phone, restaurant_id, restaurant_name, pickup_lat, pickup_lng,
+		 dropoff_lat, dropoff_lng, dropoff_text, cash_to_collect_paisa, delivery_fee_paisa, status, rider_id, assigned_at)
+		VALUES ($1, $2, $3, '+923000000000', $4, 'Kolachi', 24.9, 67.1, 24.95, 67.05, 'Block 5', 0, 9900, 'assigned', $5, now())`,
+		deliveryID, orderID, outbox.NewID(), outbox.NewID(), me["X-User-Id"]); err != nil {
+		t.Fatal(err)
+	}
+	c.expect(204, "PUT", "/riders/me/location", me, map[string]float64{"lat": 24.93, "lng": 67.1})
+	if len(rec.events) != 1 {
+		t.Fatalf("events: %v", rec.events)
+	}
+	e := rec.events[0]
+	if e.topic != "rider.location" || e.key != orderID || e.data["deliveryId"] != deliveryID || e.data["riderId"] != me["X-User-Id"] ||
+		e.data["location"] != (riders.Location{Lat: 24.93, Lng: 67.1}) {
+		t.Fatalf("event: %+v", e)
+	}
 }

@@ -61,7 +61,8 @@ func run() error {
 	defer pool.Close()
 
 	dels := deliveries.Service{DB: pool, MaxPickupMeters: cfg.MaxPickupMeters, LocationFreshFor: cfg.LocationFreshFor}
-	deps := api.Deps{DB: pool, Riders: riders.Service{DB: pool}, Deliveries: dels}
+	deps := api.Deps{DB: pool, Deliveries: dels}
+	rs := riders.Service{DB: pool}
 	var workers sync.WaitGroup
 	start := func(f func()) { workers.Add(1); go func() { defer workers.Done(); f() }() }
 
@@ -80,12 +81,14 @@ func run() error {
 			return err
 		}
 		defer producer.Close()
+		rs.Locations = outbox.Direct{Client: producer}
 		relay := outbox.Relay{DB: pool, Publisher: outbox.KafkaPublisher{Client: producer}, Batch: 100, Every: cfg.OutboxPollEvery}
 		start(func() { relay.Run(ctx) })
 	} else {
 		slog.Warn("KAFKA_BROKERS is not set: order events are not consumed and delivery events stay in the outbox")
 	}
 
+	deps.Riders = rs
 	srv := &http.Server{Addr: ":" + cfg.Port, Handler: api.New(deps), ReadHeaderTimeout: 5 * time.Second}
 	errs := make(chan error, 1)
 	go func() {

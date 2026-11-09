@@ -81,7 +81,16 @@ func (a *Application) validate() error {
 	return nil
 }
 
-type Service struct{ DB *pgxpool.Pool }
+// Sender publishes an event without the outbox, best effort (outbox.Direct).
+type Sender interface {
+	Send(ctx context.Context, topic, key string, at time.Time, data any)
+}
+
+type Service struct {
+	DB *pgxpool.Pool
+	// Where rider.location goes; nil sends nothing (no Kafka).
+	Locations Sender
+}
 
 var errNotRider = httpx.Errorf(http.StatusNotFound, "You have not applied to ride")
 
@@ -138,21 +147,34 @@ func (s Service) GoOffline(ctx context.Context, me identity.Identity) (Rider, er
 	return r, err
 }
 
-// UpdateLocation records where an online rider is now.
+// UpdateLocation records where an online rider is now. While they carry an
+// order the position also goes out as rider.location, for tracking-service.
 func (s Service) UpdateLocation(ctx context.Context, me identity.Identity, at Location) error {
 	if !at.Valid() {
 		return httpx.Errorf(http.StatusBadRequest, "location must be in Pakistan")
 	}
-	tag, err := s.DB.Exec(ctx, `UPDATE delivery.riders SET lat = $2, lng = $3, located_at = now(), updated_at = now()
-		WHERE user_id = $1 AND online`, me.UserID, at.Lat, at.Lng)
-	if err != nil {
-		return err
-	}
-	if tag.RowsAffected() == 0 {
+	var locatedAt time.Time
+	var deliveryID, orderID *string
+	err := s.DB.QueryRow(ctx, `WITH moved AS (
+			UPDATE delivery.riders SET lat = $2, lng = $3, located_at = now(), updated_at = now()
+			WHERE user_id = $1 AND online RETURNING user_id, located_at)
+		SELECT m.located_at, d.id, d.order_id FROM moved m
+		LEFT JOIN delivery.deliveries d ON d.rider_id = m.user_id AND d.status IN ('assigned', 'picked_up')`,
+		me.UserID, at.Lat, at.Lng).Scan(&locatedAt, &deliveryID, &orderID)
+	if errors.Is(err, pgx.ErrNoRows) {
 		if _, err := s.Get(ctx, me.UserID); err != nil {
 			return err
 		}
 		return httpx.Errorf(http.StatusConflict, "Go online first")
+	}
+	if err != nil {
+		return err
+	}
+	if s.Locations != nil && orderID != nil {
+		s.Locations.Send(ctx, "rider.location", *orderID, locatedAt, map[string]any{
+			"deliveryId": *deliveryID, "orderId": *orderID, "riderId": me.UserID,
+			"location": at, "at": locatedAt.UTC(),
+		})
 	}
 	return nil
 }
