@@ -19,7 +19,7 @@ info:
     | From | To | Who |
     |---|---|---|
     | `placed` | `accepted` | the restaurant, with a prep time |
-    | `placed` | `rejected` | the restaurant or an admin, with a reason |
+    | `placed` | `rejected` | the restaurant or an admin, with a reason; or `system` when the restaurant hasn't answered within 10 minutes |
     | `placed` | `cancelled` | the customer, or an admin with a reason |
     | `accepted` | `ready` | the restaurant, when the food is ready for pickup |
     | `accepted`, `ready` | `cancelled` | an admin, with a reason |
@@ -30,7 +30,11 @@ info:
     means its owner, checked with restaurant-service (ADR 0006). Riders
     don't call this API: delivery-service publishes their pickups and
     drop-offs, and order-service applies them (recorded as `rider`). A rider
-    may pick up an order the restaurant forgot to mark ready.
+    may pick up an order the restaurant forgot to mark ready. Nobody calls
+    the API as `system`: order-service itself rejects an order still
+    `placed` 10 minutes after checkout (`ACCEPT_TIMEOUT_MINUTES`), with the
+    reason "Not accepted within 10 minutes", so a customer never waits on a
+    kitchen that isn't looking.
 
     **Who sees what.** Customers see their own orders. Restaurant owners
     see the orders of their restaurants. Admins see every order. Anyone else
@@ -356,7 +360,7 @@ components:
       properties:
         status: { $ref: '#/components/schemas/Status' }
         at: { type: string, format: date-time }
-        by: { type: string, enum: [customer, restaurant, admin, rider] }
+        by: { type: string, enum: [customer, restaurant, admin, rider, system] }
         reason: { type: [string, 'null'] }
 
     Order:

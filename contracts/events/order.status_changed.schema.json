@@ -13,7 +13,7 @@
     "restaurantName": { "type": "string" },
     "from": { "$ref": "#/$defs/status" },
     "to": { "$ref": "#/$defs/status" },
-    "by": { "enum": ["customer", "restaurant", "admin", "rider"], "description": "rider: from delivery-service's delivery events" },
+    "by": { "enum": ["customer", "restaurant", "admin", "rider", "system"], "description": "rider: from delivery-service's delivery events; system: order-service rejecting an order the restaurant didn't answer in time" },
     "reason": { "type": ["string", "null"] },
     "prepTimeMinutes": { "type": ["integer", "null"], "description": "Set when the order is accepted" },
     "estimatedDeliveryAt": { "type": "string", "format": "date-time" },
