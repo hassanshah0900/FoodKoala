@@ -23,9 +23,10 @@ export function suggestedSettlement(b: Balance): { kind: SettlementKind; amountP
   return null;
 }
 
-/** Who owes whom, in words. */
-export function netText(netPaisa: number): string {
-  if (netPaisa > 0) return `FoodKoala owes the rider ${rupees(netPaisa)}`;
-  if (netPaisa < 0) return `The rider owes FoodKoala ${rupees(-netPaisa)}`;
+/** Who owes whom, in words, as an admin or the rider reads it. */
+export function netText(netPaisa: number, reader: 'admin' | 'rider' = 'admin'): string {
+  const rider = reader === 'rider' ? ['you', 'You owe'] : ['the rider', 'The rider owes'];
+  if (netPaisa > 0) return `FoodKoala owes ${rider[0]} ${rupees(netPaisa)}`;
+  if (netPaisa < 0) return `${rider[1]} FoodKoala ${rupees(-netPaisa)}`;
   return 'All settled';
 }

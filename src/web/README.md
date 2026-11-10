@@ -66,6 +66,9 @@ The delivery in hand shows where to go now, with directions in the maps app and 
 to collect, and one button for the next step: "I have the food", then "Delivered". Before pickup the rider can
 hand it back. Going offline isn't possible while carrying an order.
 
+**`/rider/earnings`**: what the rider earned today, in 7 or 30 days (fees, tips, deliveries, cash collected); their
+balance with FoodKoala (cash they hold, earnings not paid, who owes whom); and the settlements recorded.
+
 ### Admin console (`/admin`)
 
 Only for users with the `admin` role (see `ADMIN_PHONES` in auth-service); guests are sent to log in and anyone
