@@ -2,12 +2,23 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BagIcon, BikeIcon, CashIcon, ClockIcon, GridIcon, MenuIcon, StoreIcon, TicketIcon } from '@/components/icons';
+import {
+  BagIcon,
+  BikeIcon,
+  CalendarIcon,
+  CashIcon,
+  ClockIcon,
+  GridIcon,
+  MenuIcon,
+  StoreIcon,
+  TicketIcon,
+} from '@/components/icons';
 
 // Icons by name: a server layout can't hand a client component a component, only data.
 const ICONS = {
   bag: BagIcon,
   bike: BikeIcon,
+  calendar: CalendarIcon,
   cash: CashIcon,
   clock: ClockIcon,
   grid: GridIcon,

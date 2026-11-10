@@ -2,6 +2,7 @@ import { del, get, orNull, post, put } from './http';
 import type {
   DeliveryQuote,
   DeliveryZone,
+  Hours,
   ManagedRestaurant,
   Page,
   Point,
@@ -56,3 +57,7 @@ export const pauseOrders = (token: string, id: string, minutes: number) =>
   put<ManagedRestaurant>(`restaurants/${id}/pause`, { minutes }, { token });
 
 export const resumeOrders = (token: string, id: string) => del<ManagedRestaurant>(`restaurants/${id}/pause`, { token });
+
+/** Replaces the weekly and special hours. */
+export const setHours = (token: string, id: string, hours: Hours) =>
+  put<ManagedRestaurant>(`restaurants/${id}/hours`, hours, { token });

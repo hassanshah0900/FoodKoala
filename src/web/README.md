@@ -42,6 +42,9 @@ restaurant they own is a switch away. Only its owner can open a restaurant's con
 - **`/vendor/{restaurantId}/menu/new`** and **`/menu/items/{itemId}`**: a dish's name, price, description, photo
   link, category and choices (groups like "Size: pick 1" with what each option adds). Option ids are kept when an
   item is saved, so carts holding them stay valid.
+- **`/vendor/{restaurantId}/hours`**: each weekday open at set times (up to 3, e.g. with a break; closing after
+  midnight is fine), 24 hours or closed, with "use Monday's hours every day"; and special days such as Ramadan or
+  Eid that replace the week's hours on their dates, or close the restaurant.
 
 ### Admin console (`/admin`)
 

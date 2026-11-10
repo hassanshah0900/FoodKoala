@@ -1,6 +1,6 @@
 import type { Hours, TimeRange, Weekday } from './api/types';
 
-const DAYS: [Weekday, string][] = [
+export const DAYS: [Weekday, string][] = [
   ['mon', 'Monday'],
   ['tue', 'Tuesday'],
   ['wed', 'Wednesday'],
