@@ -339,3 +339,19 @@ export interface Payment {
   collectedAt: string | null;
   cancelledAt: string | null;
 }
+
+/** SalesReport in order-service.yaml: orders placed in [from, to), days in Pakistan time. */
+export interface SalesReport {
+  restaurantId: string;
+  from: string;
+  to: string;
+  orders: { placed: number; delivered: number; cancelled: number; rejected: number };
+  /** Subtotals of the delivered orders. */
+  salesPaisa: number;
+  discountsPaisa: number;
+  averageOrderPaisa: number | null;
+  averagePrepMinutes: number | null;
+  topItems: { itemId: string; name: string; quantity: number; salesPaisa: number }[];
+  /** Only days with orders, oldest first. */
+  days: { date: string; placed: number; delivered: number; salesPaisa: number }[];
+}

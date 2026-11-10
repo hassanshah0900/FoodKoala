@@ -1,5 +1,14 @@
 import { get, orNull, patch, post } from './http';
-import type { Order, OrderStatus, Page, Voucher, VoucherCreate, VoucherDiscount, VoucherUpdate } from './types';
+import type {
+  Order,
+  OrderStatus,
+  Page,
+  SalesReport,
+  Voucher,
+  VoucherCreate,
+  VoucherDiscount,
+  VoucherUpdate,
+} from './types';
 
 export interface PlaceOrder {
   addressId: string;
@@ -39,6 +48,10 @@ export const restaurantOrders = (token: string, restaurantId: string, statuses: 
     token,
     query: { status: statuses.join(','), page, limit },
   });
+
+/** A restaurant's sales for orders placed in [from, to), at most 92 days (its owner or an admin). */
+export const salesReport = (token: string, restaurantId: string, from: string, to: string) =>
+  get<SalesReport>(`orders/restaurants/${restaurantId}/report`, { token, query: { from, to } });
 
 // Admin: the vouchers customers apply at checkout.
 
