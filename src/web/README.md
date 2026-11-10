@@ -45,6 +45,9 @@ restaurant they own is a switch away. Only its owner can open a restaurant's con
 - **`/vendor/{restaurantId}/hours`**: each weekday open at set times (up to 3, e.g. with a break; closing after
   midnight is fine), 24 hours or closed, with "use Monday's hours every day"; and special days such as Ramadan or
   Eid that replace the week's hours on their dates, or close the restaurant.
+- **`/vendor/{restaurantId}/zones`**: where it delivers: zones as rings "within N km" of the restaurant, each with
+  its delivery fee, minimum order and time, drawn to scale. Where zones overlap the customer gets the cheapest, so a
+  free nearby ring inside a wider paid one works. A zone drawn some other way keeps its shape unless given a distance.
 
 ### Admin console (`/admin`)
 

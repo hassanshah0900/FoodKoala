@@ -90,10 +90,17 @@ export interface ManagedRestaurant extends Restaurant {
   updatedAt: string;
 }
 
-/** DeliveryZone, without the polygon. */
+/** A GeoJSON polygon: one closed ring of [lng, lat] positions. */
+export interface Polygon {
+  type: 'Polygon';
+  coordinates: [number, number][][];
+}
+
+/** DeliveryZone in restaurant-service.yaml. */
 export interface DeliveryZone {
   id: string;
   name: string;
+  area: Polygon;
   deliveryFeePaisa: number;
   minimumOrderPaisa: number;
   deliveryTimeMinutes: number;
