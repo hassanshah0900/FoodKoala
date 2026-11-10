@@ -50,17 +50,20 @@ export function priceLines(restaurantId: string, { lines }: PriceRequest, menu: 
   const problems: string[] = [];
   const priced: PricedLine[] = [];
 
-  lines.forEach((line, i) => {
+  for (const [i, line] of lines.entries()) {
     const at = `lines[${i}]`;
     const item = menu.get(line.itemId);
-    if (!item) return void problems.push(`${at}: item ${line.itemId} is not on this menu`);
+    if (!item) {
+      problems.push(`${at}: item ${line.itemId} is not on this menu`);
+      continue;
+    }
     if (!item.isAvailable) problems.push(`${at}: ${item.name} is sold out`);
 
     const chosen = new Set(line.optionIds);
     const options: PricedLine['options'] = [];
     for (const group of item.optionGroups) {
       const picked = group.options.filter((o) => chosen.has(o.id));
-      picked.forEach((o) => chosen.delete(o.id));
+      for (const o of picked) chosen.delete(o.id);
       if (picked.length < group.minSelect || picked.length > group.maxSelect) {
         problems.push(`${at}: choose ${choose(group.minSelect, group.maxSelect)} in "${group.name}"`);
       }
@@ -80,7 +83,7 @@ export function priceLines(restaurantId: string, { lines }: PriceRequest, menu: 
       unitPricePaisa,
       lineTotalPaisa: unitPricePaisa * line.quantity,
     });
-  });
+  }
 
   if (problems.length > 0) return { ok: false, problems };
   return {

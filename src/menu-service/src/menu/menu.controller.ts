@@ -11,19 +11,19 @@ import {
   Put,
   UseGuards,
 } from '@nestjs/common';
-import { CurrentUser, IdentityGuard, type Identity } from '../identity/identity';
+import { CurrentUser, type Identity, IdentityGuard } from '../identity/identity';
 import {
+  type CategoryCreateDto,
+  type CategoryUpdateDto,
   categoryCreateSchema,
   categoryUpdateSchema,
+  type ItemCreateDto,
+  type ItemUpdateDto,
   idSchema,
   itemCreateSchema,
   itemUpdateSchema,
-  orderSchema,
-  type CategoryCreateDto,
-  type CategoryUpdateDto,
-  type ItemCreateDto,
-  type ItemUpdateDto,
   type OrderDto,
+  orderSchema,
 } from './menu.dto';
 import { MenuService } from './menu.service';
 

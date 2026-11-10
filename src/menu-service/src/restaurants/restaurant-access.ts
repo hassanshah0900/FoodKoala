@@ -7,7 +7,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { APP_CONFIG, type AppConfig } from '../config/config';
-import { isAdmin, type Identity } from '../identity/identity';
+import { type Identity, isAdmin } from '../identity/identity';
 
 /**
  * Asks restaurant-service whether the caller may manage a restaurant (ADR 0006).

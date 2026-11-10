@@ -4,7 +4,7 @@ import { and, eq, inArray } from 'drizzle-orm';
 import type { Database } from '../db/database';
 import { items } from '../db/schema';
 import { idSchema } from '../menu/menu.dto';
-import { priceLines, priceRequestSchema, type PriceRequest } from './pricing';
+import { type PriceRequest, priceLines, priceRequestSchema } from './pricing';
 
 /** Public: the only place order lines get their prices (cart and order services call it). */
 @Controller('restaurants/:restaurantId/price')

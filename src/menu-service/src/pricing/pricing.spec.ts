@@ -36,7 +36,10 @@ const groups: OptionGroup[] = [
 ];
 
 const menu = new Map([
-  [ids.biryani, { id: ids.biryani, name: 'Chicken Biryani', pricePaisa: 45000, isAvailable: true, optionGroups: groups }],
+  [
+    ids.biryani,
+    { id: ids.biryani, name: 'Chicken Biryani', pricePaisa: 45000, isAvailable: true, optionGroups: groups },
+  ],
   [ids.raita, { id: ids.raita, name: 'Raita', pricePaisa: 5000, isAvailable: false, optionGroups: [] }],
 ]);
 
@@ -72,10 +75,18 @@ describe('priceLines', () => {
   });
 
   it.each([
-    ['an item from another menu', [{ itemId: ids.other, quantity: 1 }], 'lines[0]: item 00000000-0000-4000-8000-0000000000ff is not on this menu'],
+    [
+      'an item from another menu',
+      [{ itemId: ids.other, quantity: 1 }],
+      'lines[0]: item 00000000-0000-4000-8000-0000000000ff is not on this menu',
+    ],
     ['a sold-out item', [{ itemId: ids.raita, quantity: 1 }], 'lines[0]: Raita is sold out'],
     ['a missing required choice', [{ itemId: ids.biryani, quantity: 1 }], 'lines[0]: choose 1 in "Choose size"'],
-    ['two sizes', [{ itemId: ids.biryani, quantity: 1, optionIds: [ids.single, ids.full] }], 'lines[0]: choose 1 in "Choose size"'],
+    [
+      'two sizes',
+      [{ itemId: ids.biryani, quantity: 1, optionIds: [ids.single, ids.full] }],
+      'lines[0]: choose 1 in "Choose size"',
+    ],
     [
       'a sold-out option',
       [{ itemId: ids.biryani, quantity: 1, optionIds: [ids.single, ids.egg] }],
@@ -96,7 +107,10 @@ describe('priceLines', () => {
       { itemId: ids.raita, quantity: 1 },
       { itemId: ids.biryani, quantity: 1 },
     ]);
-    expect(result).toEqual({ ok: false, problems: ['lines[1]: Raita is sold out', 'lines[2]: choose 1 in "Choose size"'] });
+    expect(result).toEqual({
+      ok: false,
+      problems: ['lines[1]: Raita is sold out', 'lines[2]: choose 1 in "Choose size"'],
+    });
   });
 
   it('says "0 to 1" for ranges', () => {
@@ -105,9 +119,18 @@ describe('priceLines', () => {
       name: 'Lassi',
       pricePaisa: 20000,
       isAvailable: true,
-      optionGroups: [{ ...groups[1], name: 'Add a topping', maxSelect: 1, options: groups[1].options.map((o) => ({ ...o, isAvailable: true })) }],
+      optionGroups: [
+        {
+          ...groups[1],
+          name: 'Add a topping',
+          maxSelect: 1,
+          options: groups[1].options.map((o) => ({ ...o, isAvailable: true })),
+        },
+      ],
     };
-    const request = priceRequestSchema.parse({ lines: [{ itemId: ids.raita, quantity: 1, optionIds: [ids.kabab, ids.egg] }] });
+    const request = priceRequestSchema.parse({
+      lines: [{ itemId: ids.raita, quantity: 1, optionIds: [ids.kabab, ids.egg] }],
+    });
     expect(priceLines(restaurantId, request, new Map([[ids.raita, drink]]))).toEqual({
       ok: false,
       problems: ['lines[0]: choose 0 to 1 in "Add a topping"'],

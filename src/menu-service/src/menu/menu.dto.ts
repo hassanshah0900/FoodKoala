@@ -31,7 +31,10 @@ const optionGroupInput = z
     options: z.array(optionInput).min(1).max(30),
   })
   .refine((g) => g.minSelect <= g.maxSelect, { message: 'minSelect is above maxSelect', path: ['minSelect'] })
-  .refine((g) => g.maxSelect <= g.options.length, { message: 'maxSelect is above the number of options', path: ['maxSelect'] });
+  .refine((g) => g.maxSelect <= g.options.length, {
+    message: 'maxSelect is above the number of options',
+    path: ['maxSelect'],
+  });
 
 const optionGroups = z
   .array(optionGroupInput)
@@ -46,7 +49,12 @@ export function withIds(groups: z.output<typeof optionGroups>): OptionGroup[] {
     name: g.name,
     minSelect: g.minSelect,
     maxSelect: g.maxSelect,
-    options: g.options.map((o) => ({ id: o.id ?? randomUUID(), name: o.name, pricePaisa: o.pricePaisa, isAvailable: o.isAvailable })),
+    options: g.options.map((o) => ({
+      id: o.id ?? randomUUID(),
+      name: o.name,
+      pricePaisa: o.pricePaisa,
+      isAvailable: o.isAvailable,
+    })),
   }));
 }
 

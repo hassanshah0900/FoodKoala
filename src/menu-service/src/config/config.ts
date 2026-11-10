@@ -16,7 +16,10 @@ const configSchema = z.object({
     .string()
     .optional()
     .transform((s) => {
-      const brokers = s?.split(',').map((b) => b.trim()).filter(Boolean);
+      const brokers = s
+        ?.split(',')
+        .map((b) => b.trim())
+        .filter(Boolean);
       return brokers?.length ? brokers : undefined;
     })
     .pipe(z.array(z.string().regex(/^[\w.-]+:\d+$/, 'expected host:port')).optional()),

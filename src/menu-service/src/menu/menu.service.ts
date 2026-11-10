@@ -3,18 +3,18 @@ import { InjectDrizzle } from '@nestjs/drizzle';
 import { and, asc, count, eq, max, sql } from 'drizzle-orm';
 import { APP_CONFIG, type AppConfig } from '../config/config';
 import type { Database, Tx } from '../db/database';
-import { categories, items, type CategoryRow, type ItemRow } from '../db/schema';
+import { type CategoryRow, categories, type ItemRow, items } from '../db/schema';
 import { recordMenuChange } from '../events/menu-events';
 import type { Identity } from '../identity/identity';
 import { RestaurantAccess } from '../restaurants/restaurant-access';
 import {
-  withIds,
   type CategoryCreateDto,
   type CategoryUpdateDto,
   type ItemCreateDto,
   type ItemUpdateDto,
+  withIds,
 } from './menu.dto';
-import { toCategory, toItem, type Category, type Item } from './menu.view';
+import { type Category, type Item, toCategory, toItem } from './menu.view';
 
 export interface Menu {
   restaurantId: string;
@@ -121,7 +121,12 @@ export class MenuService {
         .select({ id: categories.id })
         .from(categories)
         .where(eq(categories.restaurantId, restaurantId));
-      if (!sameSet(ids, existing.map((c) => c.id))) {
+      if (
+        !sameSet(
+          ids,
+          existing.map((c) => c.id),
+        )
+      ) {
         throw new BadRequestException('Send every category id of the restaurant exactly once');
       }
       await applyOrder(tx, categories, ids);
@@ -200,7 +205,12 @@ export class MenuService {
     await this.db.transaction(async (tx) => {
       await lockRestaurant(tx, category.restaurantId);
       const existing = await tx.select({ id: items.id }).from(items).where(eq(items.categoryId, categoryId));
-      if (!sameSet(ids, existing.map((i) => i.id))) {
+      if (
+        !sameSet(
+          ids,
+          existing.map((i) => i.id),
+        )
+      ) {
         throw new BadRequestException('Send every item id of the category exactly once');
       }
       await applyOrder(tx, items, ids);

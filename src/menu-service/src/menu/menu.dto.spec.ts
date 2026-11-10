@@ -59,7 +59,13 @@ describe('withIds', () => {
   it('keeps given ids and adds missing ones', () => {
     const kept = '5e6f7a8b-9c0d-4e1f-a2b3-c4d5e6f7a8b9';
     const [group] = withIds([
-      { ...size, options: [{ id: kept, name: 'Single', pricePaisa: 0, isAvailable: true }, { name: 'Full', pricePaisa: 35000, isAvailable: true }] },
+      {
+        ...size,
+        options: [
+          { id: kept, name: 'Single', pricePaisa: 0, isAvailable: true },
+          { name: 'Full', pricePaisa: 35000, isAvailable: true },
+        ],
+      },
     ]);
     expect(group.id).toMatch(/^[0-9a-f-]{36}$/);
     expect(group.options[0].id).toBe(kept);

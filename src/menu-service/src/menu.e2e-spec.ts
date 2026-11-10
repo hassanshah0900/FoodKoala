@@ -1,10 +1,10 @@
+import { randomUUID } from 'node:crypto';
+import { createServer, type Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { INestApplication } from '@nestjs/common';
 import { getDrizzleToken } from '@nestjs/drizzle';
 import { Test } from '@nestjs/testing';
 import { asc, eq, inArray } from 'drizzle-orm';
-import { randomUUID } from 'node:crypto';
-import { createServer, type Server } from 'node:http';
-import type { AddressInfo } from 'node:net';
 import request from 'supertest';
 import { AppModule } from './app.module';
 import type { Database } from './db/database';
@@ -21,7 +21,9 @@ function fakeRestaurantService(): Server {
     const ownerId = owners.get(id);
     if (!ownerId) return void res.writeHead(404, { 'content-type': 'application/json' }).end('{"statusCode":404}');
     const caller = req.headers['x-user-id'];
-    const admin = String(req.headers['x-user-roles'] ?? '').split(',').includes('admin');
+    const admin = String(req.headers['x-user-roles'] ?? '')
+      .split(',')
+      .includes('admin');
     const body = caller === ownerId || admin ? { id, ownerId } : { id };
     res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(body));
   });
@@ -120,14 +122,32 @@ describe('menu-service (e2e)', () => {
       const drinks = await category(r, 'Drinks');
 
       const item = await http.post(`/categories/${mains}/items`).set(r.owner).send(biryani).expect(201);
-      expect(item.body).toMatchObject({ restaurantId: r.id, categoryId: mains, name: 'Chicken Biryani', isAvailable: true });
+      expect(item.body).toMatchObject({
+        restaurantId: r.id,
+        categoryId: mains,
+        name: 'Chicken Biryani',
+        isAvailable: true,
+      });
       expect(item.body.optionGroups[0].id).toEqual(expect.any(String));
       expect(item.body.optionGroups[0].options.map((o: { id: string }) => o.id)).toHaveLength(2);
-      await http.post(`/categories/${mains}/items`).set(r.owner).send({ name: 'Beef Pulao', pricePaisa: 40000 }).expect(201);
-      await http.post(`/categories/${drinks}/items`).set(r.owner).send({ name: 'Mint Margarita', pricePaisa: 25000 }).expect(201);
+      await http
+        .post(`/categories/${mains}/items`)
+        .set(r.owner)
+        .send({ name: 'Beef Pulao', pricePaisa: 40000 })
+        .expect(201);
+      await http
+        .post(`/categories/${drinks}/items`)
+        .set(r.owner)
+        .send({ name: 'Mint Margarita', pricePaisa: 25000 })
+        .expect(201);
 
       const menu = await http.get(`/restaurants/${r.id}`).expect(200);
-      expect(menu.body.categories.map((c: { name: string; items: { name: string }[] }) => [c.name, c.items.map((i) => i.name)])).toEqual([
+      expect(
+        menu.body.categories.map((c: { name: string; items: { name: string }[] }) => [
+          c.name,
+          c.items.map((i) => i.name),
+        ]),
+      ).toEqual([
         ['Biryani', ['Chicken Biryani', 'Beef Pulao']],
         ['Drinks', ['Mint Margarita']],
       ]);
@@ -138,17 +158,35 @@ describe('menu-service (e2e)', () => {
       const r = newRestaurant();
       const a = await category(r, 'A');
       const b = await category(r, 'B');
-      const one = (await http.post(`/categories/${a}/items`).set(r.owner).send({ name: 'One', pricePaisa: 100 })).body.id;
-      const two = (await http.post(`/categories/${a}/items`).set(r.owner).send({ name: 'Two', pricePaisa: 100 })).body.id;
+      const one = (await http.post(`/categories/${a}/items`).set(r.owner).send({ name: 'One', pricePaisa: 100 })).body
+        .id;
+      const two = (await http.post(`/categories/${a}/items`).set(r.owner).send({ name: 'Two', pricePaisa: 100 })).body
+        .id;
 
-      await http.put(`/restaurants/${r.id}/categories/order`).set(r.owner).send({ ids: [b, a] }).expect(204);
-      await http.put(`/categories/${a}/items/order`).set(r.owner).send({ ids: [two, one] }).expect(204);
+      await http
+        .put(`/restaurants/${r.id}/categories/order`)
+        .set(r.owner)
+        .send({ ids: [b, a] })
+        .expect(204);
+      await http
+        .put(`/categories/${a}/items/order`)
+        .set(r.owner)
+        .send({ ids: [two, one] })
+        .expect(204);
       const menu = await http.get(`/restaurants/${r.id}`).expect(200);
       expect(menu.body.categories.map((c: { name: string }) => c.name)).toEqual(['B', 'A']);
       expect(menu.body.categories[1].items.map((i: { name: string }) => i.name)).toEqual(['Two', 'One']);
 
-      await http.put(`/restaurants/${r.id}/categories/order`).set(r.owner).send({ ids: [a] }).expect(400);
-      await http.put(`/categories/${a}/items/order`).set(r.owner).send({ ids: [one, randomUUID()] }).expect(400);
+      await http
+        .put(`/restaurants/${r.id}/categories/order`)
+        .set(r.owner)
+        .send({ ids: [a] })
+        .expect(400);
+      await http
+        .put(`/categories/${a}/items/order`)
+        .set(r.owner)
+        .send({ ids: [one, randomUUID()] })
+        .expect(400);
     });
 
     it('marks items sold out, keeps option ids when asked, and moves items', async () => {
@@ -172,7 +210,10 @@ describe('menu-service (e2e)', () => {
               name: group.name,
               minSelect: 1,
               maxSelect: 1,
-              options: [{ ...single, pricePaisa: 1000 }, { name: 'Family (serves 4)', pricePaisa: 90000 }],
+              options: [
+                { ...single, pricePaisa: 1000 },
+                { name: 'Family (serves 4)', pricePaisa: 90000 },
+              ],
             },
           ],
         })
@@ -204,7 +245,12 @@ describe('menu-service (e2e)', () => {
     it('keeps to the category limit when categories are added at once', async () => {
       const r = newRestaurant();
       const results = await Promise.all(
-        Array.from({ length: 55 }, (_, i) => http.post(`/restaurants/${r.id}/categories`).set(r.owner).send({ name: `C${i}` })),
+        Array.from({ length: 55 }, (_, i) =>
+          http
+            .post(`/restaurants/${r.id}/categories`)
+            .set(r.owner)
+            .send({ name: `C${i}` }),
+        ),
       );
       expect(results.filter((res) => res.status === 201)).toHaveLength(50);
       const menu = await http.get(`/restaurants/${r.id}`).expect(200);
@@ -245,7 +291,12 @@ describe('menu-service (e2e)', () => {
 
       const res = await http
         .post(`/restaurants/${r.id}/price`)
-        .send({ lines: [{ itemId: item.id, quantity: 1, optionIds: [single.id] }, { itemId: item.id, quantity: 1 }] })
+        .send({
+          lines: [
+            { itemId: item.id, quantity: 1, optionIds: [single.id] },
+            { itemId: item.id, quantity: 1 },
+          ],
+        })
         .expect(422);
       expect(res.body.message).toEqual([
         'lines[0]: Chicken Biryani is sold out',
@@ -285,7 +336,11 @@ describe('menu-service (e2e)', () => {
         .expect(201);
       await http.patch(`/items/${item.body.id}`).set(r.owner).send({ isAvailable: false }).expect(200);
       await http.patch(`/categories/${drinks}`).set(r.owner).send({ name: 'Cold drinks' }).expect(200);
-      await http.put(`/restaurants/${r.id}/categories/order`).set(r.owner).send({ ids: [drinks, mains] }).expect(204);
+      await http
+        .put(`/restaurants/${r.id}/categories/order`)
+        .set(r.owner)
+        .send({ ids: [drinks, mains] })
+        .expect(204);
       await http.delete(`/items/${cola.body.id}`).set(r.owner).expect(204);
 
       const sent = await events(r.id);
