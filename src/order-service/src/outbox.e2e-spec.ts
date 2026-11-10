@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { drizzle } from 'drizzle-orm/node-postgres';
 import { inArray, isNull } from 'drizzle-orm';
+import { drizzle } from 'drizzle-orm/node-postgres';
 import { loadConfig } from './config/config';
 import { outbox } from './db/schema';
 import { OutboxRelay } from './outbox/outbox-relay';
@@ -65,7 +65,15 @@ describe('outbox relay (e2e)', () => {
       value: JSON.stringify(rows[0].payload),
       headers: { 'event-id': rows[0].eventId, 'event-type': 'order.status_changed' },
     });
-    const left = await db.select().from(outbox).where(inArray(outbox.id, rows.map((r) => r.id)));
+    const left = await db
+      .select()
+      .from(outbox)
+      .where(
+        inArray(
+          outbox.id,
+          rows.map((r) => r.id),
+        ),
+      );
     expect(left.every((r) => r.publishedAt !== null)).toBe(true);
   });
 
@@ -123,11 +131,24 @@ describe('outbox relay (e2e)', () => {
     const relay = new OutboxRelay(db, config, new FakePublisher());
     const [old, recent, pending] = await write(3);
     const tenDaysAgo = new Date(Date.now() - 10 * 24 * 3600_000);
-    await db.update(outbox).set({ publishedAt: tenDaysAgo }).where(inArray(outbox.id, [old.id]));
-    await db.update(outbox).set({ publishedAt: new Date() }).where(inArray(outbox.id, [recent.id]));
+    await db
+      .update(outbox)
+      .set({ publishedAt: tenDaysAgo })
+      .where(inArray(outbox.id, [old.id]));
+    await db
+      .update(outbox)
+      .set({ publishedAt: new Date() })
+      .where(inArray(outbox.id, [recent.id]));
 
     expect(await relay.purge()).toBeGreaterThanOrEqual(1);
-    const left = (await db.select().from(outbox).where(inArray(outbox.id, [old.id, recent.id, pending.id]))).map((r) => r.id).sort((a, b) => a - b);
+    const left = (
+      await db
+        .select()
+        .from(outbox)
+        .where(inArray(outbox.id, [old.id, recent.id, pending.id]))
+    )
+      .map((r) => r.id)
+      .sort((a, b) => a - b);
     expect(left).toEqual([recent.id, pending.id]);
   });
 

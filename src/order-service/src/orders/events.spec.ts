@@ -33,7 +33,9 @@ const order: OrderRow = {
 
 describe('order events', () => {
   it('wraps order.placed in the envelope, keyed by order id', () => {
-    const event = orderPlaced(order, [{ itemId: 'i1', name: 'Zinger', quantity: 2, unitPricePaisa: 55000, lineTotalPaisa: 110000 }]);
+    const event = orderPlaced(order, [
+      { itemId: 'i1', name: 'Zinger', quantity: 2, unitPricePaisa: 55000, lineTotalPaisa: 110000 },
+    ]);
     expect(event).toMatchObject({ topic: 'order.placed', key: order.id });
     expect(event.payload).toEqual({
       id: event.eventId,
@@ -59,7 +61,10 @@ describe('order events', () => {
 
   it('describes a status change from and to', () => {
     const at = new Date('2026-11-08T10:05:00Z');
-    const event = orderStatusChanged({ ...order, status: 'accepted', prepTimeMinutes: 20 }, { from: 'placed', by: 'restaurant', reason: null, at });
+    const event = orderStatusChanged(
+      { ...order, status: 'accepted', prepTimeMinutes: 20 },
+      { from: 'placed', by: 'restaurant', reason: null, at },
+    );
     expect(event.payload.data).toMatchObject({
       from: 'placed',
       to: 'accepted',

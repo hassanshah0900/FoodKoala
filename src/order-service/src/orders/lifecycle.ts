@@ -77,7 +77,12 @@ export function decide(from: Status, change: Change, roles: ReadonlySet<Actor>):
   }
   const actor = rule.by.find((a) => roles.has(a));
   if (!actor) {
-    const names: Partial<Record<Actor, string>> = { customer: 'the customer', admin: 'an admin', restaurant: 'the restaurant', rider: 'the rider' };
+    const names: Partial<Record<Actor, string>> = {
+      customer: 'the customer',
+      admin: 'an admin',
+      restaurant: 'the restaurant',
+      rider: 'the rider',
+    };
     const who = rule.by.flatMap((a) => names[a] ?? []); // nobody calls the API as `system`
     throw new ForbiddenException(`Only ${who.join(' or ')} can ${VERB[change.to]} this order`);
   }

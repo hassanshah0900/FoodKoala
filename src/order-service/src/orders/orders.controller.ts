@@ -13,18 +13,18 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import type { Response } from 'express';
-import { CurrentUser, IdentityGuard, type Identity } from '../identity/identity';
+import { CurrentUser, type Identity, IdentityGuard } from '../identity/identity';
 import {
+  type CheckoutDto,
   checkoutSchema,
   idempotencyKeySchema,
   idSchema,
-  pageQuerySchema,
-  restaurantOrdersQuerySchema,
-  statusChangeSchema,
-  type CheckoutDto,
   type PageQuery,
+  pageQuerySchema,
   type RestaurantOrdersQuery,
+  restaurantOrdersQuerySchema,
   type StatusChangeDto,
+  statusChangeSchema,
 } from './orders.dto';
 import { OrdersService } from './orders.service';
 
@@ -42,7 +42,10 @@ export class OrdersController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const key = idempotencyKeySchema.safeParse(rawKey);
-    if (!key.success) throw new BadRequestException(rawKey === undefined ? 'Send an Idempotency-Key header' : key.error.issues[0].message);
+    if (!key.success)
+      throw new BadRequestException(
+        rawKey === undefined ? 'Send an Idempotency-Key header' : key.error.issues[0].message,
+      );
     const { order, created } = await this.orders.checkout(me, key.data, body);
     res.status(created ? HttpStatus.CREATED : HttpStatus.OK);
     return order;

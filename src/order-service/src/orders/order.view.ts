@@ -1,4 +1,13 @@
-import type { Actor, DeliveryAddress, LineOption, OrderLineRow, OrderRow, PaymentMethod, Status, StatusHistoryRow } from '../db/schema';
+import type {
+  Actor,
+  DeliveryAddress,
+  LineOption,
+  OrderLineRow,
+  OrderRow,
+  PaymentMethod,
+  Status,
+  StatusHistoryRow,
+} from '../db/schema';
 
 /** Order in contracts/openapi/order-service.yaml. */
 export interface Order {

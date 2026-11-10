@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
 import { DrizzleModule } from '@nestjs/drizzle';
 import { drizzle } from 'drizzle-orm/node-postgres';
+import { CartClient, RestaurantClient, UserClient } from './clients/clients';
 import { APP_CONFIG, type AppConfig } from './config/config';
 import { ConfigModule } from './config/config.module';
-import { CartClient, RestaurantClient, UserClient } from './clients/clients';
 import { DeliveryEventConsumer } from './delivery/delivery-event-consumer';
 import { HealthController } from './health/health.controller';
 import { AcceptTimeouts } from './orders/accept-timeouts';

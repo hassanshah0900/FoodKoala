@@ -52,7 +52,8 @@ export interface DeliveryQuote {
 }
 
 /** An answer we don't expect means a bug on one side; fail closed like an outage. */
-const unexpected = (service: string, status: number) => new UnavailableService(service, `answered ${status} unexpectedly`);
+const unexpected = (service: string, status: number) =>
+  new UnavailableService(service, `answered ${status} unexpectedly`);
 
 @Injectable()
 export class CartClient {
@@ -80,10 +81,15 @@ export class UserClient {
 
   /** One of the caller's saved addresses, or null when it is not theirs or doesn't exist. */
   async address(me: Identity, id: string): Promise<Address | null> {
-    const res = await call<Address>('user-service', this.config.USER_SERVICE_URL, `me/addresses/${encodeURIComponent(id)}`, {
-      as: me,
-      timeoutMs: this.config.SERVICE_TIMEOUT_MS,
-    });
+    const res = await call<Address>(
+      'user-service',
+      this.config.USER_SERVICE_URL,
+      `me/addresses/${encodeURIComponent(id)}`,
+      {
+        as: me,
+        timeoutMs: this.config.SERVICE_TIMEOUT_MS,
+      },
+    );
     if (res.status === 404) return null;
     if (res.status !== 200) throw unexpected('user-service', res.status);
     return res.body;
@@ -99,10 +105,15 @@ export class RestaurantClient {
    * owners and admins see theirs in any status, with `ownerId`. Null when not visible.
    */
   async get(id: string, as?: Identity): Promise<Restaurant | null> {
-    const res = await call<Restaurant>('restaurant-service', this.config.RESTAURANT_SERVICE_URL, encodeURIComponent(id), {
-      as,
-      timeoutMs: this.config.SERVICE_TIMEOUT_MS,
-    });
+    const res = await call<Restaurant>(
+      'restaurant-service',
+      this.config.RESTAURANT_SERVICE_URL,
+      encodeURIComponent(id),
+      {
+        as,
+        timeoutMs: this.config.SERVICE_TIMEOUT_MS,
+      },
+    );
     if (res.status === 404) return null;
     if (res.status !== 200) throw unexpected('restaurant-service', res.status);
     return res.body;

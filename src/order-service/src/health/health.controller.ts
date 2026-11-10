@@ -23,7 +23,8 @@ export class HealthController {
     } catch {
       throw new ServiceUnavailableException({ status: 'unavailable', postgres: 'down' });
     }
-    if (!this.deliveryEvents.healthy) throw new ServiceUnavailableException({ status: 'unavailable', consumer: 'stopped' });
+    if (!this.deliveryEvents.healthy)
+      throw new ServiceUnavailableException({ status: 'unavailable', consumer: 'stopped' });
     return { status: 'ok' };
   }
 }

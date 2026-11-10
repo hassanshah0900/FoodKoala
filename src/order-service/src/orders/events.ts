@@ -29,7 +29,10 @@ function envelope(type: string, key: string, at: Date, data: unknown): OutboxEve
 }
 
 /** contracts/events/order.placed.schema.json */
-export function orderPlaced(order: OrderRow, lines: Pick<OrderLineRow, 'itemId' | 'name' | 'quantity' | 'unitPricePaisa' | 'lineTotalPaisa'>[]): OutboxEvent {
+export function orderPlaced(
+  order: OrderRow,
+  lines: Pick<OrderLineRow, 'itemId' | 'name' | 'quantity' | 'unitPricePaisa' | 'lineTotalPaisa'>[],
+): OutboxEvent {
   const a = order.deliveryAddress;
   return envelope('order.placed', order.id, order.placedAt, {
     orderId: order.id,
@@ -45,16 +48,28 @@ export function orderPlaced(order: OrderRow, lines: Pick<OrderLineRow, 'itemId' 
       unitPricePaisa: l.unitPricePaisa,
       lineTotalPaisa: l.lineTotalPaisa,
     })),
-    totals: { subtotalPaisa: order.subtotalPaisa, deliveryFeePaisa: order.deliveryFeePaisa, totalPaisa: order.totalPaisa },
+    totals: {
+      subtotalPaisa: order.subtotalPaisa,
+      deliveryFeePaisa: order.deliveryFeePaisa,
+      totalPaisa: order.totalPaisa,
+    },
     paymentMethod: order.paymentMethod,
-    deliveryAddress: { lat: a.location.lat, lng: a.location.lng, text: `${a.line1}, ${a.area}, ${a.city}`, landmark: a.landmark },
+    deliveryAddress: {
+      lat: a.location.lat,
+      lng: a.location.lng,
+      text: `${a.line1}, ${a.area}, ${a.city}`,
+      landmark: a.landmark,
+    },
     estimatedDeliveryAt: order.estimatedDeliveryAt.toISOString(),
     placedAt: order.placedAt.toISOString(),
   });
 }
 
 /** contracts/events/order.status_changed.schema.json */
-export function orderStatusChanged(order: OrderRow, change: { from: Status; by: Actor; reason: string | null; at: Date }): OutboxEvent {
+export function orderStatusChanged(
+  order: OrderRow,
+  change: { from: Status; by: Actor; reason: string | null; at: Date },
+): OutboxEvent {
   return envelope('order.status_changed', order.id, change.at, {
     orderId: order.id,
     customerId: order.customerId,

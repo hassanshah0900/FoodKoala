@@ -1,5 +1,5 @@
-import { KafkaJS } from '@confluentinc/kafka-javascript';
 import { randomUUID } from 'node:crypto';
+import { KafkaJS } from '@confluentinc/kafka-javascript';
 import { KafkaPublisher } from './outbox/publisher';
 
 const brokers = process.env.KAFKA_BROKERS?.split(',');
