@@ -3,7 +3,8 @@ info:
   title: user-service
   version: 0.1.0
   description: |
-    The signed-in user's profile and saved delivery addresses.
+    The signed-in user's profile, saved delivery addresses and favourite
+    restaurants.
 
     Every endpoint except the health checks needs an authenticated request.
     `api-gateway` verifies the access token and forwards the identity headers
@@ -25,6 +26,8 @@ tags:
     description: The signed-in user's profile
   - name: addresses
     description: Saved delivery addresses
+  - name: favourites
+    description: Favourite restaurants
   - name: health
     description: Liveness and readiness probes
 
@@ -158,6 +161,63 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /me/favourites:
+    get:
+      tags: [favourites]
+      operationId: listMyFavourites
+      summary: My favourite restaurants, most recently added first
+      description: |
+        Each comes with the restaurant as restaurant-service shows it to
+        everyone (`Restaurant` in restaurant-service.yaml: open now, paused,
+        accepting orders). `restaurant` is null while it is not listed (for
+        example suspended); the favourite is kept in case it comes back.
+      responses:
+        '200':
+          description: Favourites
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Favourite' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '503': { $ref: '#/components/responses/RestaurantsUnavailable' }
+
+  /me/favourites/{restaurantId}:
+    parameters:
+      - name: restaurantId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    put:
+      tags: [favourites]
+      operationId: addMyFavourite
+      summary: Add a restaurant to my favourites
+      description: Idempotent. Only restaurants listed to customers (approved) can be added. At most 100.
+      responses:
+        '204': { description: It is a favourite }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404':
+          description: No such restaurant listed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: Favourite limit (100) reached
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '503': { $ref: '#/components/responses/RestaurantsUnavailable' }
+    delete:
+      tags: [favourites]
+      operationId: removeMyFavourite
+      summary: Remove a restaurant from my favourites
+      description: Idempotent; removing one that isn't a favourite is fine.
+      responses:
+        '204': { description: It is not a favourite }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
   /healthz:
     get:
       tags: [health]
@@ -187,6 +247,16 @@ components:
       description: Access token from auth-service, verified by api-gateway.
 
   schemas:
+    Favourite:
+      type: object
+      required: [restaurantId, addedAt, restaurant]
+      properties:
+        restaurantId: { type: string, format: uuid }
+        addedAt: { type: string, format: date-time }
+        restaurant:
+          type: [object, 'null']
+          description: Restaurant of restaurant-service.yaml; null while it is not listed
+
     Language:
       type: string
       enum: [en, ur]
@@ -300,6 +370,11 @@ components:
           schema: { $ref: '#/components/schemas/Error' }
     Unauthorized:
       description: No authenticated user
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    RestaurantsUnavailable:
+      description: restaurant-service did not answer; try again
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
