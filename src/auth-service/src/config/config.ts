@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { normalizePakistaniMobile } from '../phone/phone';
 
 export const APP_CONFIG = Symbol('APP_CONFIG');
 
@@ -35,6 +36,25 @@ const configSchema = z
     TWILIO_API_URL: z.url().default('https://api.twilio.com'),
     /** A login waits on this, so keep it short. */
     SMS_TIMEOUT_MS: z.coerce.number().int().positive().default(5000),
+
+    /**
+     * Comma-separated mobiles that get the admin role when they sign in. There is
+     * no other way to make the first admin; removing a number does not take the role back.
+     */
+    ADMIN_PHONES: z
+      .string()
+      .default('')
+      .transform((list, ctx) =>
+        list
+          .split(',')
+          .map((p) => p.trim())
+          .filter(Boolean)
+          .map((p) => {
+            const phone = normalizePakistaniMobile(p);
+            if (!phone) ctx.addIssue({ code: 'custom', message: `${p} is not a Pakistani mobile number` });
+            return phone ?? p;
+          }),
+      ),
   })
   .superRefine((c, ctx) => {
     if (c.SMS_PROVIDER === 'twilio') {

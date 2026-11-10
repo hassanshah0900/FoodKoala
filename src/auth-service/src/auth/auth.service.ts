@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
+import { APP_CONFIG, type AppConfig } from '../config/config';
 import type { Role, User } from '../db/schema';
 import { OtpService } from '../otp/otp.service';
 import { AccessTokenService } from '../tokens/access-token.service';
@@ -21,6 +22,7 @@ export class AuthService {
     private readonly users: UsersRepository,
     private readonly accessTokens: AccessTokenService,
     private readonly refreshTokens: RefreshTokenService,
+    @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 
   requestOtp(phone: string) {
@@ -29,9 +31,12 @@ export class AuthService {
 
   async verifyOtp(phone: string, code: string): Promise<Session> {
     await this.otp.verify(phone, code);
-    const { user, isNew } = await this.users.findOrCreateByPhone(phone);
+    const found = await this.users.findOrCreateByPhone(phone);
+    const user = this.config.ADMIN_PHONES.includes(phone)
+      ? await this.users.grantRole(found.user, 'admin')
+      : found.user;
     const refreshToken = await this.refreshTokens.issue(user.id);
-    return { ...(await this.session(user, refreshToken)), isNewUser: isNew };
+    return { ...(await this.session(user, refreshToken)), isNewUser: found.isNew };
   }
 
   async refresh(token: string): Promise<Session> {

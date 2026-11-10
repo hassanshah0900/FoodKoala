@@ -1,7 +1,7 @@
 import { INestApplication } from '@nestjs/common';
 import { getDrizzleToken } from '@nestjs/drizzle';
 import { Test } from '@nestjs/testing';
-import { eq } from 'drizzle-orm';
+import { inArray } from 'drizzle-orm';
 import type Redis from 'ioredis';
 import { createLocalJWKSet, jwtVerify } from 'jose';
 import request from 'supertest';
@@ -19,9 +19,11 @@ class CapturingSms extends SmsSender {
   }
 }
 
-// A random 03xx number per run so reruns don't collide.
-const local = `03${String(Math.floor(Math.random() * 1e9)).padStart(9, '0')}`;
+// Random 03xx numbers per run so reruns don't collide.
+const randomLocal = () => `03${String(Math.floor(Math.random() * 1e9)).padStart(9, '0')}`;
+const local = randomLocal();
 const PHONE = `+92${local.slice(1)}`;
+const ADMIN = `+92${randomLocal().slice(1)}`;
 
 describe('auth flow (e2e)', () => {
   let app: INestApplication;
@@ -29,6 +31,7 @@ describe('auth flow (e2e)', () => {
   const sms = new CapturingSms();
 
   beforeAll(async () => {
+    process.env.ADMIN_PHONES = ADMIN;
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(SmsSender)
       .useValue(sms)
@@ -39,16 +42,20 @@ describe('auth flow (e2e)', () => {
   });
 
   afterAll(async () => {
-    await app.get<Database>(getDrizzleToken()).delete(users).where(eq(users.phone, PHONE));
+    await app
+      .get<Database>(getDrizzleToken())
+      .delete(users)
+      .where(inArray(users.phone, [PHONE, ADMIN]));
     await app.close();
+    delete process.env.ADMIN_PHONES;
   });
 
-  async function login() {
-    await app.get<Redis>(REDIS).del(`auth:otp:cooldown:${PHONE}`);
-    await http.post('/otp/request').send({ phone: local }).expect(202);
+  async function login(phone = PHONE) {
+    await app.get<Redis>(REDIS).del(`auth:otp:cooldown:${phone}`);
+    await http.post('/otp/request').send({ phone }).expect(202);
     const res = await http
       .post('/otp/verify')
-      .send({ phone: PHONE, code: sms.codes.get(PHONE) })
+      .send({ phone, code: sms.codes.get(phone) })
       .expect(200);
     return res.body;
   }
@@ -102,6 +109,14 @@ describe('auth flow (e2e)', () => {
     const second = await login();
     expect(second.isNewUser).toBe(false);
     expect(second.user.id).toBe(first.user.id);
+  });
+
+  it('makes the numbers in ADMIN_PHONES admins, once', async () => {
+    expect((await login(ADMIN)).user.roles).toEqual(['customer', 'admin']);
+    const again = await login(ADMIN);
+    expect(again.user.roles).toEqual(['customer', 'admin']);
+    const refreshed = await http.post('/token/refresh').send({ refreshToken: again.refreshToken }).expect(200);
+    expect(refreshed.body.user.roles).toEqual(['customer', 'admin']);
   });
 
   it('rotates refresh tokens and revokes the family when a used token is replayed', async () => {
