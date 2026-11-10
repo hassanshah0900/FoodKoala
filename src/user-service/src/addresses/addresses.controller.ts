@@ -1,22 +1,11 @@
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { CurrentUser, type Identity, IdentityGuard } from '../identity/identity';
 import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  HttpCode,
-  HttpStatus,
-  Param,
-  Patch,
-  Post,
-  UseGuards,
-} from '@nestjs/common';
-import { CurrentUser, IdentityGuard, type Identity } from '../identity/identity';
-import {
+  type AddressCreateDto,
+  type AddressUpdateDto,
   addressCreateSchema,
   addressIdSchema,
   addressUpdateSchema,
-  type AddressCreateDto,
-  type AddressUpdateDto,
 } from './addresses.dto';
 import { AddressesService } from './addresses.service';
 

@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Patch, UseGuards } from '@nestjs/common';
-import { CurrentUser, IdentityGuard, type Identity } from '../identity/identity';
-import { profileUpdateSchema, type ProfileUpdateDto } from './profiles.dto';
+import { CurrentUser, type Identity, IdentityGuard } from '../identity/identity';
+import { type ProfileUpdateDto, profileUpdateSchema } from './profiles.dto';
 import { ProfilesService } from './profiles.service';
 
 @Controller('me')
@@ -14,10 +14,7 @@ export class ProfilesController {
   }
 
   @Patch()
-  update(
-    @CurrentUser() me: Identity,
-    @Body({ schema: profileUpdateSchema }) body: ProfileUpdateDto,
-  ) {
+  update(@CurrentUser() me: Identity, @Body({ schema: profileUpdateSchema }) body: ProfileUpdateDto) {
     return this.profiles.update(me, body);
   }
 }

@@ -1,6 +1,6 @@
 import { Controller, Delete, Get, HttpCode, HttpStatus, Param, Put, UseGuards } from '@nestjs/common';
 import { z } from 'zod';
-import { CurrentUser, IdentityGuard, type Identity } from '../identity/identity';
+import { CurrentUser, type Identity, IdentityGuard } from '../identity/identity';
 import { FavouritesService } from './favourites.service';
 
 const restaurantIdSchema = z.uuid();

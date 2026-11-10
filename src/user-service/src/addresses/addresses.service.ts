@@ -3,7 +3,7 @@ import { InjectDrizzle } from '@nestjs/drizzle';
 import { and, count, desc, eq } from 'drizzle-orm';
 import { APP_CONFIG, type AppConfig } from '../config/config';
 import type { Database, Tx } from '../db/database';
-import { addresses, profiles, type AddressRow } from '../db/schema';
+import { type AddressRow, addresses, profiles } from '../db/schema';
 import type { Identity } from '../identity/identity';
 import { ProfilesService } from '../profiles/profiles.service';
 import type { AddressCreateDto, AddressUpdateDto } from './addresses.dto';
@@ -58,10 +58,7 @@ export class AddressesService {
     return this.db.transaction(async (tx) => {
       await this.lockUser(tx, me.userId);
 
-      const [{ total }] = await tx
-        .select({ total: count() })
-        .from(addresses)
-        .where(eq(addresses.userId, me.userId));
+      const [{ total }] = await tx.select({ total: count() }).from(addresses).where(eq(addresses.userId, me.userId));
       if (total >= this.config.MAX_ADDRESSES_PER_USER) {
         throw new ConflictException(
           `You can save up to ${this.config.MAX_ADDRESSES_PER_USER} addresses; delete one first`,

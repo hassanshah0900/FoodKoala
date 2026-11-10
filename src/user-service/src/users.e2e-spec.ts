@@ -1,8 +1,8 @@
+import { randomUUID } from 'node:crypto';
 import { INestApplication } from '@nestjs/common';
 import { getDrizzleToken } from '@nestjs/drizzle';
 import { Test } from '@nestjs/testing';
 import { inArray } from 'drizzle-orm';
-import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { AppModule } from './app.module';
 import type { Database } from './db/database';
@@ -27,7 +27,13 @@ const home = {
   instructions: 'Ring the bell twice',
   location: { lat: 33.7215, lng: 73.0433 },
 };
-const work = { label: 'work', line1: 'Office 3, Blue Area', area: 'Blue Area', city: 'Islamabad', location: { lat: 33.7104, lng: 73.0597 } };
+const work = {
+  label: 'work',
+  line1: 'Office 3, Blue Area',
+  area: 'Blue Area',
+  city: 'Islamabad',
+  location: { lat: 33.7104, lng: 73.0597 },
+};
 
 describe('user-service (e2e)', () => {
   let app: INestApplication;
@@ -89,7 +95,10 @@ describe('user-service (e2e)', () => {
     it('follows phone number changes from auth', async () => {
       const me = newUser('+923001110000');
       await http.get('/me').set(me).expect(200);
-      const res = await http.get('/me').set({ ...me, 'X-User-Phone': '+923001119999' }).expect(200);
+      const res = await http
+        .get('/me')
+        .set({ ...me, 'X-User-Phone': '+923001119999' })
+        .expect(200);
       expect(res.body.phone).toBe('+923001119999');
     });
   });
@@ -111,7 +120,12 @@ describe('user-service (e2e)', () => {
     it('switches the default on create and on update, keeping exactly one', async () => {
       const me = newUser();
       const a = (await http.post('/me/addresses').set(me).send(home)).body;
-      const b = (await http.post('/me/addresses').set(me).send({ ...work, isDefault: true })).body;
+      const b = (
+        await http
+          .post('/me/addresses')
+          .set(me)
+          .send({ ...work, isDefault: true })
+      ).body;
       expect(b.isDefault).toBe(true);
 
       await http.patch(`/me/addresses/${a.id}`).set(me).send({ isDefault: true }).expect(200);
@@ -143,7 +157,12 @@ describe('user-service (e2e)', () => {
       const me = newUser();
       const a = (await http.post('/me/addresses').set(me).send(home)).body;
       const b = (await http.post('/me/addresses').set(me).send(work)).body;
-      const c = (await http.post('/me/addresses').set(me).send({ ...work, line1: 'Office 9' })).body;
+      const c = (
+        await http
+          .post('/me/addresses')
+          .set(me)
+          .send({ ...work, line1: 'Office 9' })
+      ).body;
 
       await http.delete(`/me/addresses/${a.id}`).set(me).expect(204);
       const list = (await http.get('/me/addresses').set(me)).body as { id: string; isDefault: boolean }[];
@@ -176,7 +195,11 @@ describe('user-service (e2e)', () => {
     it('allows at most 10 addresses', async () => {
       const me = newUser();
       for (let i = 0; i < 10; i++) {
-        await http.post('/me/addresses').set(me).send({ ...work, line1: `Office ${i}` }).expect(201);
+        await http
+          .post('/me/addresses')
+          .set(me)
+          .send({ ...work, line1: `Office ${i}` })
+          .expect(201);
       }
       const res = await http.post('/me/addresses').set(me).send(work).expect(409);
       expect(res.body.message).toMatch(/up to 10/);
@@ -185,7 +208,12 @@ describe('user-service (e2e)', () => {
     it('keeps exactly one default when a new user adds addresses concurrently', async () => {
       const me = newUser();
       const results = await Promise.all(
-        Array.from({ length: 6 }, (_, i) => http.post('/me/addresses').set(me).send({ ...work, line1: `Desk ${i}` })),
+        Array.from({ length: 6 }, (_, i) =>
+          http
+            .post('/me/addresses')
+            .set(me)
+            .send({ ...work, line1: `Desk ${i}` }),
+        ),
       );
       expect(results.map((r) => r.status)).toEqual(Array(6).fill(201));
       const list = (await http.get('/me/addresses').set(me)).body as { isDefault: boolean }[];

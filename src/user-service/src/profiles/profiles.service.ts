@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectDrizzle } from '@nestjs/drizzle';
 import { eq, sql } from 'drizzle-orm';
 import type { Database, Tx } from '../db/database';
-import { profiles, type Profile } from '../db/schema';
+import { type Profile, profiles } from '../db/schema';
 import type { Identity } from '../identity/identity';
 import type { ProfileUpdateDto } from './profiles.dto';
 
@@ -30,11 +30,7 @@ export class ProfilesService {
 
   async update(me: Identity, changes: ProfileUpdateDto): Promise<Profile> {
     await this.getOrCreate(me);
-    const [profile] = await this.db
-      .update(profiles)
-      .set(changes)
-      .where(eq(profiles.id, me.userId))
-      .returning();
+    const [profile] = await this.db.update(profiles).set(changes).where(eq(profiles.id, me.userId)).returning();
     return profile;
   }
 }

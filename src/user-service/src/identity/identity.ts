@@ -1,10 +1,4 @@
-import {
-  CanActivate,
-  createParamDecorator,
-  ExecutionContext,
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { CanActivate, createParamDecorator, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
 import type { Request } from 'express';
 import { z } from 'zod';
 
