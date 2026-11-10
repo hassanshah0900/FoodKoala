@@ -1,4 +1,5 @@
-import { del, get, orNull, post, put } from './http';
+import type { ZoneInput } from '../zones';
+import { del, get, orNull, patch, post, put } from './http';
 import type {
   DeliveryQuote,
   DeliveryZone,
@@ -61,3 +62,14 @@ export const resumeOrders = (token: string, id: string) => del<ManagedRestaurant
 /** Replaces the weekly and special hours. */
 export const setHours = (token: string, id: string, hours: Hours) =>
   put<ManagedRestaurant>(`restaurants/${id}/hours`, hours, { token });
+
+// Owners: delivery zones (up to 10). Where zones overlap, customers pay the cheapest.
+
+export const addZone = (token: string, id: string, zone: ZoneInput) =>
+  post<DeliveryZone>(`restaurants/${id}/zones`, zone, { token });
+
+export const updateZone = (token: string, id: string, zoneId: string, zone: Partial<ZoneInput>) =>
+  patch<DeliveryZone>(`restaurants/${id}/zones/${zoneId}`, zone, { token });
+
+export const deleteZone = (token: string, id: string, zoneId: string) =>
+  del<void>(`restaurants/${id}/zones/${zoneId}`, { token });

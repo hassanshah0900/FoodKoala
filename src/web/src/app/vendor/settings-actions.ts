@@ -2,11 +2,13 @@
 
 import { revalidatePath } from 'next/cache';
 import { refusal } from '@/lib/api/http';
-import { setHours } from '@/lib/api/restaurants';
+import { addZone, deleteZone, setHours, updateZone } from '@/lib/api/restaurants';
+import { formValues } from '@/lib/form-values';
 import { type HoursDraft, readHoursDraft } from '@/lib/hours-editing';
 import { requireOwner } from '@/lib/owner';
+import { readZoneForm } from '@/lib/zones';
 
-export type SettingsState = { errors?: string[]; saved?: boolean };
+export type SettingsState = { errors?: string[]; saved?: boolean; values?: Record<string, string> };
 
 /** Saves the weekly and special hours from the hours editor (sent as JSON). */
 export async function saveHours(restaurantId: string, _prev: SettingsState, form: FormData): Promise<SettingsState> {
@@ -19,14 +21,47 @@ export async function saveHours(restaurantId: string, _prev: SettingsState, form
   }
   const read = readHoursDraft(draft);
   if ('errors' in read) return { errors: read.errors };
+  return saved(restaurantId, () => setHours(token, restaurantId, read.hours));
+}
+
+/** Runs the change; a refusal becomes the form's message, success refreshes the console and the customer's page. */
+async function saved(
+  restaurantId: string,
+  call: () => Promise<unknown>,
+  values?: Record<string, string>,
+): Promise<SettingsState> {
   try {
-    await setHours(token, restaurantId, read.hours);
+    await call();
   } catch (err) {
     const error = refusal(err);
     if (error === null) throw err;
-    return { errors: error.split('; ') };
+    return { errors: error.split('; '), values };
   }
   revalidatePath(`/vendor/${restaurantId}`, 'layout');
   revalidatePath(`/restaurant/${restaurantId}`);
   return { saved: true };
+}
+
+/** Adds a zone (no `zoneId`) or changes one; the area is a circle of the distance given around the restaurant. */
+export async function saveZone(
+  restaurantId: string,
+  zoneId: string | null,
+  _prev: SettingsState,
+  form: FormData,
+): Promise<SettingsState> {
+  const { token, restaurant } = await requireOwner(restaurantId);
+  const values = formValues(form);
+  const read = readZoneForm((name) => values[name] ?? '', restaurant.location, zoneId !== null);
+  if ('errors' in read) return { errors: read.errors, values };
+  return saved(
+    restaurantId,
+    () => (zoneId ? updateZone(token, restaurantId, zoneId, read.zone) : addZone(token, restaurantId, read.zone)),
+    values,
+  );
+}
+
+export async function removeZone(restaurantId: string, zoneId: string): Promise<void> {
+  const { token } = await requireOwner(restaurantId);
+  await deleteZone(token, restaurantId, zoneId);
+  revalidatePath(`/vendor/${restaurantId}`, 'layout');
 }
