@@ -25,8 +25,44 @@ export const ref = (orderId: string) => `#${orderId.slice(0, 8).toUpperCase()}`;
 
 const because = (reason: string | null) => (reason ? `: ${reason}` : '');
 
-/** The customer's message for an order event; null when there is nothing to say. */
-export function messageFor(event: OrderEvent): Message | null {
+const VEHICLE: Record<string, string> = { motorbike: 'on a motorbike', bicycle: 'on a bicycle', car: 'by car' };
+
+/**
+ * Everyone's message about an event: the customer's, and for a new delivery
+ * the rider's too. Empty when there is nothing to say.
+ */
+export function messagesFor(event: OrderEvent): Message[] {
+  if (event.type === 'delivery.assigned') {
+    const d = event.data;
+    const order = ref(d.orderId);
+    const how = VEHICLE[d.vehicle] ? ` ${VEHICLE[d.vehicle]}` : '';
+    const job = `New delivery ${order}: collect it from ${d.restaurantName}.`;
+    return [
+      {
+        userId: d.customerId,
+        kind: 'rider_assigned',
+        title: 'Rider assigned',
+        body: `${d.riderName} is bringing your order ${order}${how}. You can call them on ${d.riderPhone}.`,
+        data: { orderId: d.orderId, riderId: d.riderId },
+        // The customer's next text comes when the food is on its way.
+        sms: null,
+      },
+      {
+        userId: d.riderId,
+        kind: 'delivery_assigned',
+        title: 'New delivery',
+        body: `${job} The customer's number is ${d.customerPhone}.`,
+        data: { orderId: d.orderId },
+        // Riders may have the app in their pocket: a text makes sure they see it.
+        sms: { phone: d.riderPhone, body: `FoodKoala: ${job} Open the rider app for the details.` },
+      },
+    ];
+  }
+  const m = customerMessage(event);
+  return m ? [m] : [];
+}
+
+function customerMessage(event: Exclude<OrderEvent, { type: 'delivery.assigned' }>): Message | null {
   const d = event.data;
   const base = { userId: d.customerId, data: { orderId: d.orderId } };
   const order = ref(d.orderId);

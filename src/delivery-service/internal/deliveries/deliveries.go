@@ -256,11 +256,12 @@ func (s Service) AssignOnce(ctx context.Context) (int, error) {
 func (s Service) assign(ctx context.Context, id string) (bool, error) {
 	ok := false
 	err := pgx.BeginFunc(ctx, s.DB, func(tx pgx.Tx) error {
-		var orderID string
+		var orderID, customerID, customerPhone, restaurantName string
 		var lat, lng float64
 		var declined []string
-		err := tx.QueryRow(ctx, `SELECT order_id, pickup_lat, pickup_lng, declined_by::text[] FROM delivery.deliveries
-			WHERE id = $1 AND status = 'searching' FOR UPDATE SKIP LOCKED`, id).Scan(&orderID, &lat, &lng, &declined)
+		err := tx.QueryRow(ctx, `SELECT order_id, customer_id, customer_phone, restaurant_name, pickup_lat, pickup_lng, declined_by::text[]
+			FROM delivery.deliveries WHERE id = $1 AND status = 'searching' FOR UPDATE SKIP LOCKED`, id).
+			Scan(&orderID, &customerID, &customerPhone, &restaurantName, &lat, &lng, &declined)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil // taken by another assigner, or no longer searching
 		}
@@ -290,6 +291,8 @@ func (s Service) assign(ctx context.Context, id string) (bool, error) {
 		return outbox.Add(ctx, tx, "delivery.assigned", orderID, at, map[string]any{
 			"deliveryId": id, "orderId": orderID, "riderId": rider.UserID, "riderName": rider.Name,
 			"riderPhone": rider.Phone, "vehicle": rider.Vehicle, "at": at,
+			// For notification-service to tell the customer and brief the rider.
+			"customerId": customerID, "customerPhone": customerPhone, "restaurantName": restaurantName,
 		})
 	})
 	return ok, err

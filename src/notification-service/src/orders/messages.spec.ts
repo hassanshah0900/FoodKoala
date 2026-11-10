@@ -1,4 +1,4 @@
-import { clock, messageFor, ref, rupees } from './messages';
+import { clock, messagesFor, ref, rupees } from './messages';
 import { orderEventSchema, type OrderEvent } from './order-events';
 
 const orderId = 'ab12cd34-0000-4000-8000-000000000000';
@@ -29,7 +29,14 @@ describe('formatting', () => {
   });
 });
 
-describe('messageFor', () => {
+/** The customer's message, for events that concern only them. */
+const messageFor = (e: OrderEvent) => {
+  const all = messagesFor(e);
+  expect(all.length).toBeLessThanOrEqual(1);
+  return all[0] ?? null;
+};
+
+describe('messagesFor', () => {
   it('confirms a placed order in the inbox only', () => {
     expect(messageFor(placed)).toEqual({
       userId: customerId,
@@ -73,5 +80,35 @@ describe('messageFor', () => {
   it('reads events from actors it does not know yet', () => {
     const event = { id: crypto.randomUUID(), type: 'order.status_changed', occurredAt: new Date().toISOString(), data: { ...common, from: 'picked_up', to: 'delivered', by: 'rider', reason: null } };
     expect(orderEventSchema.parse(event).data).toMatchObject({ by: 'rider' });
+  });
+
+  it('tells the customer who their rider is, and briefs the rider by text', () => {
+    const riderId = crypto.randomUUID();
+    const event = orderEventSchema.parse({
+      id: crypto.randomUUID(),
+      type: 'delivery.assigned',
+      occurredAt: new Date().toISOString(),
+      data: {
+        deliveryId: crypto.randomUUID(), orderId, riderId, riderName: 'Ali Raza', riderPhone: '+923009876543', vehicle: 'motorbike',
+        at: new Date().toISOString(), customerId, customerPhone: '+923001234567', restaurantName: 'Karachi Broast',
+      },
+    });
+    const [customer, rider] = messagesFor(event);
+    expect(customer).toEqual({
+      userId: customerId,
+      kind: 'rider_assigned',
+      title: 'Rider assigned',
+      body: 'Ali Raza is bringing your order #AB12CD34 on a motorbike. You can call them on +923009876543.',
+      data: { orderId, riderId },
+      sms: null,
+    });
+    expect(rider).toEqual({
+      userId: riderId,
+      kind: 'delivery_assigned',
+      title: 'New delivery',
+      body: "New delivery #AB12CD34: collect it from Karachi Broast. The customer's number is +923001234567.",
+      data: { orderId },
+      sms: { phone: '+923009876543', body: 'FoodKoala: New delivery #AB12CD34: collect it from Karachi Broast. Open the rider app for the details.' },
+    });
   });
 });

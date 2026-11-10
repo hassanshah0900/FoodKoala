@@ -119,6 +119,35 @@ describe('notification-service (e2e)', () => {
     expect(await smsOf(me)).toEqual([expect.objectContaining({ status: 'sent', providerId: expect.stringMatching(/^SM/), attempts: 1 })]);
   });
 
+  it('tells the customer who their rider is and texts the rider the job, once each', async () => {
+    const [me, rider] = [user(), user()];
+    const riderPhone = phone();
+    const event = {
+      id: randomUUID(),
+      type: 'delivery.assigned',
+      version: 1,
+      occurredAt: new Date().toISOString(),
+      source: 'delivery-service',
+      data: {
+        deliveryId: randomUUID(), orderId: randomUUID(), riderId: rider, riderName: 'Ali Raza', riderPhone, vehicle: 'motorbike',
+        at: new Date().toISOString(), customerId: me, customerPhone: phone(), restaurantName: 'Karachi Broast',
+      },
+    };
+    await consumer.handle('delivery.assigned', 0, { value: Buffer.from(JSON.stringify(event)), offset: '0' });
+    await consumer.handle('delivery.assigned', 0, { value: Buffer.from(JSON.stringify(event)), offset: '1' }); // redelivered
+
+    const mine = (await http.get('/').set(as(me)).expect(200)).body.items;
+    expect(mine).toEqual([expect.objectContaining({ kind: 'rider_assigned', title: 'Rider assigned', data: { orderId: event.data.orderId, riderId: rider } })]);
+    expect(mine[0].body).toContain('Ali Raza is bringing your order');
+    const theirs = (await http.get('/').set(as(rider)).expect(200)).body.items;
+    expect(theirs).toEqual([expect.objectContaining({ kind: 'delivery_assigned', title: 'New delivery' })]);
+    expect(await smsOf(me)).toEqual([]);
+    expect(await smsOf(rider)).toEqual([expect.objectContaining({ phone: riderPhone, status: 'queued' })]);
+
+    await dispatcher.sendDue();
+    expect(sender.sent).toEqual([{ phone: riderPhone, body: expect.stringContaining('FoodKoala: New delivery') }]);
+  });
+
   it('keeps quiet updates in the inbox without texting', async () => {
     const me = user();
     await deliver(statusChanged(me, 'ready', { from: 'accepted' }));

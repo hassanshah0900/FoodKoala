@@ -9,21 +9,26 @@ export class InboxWriter {
   constructor(@InjectDrizzle() private readonly db: Database) {}
 
   /**
-   * Saves the inbox entry and queues its SMS in one transaction. Returns false
-   * when this event was recorded before, so a replay neither duplicates the
-   * entry nor texts twice. The entry is dated when the event happened, not when
-   * it was consumed, so the inbox stays in order even if a topic lags.
+   * Saves an event's inbox entries and queues their texts in one transaction.
+   * Returns how many were new: an entry recorded before (same event, same
+   * person) is skipped, so a replay neither duplicates it nor texts twice.
+   * Entries are dated when the event happened, not when it was consumed, so
+   * the inbox stays in order even if a topic lags.
    */
-  async record(eventId: string, occurredAt: Date, m: Message): Promise<boolean> {
+  async record(eventId: string, occurredAt: Date, messages: Message[]): Promise<number> {
     return this.db.transaction(async (tx) => {
-      const [row] = await tx
-        .insert(notifications)
-        .values({ eventId, userId: m.userId, kind: m.kind, title: m.title, body: m.body, data: m.data, createdAt: occurredAt })
-        .onConflictDoNothing({ target: notifications.eventId })
-        .returning({ id: notifications.id });
-      if (!row) return false;
-      if (m.sms) await tx.insert(smsMessages).values({ notificationId: row.id, phone: m.sms.phone, body: m.sms.body });
-      return true;
+      let added = 0;
+      for (const m of messages) {
+        const [row] = await tx
+          .insert(notifications)
+          .values({ eventId, userId: m.userId, kind: m.kind, title: m.title, body: m.body, data: m.data, createdAt: occurredAt })
+          .onConflictDoNothing({ target: [notifications.eventId, notifications.userId] })
+          .returning({ id: notifications.id });
+        if (!row) continue;
+        added++;
+        if (m.sms) await tx.insert(smsMessages).values({ notificationId: row.id, phone: m.sms.phone, body: m.sms.body });
+      }
+      return added;
     });
   }
 }
