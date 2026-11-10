@@ -25,6 +25,10 @@ info:
     A range whose closing time is earlier than its opening time ends the next
     day, e.g. `18:00`–`02:00`.
 
+    **Ratings.** Customers rate delivered orders in order-service; this
+    service reads `order.reviewed` and keeps each restaurant's average rating
+    and its reviews. Comments are shown without who wrote them.
+
     **Money** is in paisa (integer, 1 PKR = 100 paisa), see `contracts/README.md`.
 servers:
   - url: http://localhost:8080/api/v1/restaurants
@@ -421,6 +425,26 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /{id}/reviews:
+    parameters:
+      - $ref: '#/components/parameters/RestaurantId'
+    get:
+      tags: [browse]
+      operationId: listRestaurantReviews
+      summary: Reviews of an approved restaurant, newest first
+      security: [{}, { bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Page of reviews
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReviewPage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /healthz:
     get:
       tags: [health]
@@ -599,7 +623,7 @@ components:
     Restaurant:
       type: object
       required:
-        [id, name, description, cuisines, address, location, logoUrl, coverUrl, hours, openNow, pausedUntil, acceptingOrders]
+        [id, name, description, cuisines, address, location, logoUrl, coverUrl, hours, openNow, pausedUntil, acceptingOrders, rating]
       properties:
         id: { type: string, format: uuid }
         name: { type: string }
@@ -616,6 +640,7 @@ components:
           format: date-time
           description: Set while the owner has paused orders
         acceptingOrders: { type: boolean, description: 'Approved, open now and not paused' }
+        rating: { $ref: '#/components/schemas/Rating' }
 
     ManagedRestaurant:
       description: What the owner and admins see.
@@ -645,7 +670,7 @@ components:
     RestaurantSummary:
       type: object
       required:
-        [id, name, cuisines, area, city, logoUrl, coverUrl, location, distanceMeters, openNow, pausedUntil, acceptingOrders, delivery]
+        [id, name, cuisines, area, city, logoUrl, coverUrl, location, distanceMeters, openNow, pausedUntil, acceptingOrders, rating, delivery]
       properties:
         id: { type: string, format: uuid }
         name: { type: string }
@@ -659,7 +684,36 @@ components:
         openNow: { type: boolean }
         pausedUntil: { type: [string, 'null'], format: date-time }
         acceptingOrders: { type: boolean }
+        rating: { $ref: '#/components/schemas/Rating' }
         delivery: { $ref: '#/components/schemas/Delivery' }
+
+    Rating:
+      type: object
+      required: [average, count]
+      properties:
+        average:
+          type: [number, 'null']
+          description: Mean of the restaurant ratings, one decimal (4.3); null until the first review
+        count: { type: integer, description: How many reviews }
+
+    Review:
+      type: object
+      required: [rating, comment, createdAt]
+      properties:
+        rating: { type: integer, minimum: 1, maximum: 5 }
+        comment: { type: [string, 'null'] }
+        createdAt: { type: string, format: date-time }
+
+    ReviewPage:
+      type: object
+      required: [items, page, limit, hasMore]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Review' }
+        page: { type: integer }
+        limit: { type: integer }
+        hasMore: { type: boolean }
 
     DeliveryQuote:
       type: object

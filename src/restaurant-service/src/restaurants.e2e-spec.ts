@@ -1,74 +1,19 @@
-import { randomUUID } from 'node:crypto';
-import { INestApplication } from '@nestjs/common';
-import { getDrizzleToken } from '@nestjs/drizzle';
-import { Test } from '@nestjs/testing';
-import { inArray } from 'drizzle-orm';
-import request from 'supertest';
-import { AppModule } from './app.module';
+import type { INestApplication } from '@nestjs/common';
+import type request from 'supertest';
 import type { Database } from './db/database';
-import { deliveryZones, outbox, restaurants } from './db/schema';
-import { setupApp } from './setup-app';
+import { deliveryZones } from './db/schema';
+import {
+  application,
+  box,
+  gulshan,
+  openEveryDay,
+  removeRestaurantsOf,
+  startApp,
+  userFactory,
+  zone,
+} from './testing/e2e';
 
-const createdUsers: string[] = [];
-
-/** Identity headers as api-gateway would forward them, for a fresh user. */
-function newUser(roles = 'customer') {
-  const id = randomUUID();
-  createdUsers.push(id);
-  const phone = `+923${String(Math.floor(Math.random() * 1e9)).padStart(9, '0')}`;
-  return { 'X-User-Id': id, 'X-User-Phone': phone, 'X-User-Roles': roles };
-}
-
-const application = {
-  name: 'Karachi Biryani House',
-  description: 'Sindhi biryani and karahi since 1998',
-  cuisines: ['biryani', 'pakistani'],
-  phone: '+922134567890',
-  address: { line1: 'Shop 4, Block 13-D', area: 'Gulshan-e-Iqbal', city: 'Karachi', province: 'sindh' },
-  location: { lat: 24.9204, lng: 67.0932 },
-};
-
-const allDay = [{ opens: '00:00', closes: '24:00' }];
-const openEveryDay = {
-  weekly: { mon: allDay, tue: allDay, wed: allDay, thu: allDay, fri: allDay, sat: allDay, sun: allDay },
-  special: [],
-};
-
-/** Gulshan-e-Iqbal and around, roughly. */
-const gulshan = {
-  type: 'Polygon',
-  coordinates: [
-    [
-      [67.07, 24.9],
-      [67.14, 24.9],
-      [67.14, 24.95],
-      [67.07, 24.95],
-      [67.07, 24.9],
-    ],
-  ],
-};
-
-/** A rectangle as a GeoJSON polygon. */
-const box = (minLng: number, minLat: number, maxLng: number, maxLat: number) => ({
-  type: 'Polygon',
-  coordinates: [
-    [
-      [minLng, minLat],
-      [maxLng, minLat],
-      [maxLng, maxLat],
-      [minLng, maxLat],
-      [minLng, minLat],
-    ],
-  ],
-});
-
-const zone = (area: object, deliveryFeePaisa = 9900) => ({
-  name: 'Zone',
-  area,
-  deliveryFeePaisa,
-  minimumOrderPaisa: 50000,
-  deliveryTimeMinutes: 35,
-});
+const { ids: createdUsers, newUser } = userFactory();
 
 describe('restaurant-service (e2e)', () => {
   let app: INestApplication;
@@ -77,26 +22,11 @@ describe('restaurant-service (e2e)', () => {
   const admin = newUser('customer,admin');
 
   beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
-    app = setupApp(moduleRef.createNestApplication({ logger: false }));
-    await app.init();
-    http = request(app.getHttpServer());
-    db = app.get<Database>(getDrizzleToken());
+    ({ app, http, db } = await startApp());
   });
 
   afterAll(async () => {
-    const mine = await db
-      .select({ id: restaurants.id })
-      .from(restaurants)
-      .where(inArray(restaurants.ownerId, createdUsers));
-    if (mine.length)
-      await db.delete(outbox).where(
-        inArray(
-          outbox.key,
-          mine.map((r) => r.id),
-        ),
-      );
-    await db.delete(restaurants).where(inArray(restaurants.ownerId, createdUsers));
+    await removeRestaurantsOf(db, createdUsers);
     await app.close();
   });
 

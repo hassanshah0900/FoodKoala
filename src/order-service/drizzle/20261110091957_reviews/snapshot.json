@@ -1,0 +1,255 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "75f83e56-f49c-4d23-a751-db1b551f1ba7",
+  "prevIds": [
+    "7ad883ed-c8f4-48b7-b47c-231f8d60951b"
+  ],
+  "footprints": [
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "orders",
+        "reviews"
+      ],
+      "writes": [
+        "s|tbl|orders.reviews",
+        "n|tbl|orders.reviews",
+        "e|tbl|orders.reviews",
+        "n|rel|orders.reviews",
+        "n|type|orders.reviews",
+        "n|rel|orders.reviews_pkey"
+      ],
+      "reads": [
+        "n|sch|orders"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "orders",
+        "reviews"
+      ],
+      "writes": [
+        "s|fk|orders.reviews.reviews_order_id_orders_id_fkey",
+        "n|fk|orders.reviews.reviews_order_id_orders_id_fkey",
+        "e|fk|orders.reviews.reviews_order_id_orders_id_fkey",
+        "n|con|orders.reviews.reviews_order_id_orders_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|orders.reviews",
+        "n|sch|orders",
+        "n|tbl|orders.orders",
+        "n|sch|orders",
+        "n|col|orders.reviews.order_id",
+        "n|col|orders.orders.id",
+        "e|uniqueness|orders.orders.id"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "orders",
+        "name": "reviews",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "orders",
+        "table": "reviews",
+        "name": "order_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "orders",
+        "table": "reviews",
+        "name": "customer_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "orders",
+        "table": "reviews",
+        "name": "restaurant_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "orders",
+        "table": "reviews",
+        "name": "rider_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "orders",
+        "table": "reviews",
+        "name": "restaurant_rating",
+        "type": "smallint",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "orders",
+        "table": "reviews",
+        "name": "rider_rating",
+        "type": "smallint",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "orders",
+        "table": "reviews",
+        "name": "comment",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "orders",
+        "table": "reviews",
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "orders",
+        "table": "reviews",
+        "name": "reviews_order_id_orders_id_fkey",
+        "nameExplicit": false,
+        "columns": [
+          "order_id"
+        ],
+        "schemaTo": "orders",
+        "tableTo": "orders",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "orders",
+        "table": "reviews",
+        "name": "reviews_pkey",
+        "columns": [
+          "order_id"
+        ],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "orders",
+        "table": "reviews",
+        "name": "reviews_restaurant_rating_range",
+        "value": "\"restaurant_rating\" between 1 and 5",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "orders",
+        "table": "reviews",
+        "name": "reviews_rider_rating_range",
+        "value": "\"rider_rating\" between 1 and 5",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "orders",
+        "table": "reviews",
+        "name": "reviews_rider_rating_needs_rider",
+        "value": "\"rider_rating\" is null or \"rider_id\" is not null",
+        "entityType": "checks"
+      }
+    }
+  ]
+}

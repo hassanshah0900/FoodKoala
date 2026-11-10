@@ -9,7 +9,7 @@ import type { Location } from '../geo/geo';
 import type { Identity } from '../identity/identity';
 import type { PageQuery } from '../restaurants/restaurants.dto';
 import { type Page, RestaurantsService } from '../restaurants/restaurants.service';
-import { availability } from '../restaurants/restaurants.view';
+import { availability, type Rating, ratingOf } from '../restaurants/restaurants.view';
 import type { ZoneCreateDto, ZoneUpdateDto } from './zones.dto';
 
 /** API shape of DeliveryZone in the contract. */
@@ -45,6 +45,7 @@ export interface RestaurantSummary {
   openNow: boolean;
   pausedUntil: Date | null;
   acceptingOrders: boolean;
+  rating: Rating;
   delivery: Delivery;
 }
 
@@ -214,6 +215,7 @@ export class ZonesService {
         location: { lat: r.lat, lng: r.lng },
         distanceMeters: Math.round(distance),
         ...availability(r, now),
+        rating: ratingOf(r),
         delivery,
       })),
       page,

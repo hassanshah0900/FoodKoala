@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { Actor, OrderLineRow, OrderRow, Status } from '../db/schema';
+import type { Actor, OrderLineRow, OrderRow, ReviewRow, Status } from '../db/schema';
 
 /** A row for the outbox: the envelope of contracts/README.md#event-envelope, keyed by order id. */
 export interface OutboxEvent {
@@ -83,5 +83,19 @@ export function orderStatusChanged(
     prepTimeMinutes: order.prepTimeMinutes,
     estimatedDeliveryAt: order.estimatedDeliveryAt.toISOString(),
     at: change.at.toISOString(),
+  });
+}
+
+/** contracts/events/order.reviewed.schema.json */
+export function orderReviewed(review: ReviewRow): OutboxEvent {
+  return envelope('order.reviewed', review.orderId, review.createdAt, {
+    orderId: review.orderId,
+    customerId: review.customerId,
+    restaurantId: review.restaurantId,
+    riderId: review.riderId,
+    restaurantRating: review.restaurantRating,
+    riderRating: review.riderRating,
+    comment: review.comment,
+    reviewedAt: review.createdAt.toISOString(),
   });
 }

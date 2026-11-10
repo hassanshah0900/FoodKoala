@@ -149,6 +149,30 @@ export const outbox = ordersSchema.table(
   (t) => [index('outbox_unpublished_idx').on(t.id).where(sql`${t.publishedAt} is null`)],
 );
 
+/** A customer's rating of a delivered order: at most one per order, never changed. */
+export const reviews = ordersSchema.table(
+  'reviews',
+  {
+    orderId: uuid('order_id')
+      .primaryKey()
+      .references(() => orders.id, { onDelete: 'cascade' }),
+    customerId: uuid('customer_id').notNull(),
+    restaurantId: uuid('restaurant_id').notNull(),
+    /** The rider who delivered it; null when an admin recorded the delivery. */
+    riderId: uuid('rider_id'),
+    restaurantRating: smallint('restaurant_rating').notNull(),
+    riderRating: smallint('rider_rating'),
+    comment: text('comment'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    check('reviews_restaurant_rating_range', sql`${t.restaurantRating} between 1 and 5`),
+    check('reviews_rider_rating_range', sql`${t.riderRating} between 1 and 5`),
+    check('reviews_rider_rating_needs_rider', sql`${t.riderRating} is null or ${t.riderId} is not null`),
+  ],
+);
+
 export type OrderRow = typeof orders.$inferSelect;
 export type OrderLineRow = typeof orderLines.$inferSelect;
 export type StatusHistoryRow = typeof orderStatusHistory.$inferSelect;
+export type ReviewRow = typeof reviews.$inferSelect;

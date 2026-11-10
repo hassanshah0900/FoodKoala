@@ -20,6 +20,8 @@ const configSchema = z.object({
     })
     .pipe(z.array(z.string().regex(/^[\w.-]+:\d+$/, 'expected host:port')).optional()),
   KAFKA_CLIENT_ID: z.string().min(1).default('restaurant-service'),
+  /** Consumer group for order.reviewed. */
+  KAFKA_GROUP_ID: z.string().min(1).default('restaurant-service'),
   /** How often the relay looks for new events when the outbox is empty. */
   OUTBOX_POLL_MS: z.coerce.number().int().positive().default(500),
   OUTBOX_BATCH_SIZE: z.coerce.number().int().min(1).max(1000).default(100),

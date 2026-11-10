@@ -4,6 +4,7 @@ import { and, asc, desc, eq, inArray, lt, type SQL } from 'drizzle-orm';
 import { CartClient, RestaurantClient, UserClient } from '../clients/clients';
 import { APP_CONFIG, type AppConfig } from '../config/config';
 import type { Database, Tx } from '../db/database';
+import { isUniqueViolation } from '../db/errors';
 import { type Actor, type OrderRow, orderLines, orderStatusHistory, orders, outbox, type Status } from '../db/schema';
 import { type Identity, isAdmin } from '../identity/identity';
 import { checkCart, draftOrder } from './checkout';
@@ -16,15 +17,6 @@ import type { CheckoutDto, PageQuery, RestaurantOrdersQuery, StatusChangeDto } f
 export const REJECT_BATCH = 50;
 
 const IDEMPOTENCY_CONSTRAINT = 'orders_customer_id_idempotency_key_key';
-
-/** Postgres unique_violation on `constraint`, through Drizzle's error wrapper. */
-function isUniqueViolation(err: unknown, constraint: string): boolean {
-  for (let e = err; e instanceof Error; e = e.cause) {
-    const pg = e as Error & { code?: string; constraint?: string };
-    if (pg.code === '23505' && pg.constraint === constraint) return true;
-  }
-  return false;
-}
 
 @Injectable()
 export class OrdersService {

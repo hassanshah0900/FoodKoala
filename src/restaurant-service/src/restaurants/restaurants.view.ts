@@ -15,6 +15,19 @@ export interface Restaurant {
   openNow: boolean;
   pausedUntil: Date | null;
   acceptingOrders: boolean;
+  rating: Rating;
+}
+
+/** Rating in the contract. */
+export interface Rating {
+  average: number | null;
+  count: number;
+}
+
+/** Average to one decimal (4.3), null before the first review. */
+export function ratingOf(row: Pick<RestaurantRow, 'ratingSum' | 'ratingCount'>): Rating {
+  const average = row.ratingCount ? Math.round((row.ratingSum / row.ratingCount) * 10) / 10 : null;
+  return { average, count: row.ratingCount };
 }
 
 /** API shape of ManagedRestaurant (what the owner and admins see). */
@@ -49,6 +62,7 @@ export function toRestaurant(row: RestaurantRow, now = new Date()): Restaurant {
     coverUrl: row.coverUrl,
     hours: { weekly: row.weeklyHours, special: row.specialHours },
     ...availability(row, now),
+    rating: ratingOf(row),
   };
 }
 
