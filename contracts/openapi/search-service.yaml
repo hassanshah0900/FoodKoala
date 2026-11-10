@@ -26,6 +26,9 @@ servers:
   - url: http://localhost:8002
     description: Service directly
 
+# Public: no token, no identity headers.
+security: []
+
 tags:
   - name: search
     description: Restaurant and dish search
@@ -199,7 +202,7 @@ components:
         description: { type: [string, 'null'] }
         category: { type: string }
         imageUrl: { type: [string, 'null'] }
-        pricePaisa: { type: integer, description: Base price, before options }
+        pricePaisa: { type: integer, description: 'Base price, before options' }
         isAvailable: { type: boolean }
 
     Rating:
