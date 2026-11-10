@@ -1,6 +1,6 @@
-import { ServiceUnavailableException } from '@nestjs/common';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import { ServiceUnavailableException } from '@nestjs/common';
 import { loadConfig } from '../config/config';
 import { MenuClient } from './menu-client';
 
@@ -16,7 +16,13 @@ beforeAll(async () => {
     req.on('end', () => {
       lastRequest = { url: req.url, body };
       const { status, body: out, delayMs = 0 } = reply();
-      setTimeout(() => res.writeHead(status, { 'content-type': 'application/json' }).end(out === undefined ? '' : JSON.stringify(out)), delayMs);
+      setTimeout(
+        () =>
+          res
+            .writeHead(status, { 'content-type': 'application/json' })
+            .end(out === undefined ? '' : JSON.stringify(out)),
+        delayMs,
+      );
     });
   });
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
@@ -31,14 +37,21 @@ const lines = [{ itemId: 'i1', quantity: 2, optionIds: [] }];
 
 describe('MenuClient', () => {
   it('posts the lines and returns the prices', async () => {
-    const priced = { restaurantId: 'r1', lines: [{ itemId: 'i1', name: 'Biryani', quantity: 2, options: [], unitPricePaisa: 100, lineTotalPaisa: 200 }], subtotalPaisa: 200 };
+    const priced = {
+      restaurantId: 'r1',
+      lines: [{ itemId: 'i1', name: 'Biryani', quantity: 2, options: [], unitPricePaisa: 100, lineTotalPaisa: 200 }],
+      subtotalPaisa: 200,
+    };
     reply = () => ({ status: 200, body: priced });
     await expect(client().price('r1', lines)).resolves.toEqual({ ok: true, lines: priced.lines, subtotalPaisa: 200 });
     expect(lastRequest).toEqual({ url: '/restaurants/r1/price', body: JSON.stringify({ lines }) });
   });
 
   it('turns 422 into problems with line numbers', async () => {
-    reply = () => ({ status: 422, body: { statusCode: 422, message: ['lines[0]: Biryani is sold out', 'odd message'] } });
+    reply = () => ({
+      status: 422,
+      body: { statusCode: 422, message: ['lines[0]: Biryani is sold out', 'odd message'] },
+    });
     await expect(client().price('r1', lines)).resolves.toEqual({
       ok: false,
       problems: [

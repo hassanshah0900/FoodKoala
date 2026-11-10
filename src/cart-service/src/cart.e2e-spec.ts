@@ -1,9 +1,9 @@
-import { INestApplication } from '@nestjs/common';
-import { Test } from '@nestjs/testing';
-import type Redis from 'ioredis';
 import { randomUUID } from 'node:crypto';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import { INestApplication } from '@nestjs/common';
+import { Test } from '@nestjs/testing';
+import type Redis from 'ioredis';
 import request from 'supertest';
 import { AppModule } from './app.module';
 import { REDIS } from './redis/redis.module';
@@ -46,7 +46,14 @@ function fakeMenuService(): Server {
           return o ? [{ id, group: 'Choose size', ...o }] : [];
         });
         const unit = item.pricePaisa + options.reduce((s, o) => s + o.pricePaisa, 0);
-        return { itemId: line.itemId, name: item.name, quantity: line.quantity, options, unitPricePaisa: unit, lineTotalPaisa: unit * line.quantity };
+        return {
+          itemId: line.itemId,
+          name: item.name,
+          quantity: line.quantity,
+          options,
+          unitPricePaisa: unit,
+          lineTotalPaisa: unit * line.quantity,
+        };
       });
       if (problems.length) return send(422, { statusCode: 422, message: problems });
       const ok = priced.filter((p) => p !== null);
@@ -113,7 +120,13 @@ function newUser() {
 function newItem(restaurantId: string, name = 'Chicken Biryani', pricePaisa = 45000) {
   const id = randomUUID();
   const full = randomUUID();
-  menu.set(id, { restaurantId, name, pricePaisa, available: true, options: { [full]: { name: 'Full', pricePaisa: 35000 } } });
+  menu.set(id, {
+    restaurantId,
+    name,
+    pricePaisa,
+    available: true,
+    options: { [full]: { name: 'Full', pricePaisa: 35000 } },
+  });
   return { id, full };
 }
 
@@ -163,7 +176,10 @@ describe('cart-service (e2e)', () => {
   });
 
   it('starts empty', async () => {
-    await http.get('/').set(user()).expect(200, { restaurantId: null, lines: [], subtotalPaisa: 0, problems: [], updatedAt: null });
+    await http
+      .get('/')
+      .set(user())
+      .expect(200, { restaurantId: null, lines: [], subtotalPaisa: 0, problems: [], updatedAt: null });
   });
 
   it('adds items with menu prices and merges equal lines', async () => {
@@ -171,25 +187,50 @@ describe('cart-service (e2e)', () => {
     const restaurantId = randomUUID();
     const biryani = newItem(restaurantId);
 
-    const first = await http.post('/items').set(me).send({ restaurantId, itemId: biryani.id, quantity: 1, optionIds: [biryani.full] }).expect(201);
+    const first = await http
+      .post('/items')
+      .set(me)
+      .send({ restaurantId, itemId: biryani.id, quantity: 1, optionIds: [biryani.full] })
+      .expect(201);
     expect(first.body).toMatchObject({
       restaurantId,
-      lines: [{ itemId: biryani.id, name: 'Chicken Biryani', quantity: 1, optionIds: [biryani.full], unitPricePaisa: 80000, lineTotalPaisa: 80000 }],
+      lines: [
+        {
+          itemId: biryani.id,
+          name: 'Chicken Biryani',
+          quantity: 1,
+          optionIds: [biryani.full],
+          unitPricePaisa: 80000,
+          lineTotalPaisa: 80000,
+        },
+      ],
       subtotalPaisa: 80000,
       problems: [],
     });
 
-    const merged = await http.post('/items').set(me).send({ restaurantId, itemId: biryani.id, quantity: 2, optionIds: [biryani.full] }).expect(201);
+    const merged = await http
+      .post('/items')
+      .set(me)
+      .send({ restaurantId, itemId: biryani.id, quantity: 2, optionIds: [biryani.full] })
+      .expect(201);
     expect(merged.body.lines).toHaveLength(1);
     expect(merged.body).toMatchObject({ lines: [{ quantity: 3, lineTotalPaisa: 240000 }], subtotalPaisa: 240000 });
 
-    const withNote = await http.post('/items').set(me).send({ restaurantId, itemId: biryani.id, quantity: 1, note: 'Less spicy' }).expect(201);
+    const withNote = await http
+      .post('/items')
+      .set(me)
+      .send({ restaurantId, itemId: biryani.id, quantity: 1, note: 'Less spicy' })
+      .expect(201);
     expect(withNote.body.lines).toHaveLength(2);
 
     const ttl = await redis.ttl(`cart:${me['X-User-Id']}`);
     expect(ttl).toBeGreaterThan(6 * 24 * 3600);
 
-    await http.post('/items').set(me).send({ restaurantId, itemId: biryani.id, quantity: 1, pricePaisa: 1 }).expect(400);
+    await http
+      .post('/items')
+      .set(me)
+      .send({ restaurantId, itemId: biryani.id, quantity: 1, pricePaisa: 1 })
+      .expect(400);
   });
 
   it('holds one restaurant at a time unless asked to replace', async () => {
@@ -200,7 +241,11 @@ describe('cart-service (e2e)', () => {
     const fromB = newItem(b, 'Zinger Burger', 55000);
     await http.post('/items').set(me).send({ restaurantId: a, itemId: fromA.id, quantity: 1 }).expect(201);
     await http.post('/items').set(me).send({ restaurantId: b, itemId: fromB.id, quantity: 1 }).expect(409);
-    const replaced = await http.post('/items').set(me).send({ restaurantId: b, itemId: fromB.id, quantity: 1, replace: true }).expect(201);
+    const replaced = await http
+      .post('/items')
+      .set(me)
+      .send({ restaurantId: b, itemId: fromB.id, quantity: 1, replace: true })
+      .expect(201);
     expect(replaced.body).toMatchObject({ restaurantId: b, lines: [{ name: 'Zinger Burger' }] });
   });
 
@@ -212,7 +257,10 @@ describe('cart-service (e2e)', () => {
     const res = await http.post('/items').set(me).send({ restaurantId, itemId: item.id, quantity: 1 }).expect(422);
     expect(res.body.message).toEqual(['Chicken Biryani is sold out']);
     await http.post('/items').set(me).send({ restaurantId: randomUUID(), itemId: item.id, quantity: 1 }).expect(422);
-    await http.get('/').set(me).expect(200, { restaurantId: null, lines: [], subtotalPaisa: 0, problems: [], updatedAt: null });
+    await http
+      .get('/')
+      .set(me)
+      .expect(200, { restaurantId: null, lines: [], subtotalPaisa: 0, problems: [], updatedAt: null });
   });
 
   it('changes and removes lines', async () => {
@@ -222,10 +270,18 @@ describe('cart-service (e2e)', () => {
     const cart = (await http.post('/items').set(me).send({ restaurantId, itemId: item.id, quantity: 1 })).body;
     const lineId = cart.lines[0].id;
 
-    const changed = await http.patch(`/items/${lineId}`).set(me).send({ quantity: 4, optionIds: [item.full], note: 'No raita' }).expect(200);
+    const changed = await http
+      .patch(`/items/${lineId}`)
+      .set(me)
+      .send({ quantity: 4, optionIds: [item.full], note: 'No raita' })
+      .expect(200);
     expect(changed.body.lines[0]).toMatchObject({ id: lineId, quantity: 4, note: 'No raita', unitPricePaisa: 80000 });
 
-    await http.patch(`/items/${lineId}`).set(me).send({ optionIds: [randomUUID()] }).expect(422);
+    await http
+      .patch(`/items/${lineId}`)
+      .set(me)
+      .send({ optionIds: [randomUUID()] })
+      .expect(422);
     await http.patch(`/items/${randomUUID()}`).set(me).send({ quantity: 2 }).expect(404);
     await http.patch(`/items/${lineId}`).set(user()).send({ quantity: 2 }).expect(404);
 
@@ -240,26 +296,35 @@ describe('cart-service (e2e)', () => {
     const biryani = newItem(restaurantId);
     const raita = newItem(restaurantId, 'Raita', 5000);
     await http.post('/items').set(me).send({ restaurantId, itemId: biryani.id, quantity: 1 }).expect(201);
-    const cart = (await http.post('/items').set(me).send({ restaurantId, itemId: raita.id, quantity: 2 }).expect(201)).body;
+    const cart = (await http.post('/items').set(me).send({ restaurantId, itemId: raita.id, quantity: 2 }).expect(201))
+      .body;
 
     menu.get(raita.id)!.available = false;
     menu.get(biryani.id)!.pricePaisa = 99999;
     const res = await http.get('/').set(me).expect(200);
     expect(res.body).toMatchObject({
-      lines: [{ name: 'Chicken Biryani', unitPricePaisa: 45000 }, { name: 'Raita', quantity: 2, lineTotalPaisa: 10000 }],
+      lines: [
+        { name: 'Chicken Biryani', unitPricePaisa: 45000 },
+        { name: 'Raita', quantity: 2, lineTotalPaisa: 10000 },
+      ],
       subtotalPaisa: 55000,
       problems: [{ lineId: cart.lines[1].id, message: 'Raita is sold out' }],
     });
 
     menu.get(raita.id)!.available = true;
-    expect((await http.get('/').set(me).expect(200)).body).toMatchObject({ problems: [], lines: [{ unitPricePaisa: 99999 }, {}] });
+    expect((await http.get('/').set(me).expect(200)).body).toMatchObject({
+      problems: [],
+      lines: [{ unitPricePaisa: 99999 }, {}],
+    });
   });
 
   it('loses no update when items are added at the same time', async () => {
     const me = user();
     const restaurantId = randomUUID();
     const items = Array.from({ length: 10 }, (_, i) => newItem(restaurantId, `Item ${i}`, 1000));
-    const results = await Promise.all(items.map((it) => http.post('/items').set(me).send({ restaurantId, itemId: it.id, quantity: 1 })));
+    const results = await Promise.all(
+      items.map((it) => http.post('/items').set(me).send({ restaurantId, itemId: it.id, quantity: 1 })),
+    );
     expect(results.every((r) => r.status === 201)).toBe(true);
     const cart = (await http.get('/').set(me).expect(200)).body;
     expect(cart.lines).toHaveLength(10);
@@ -280,7 +345,7 @@ describe('cart-service (e2e)', () => {
   });
 
   describe('reorder', () => {
-    it('puts the lines of a past order back, at today\'s prices', async () => {
+    it("puts the lines of a past order back, at today's prices", async () => {
       const me = user();
       const restaurantId = randomUUID();
       const biryani = newItem(restaurantId, 'Chicken Biryani', 45000);
@@ -327,7 +392,11 @@ describe('cart-service (e2e)', () => {
       expect(res.body.skipped).toEqual([
         { itemId: kheer.id, name: 'Kheer', reason: 'Kheer is sold out' },
         { itemId: expect.any(String), name: 'Old Special', reason: expect.stringMatching(/is not on this menu/) },
-        { itemId: biryani.id, name: 'Chicken Biryani', reason: `option ${removedOption} is not a choice of Chicken Biryani` },
+        {
+          itemId: biryani.id,
+          name: 'Chicken Biryani',
+          reason: `option ${removedOption} is not a choice of Chicken Biryani`,
+        },
       ]);
     });
 
@@ -349,7 +418,9 @@ describe('cart-service (e2e)', () => {
       await http.post('/items').set(me).send({ restaurantId: other, itemId: tea.id, quantity: 1 }).expect(201);
       const restaurantId = randomUUID();
       const biryani = newItem(restaurantId);
-      const orderId = pastOrder(me['X-User-Id'], restaurantId, [{ itemId: biryani.id, name: 'Chicken Biryani', quantity: 1 }]);
+      const orderId = pastOrder(me['X-User-Id'], restaurantId, [
+        { itemId: biryani.id, name: 'Chicken Biryani', quantity: 1 },
+      ]);
 
       await http.post('/reorder').set(me).send({ orderId }).expect(409);
       expect((await http.get('/').set(me).expect(200)).body.restaurantId).toBe(other);
@@ -361,7 +432,9 @@ describe('cart-service (e2e)', () => {
       const someoneElse = randomUUID();
       const restaurantId = randomUUID();
       const biryani = newItem(restaurantId);
-      const orderId = pastOrder(someoneElse, restaurantId, [{ itemId: biryani.id, name: 'Chicken Biryani', quantity: 1 }]);
+      const orderId = pastOrder(someoneElse, restaurantId, [
+        { itemId: biryani.id, name: 'Chicken Biryani', quantity: 1 },
+      ]);
       await http.post('/reorder').set(user()).send({ orderId }).expect(404);
       await http.post('/reorder').set(user()).send({ orderId: 'nope' }).expect(400);
       await http.post('/reorder').send({ orderId }).expect(401);

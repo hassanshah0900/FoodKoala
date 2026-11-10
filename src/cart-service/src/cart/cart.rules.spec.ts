@@ -72,13 +72,28 @@ describe('toView', () => {
   const cart: StoredCart = addLine(null, { ...line, quantity: 2 }, last, opts());
 
   it('shows an empty cart', () => {
-    expect(toView(null, null)).toEqual({ restaurantId: null, lines: [], subtotalPaisa: 0, problems: [], updatedAt: null });
+    expect(toView(null, null)).toEqual({
+      restaurantId: null,
+      lines: [],
+      subtotalPaisa: 0,
+      problems: [],
+      updatedAt: null,
+    });
   });
 
   it('uses fresh prices when menu-service accepted every line', () => {
     const view = toView(cart, {
       ok: true,
-      lines: [{ itemId: 'i1', name: 'Chicken Biryani (new)', quantity: 2, options: [], unitPricePaisa: 50000, lineTotalPaisa: 100000 }],
+      lines: [
+        {
+          itemId: 'i1',
+          name: 'Chicken Biryani (new)',
+          quantity: 2,
+          options: [],
+          unitPricePaisa: 50000,
+          lineTotalPaisa: 100000,
+        },
+      ],
       subtotalPaisa: 100000,
     });
     expect(view).toMatchObject({

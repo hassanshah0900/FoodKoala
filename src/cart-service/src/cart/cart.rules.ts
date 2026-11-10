@@ -116,7 +116,10 @@ export function toView(cart: StoredCart | null, pricing: Pricing | null): CartVi
   });
   const problems =
     pricing && !pricing.ok
-      ? pricing.problems.map((p) => ({ lineId: p.line === null ? null : (cart.lines[p.line]?.id ?? null), message: p.message }))
+      ? pricing.problems.map((p) => ({
+          lineId: p.line === null ? null : (cart.lines[p.line]?.id ?? null),
+          message: p.message,
+        }))
       : [];
   return {
     restaurantId: cart.restaurantId,
