@@ -52,7 +52,7 @@ def test_search_suggest_and_cuisines(client: TestClient, index: SearchIndex) -> 
         {"lat": 91, "lng": 67},
         {"lat": 24.9, "lng": 67, "limit": 51},
         {"lat": 24.9, "lng": 67, "page": 51},
-        {"lat": 24.9, "lng": 67, "sort": "rating"},
+        {"lat": 24.9, "lng": 67, "sort": "price"},
         {"lat": 24.9, "lng": 67, "q": ""},
     ],
 )

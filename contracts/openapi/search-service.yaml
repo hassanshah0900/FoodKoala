@@ -40,9 +40,10 @@ paths:
       summary: Restaurants delivering to a point, optionally matching a query
       description: |
         Without `q`, every restaurant delivering to the point, nearest first.
-        With `q`, best match first (`sort=relevance`) or nearest first
-        (`sort=distance`). Each result lists up to three of its dishes that
-        match `q`.
+        With `q`, best match first (`sort=relevance`). `sort=distance` puts
+        the nearest first and `sort=rating` the best rated (unrated last,
+        ties nearest first), with or without `q`. Each result lists up to
+        three of its dishes that match `q`.
       parameters:
         - $ref: '#/components/parameters/lat'
         - $ref: '#/components/parameters/lng'
@@ -56,7 +57,7 @@ paths:
           schema: { type: string, maxLength: 50 }
         - name: sort
           in: query
-          schema: { type: string, enum: [relevance, distance], default: relevance }
+          schema: { type: string, enum: [relevance, distance, rating], default: relevance }
         - name: page
           in: query
           schema: { type: integer, minimum: 1, maximum: 50, default: 1 }
@@ -201,11 +202,18 @@ components:
         pricePaisa: { type: integer, description: Base price, before options }
         isAvailable: { type: boolean }
 
+    Rating:
+      type: object
+      required: [average, count]
+      properties:
+        average: { type: [number, 'null'], description: One decimal (4.3); null until the first review }
+        count: { type: integer }
+
     SearchResult:
       type: object
       description: RestaurantSummary of restaurant-service, plus the dishes that matched.
       required:
-        [id, name, cuisines, area, city, logoUrl, coverUrl, location, distanceMeters, openNow, pausedUntil, acceptingOrders, delivery, matchingDishes]
+        [id, name, cuisines, area, city, logoUrl, coverUrl, location, distanceMeters, openNow, pausedUntil, acceptingOrders, rating, delivery, matchingDishes]
       properties:
         id: { type: string, format: uuid }
         name: { type: string }
@@ -219,6 +227,7 @@ components:
         openNow: { type: boolean }
         pausedUntil: { type: [string, 'null'], format: date-time }
         acceptingOrders: { type: boolean, description: Open now and not paused }
+        rating: { $ref: '#/components/schemas/Rating' }
         delivery: { $ref: '#/components/schemas/Delivery' }
         matchingDishes:
           type: array

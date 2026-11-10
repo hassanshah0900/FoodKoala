@@ -54,6 +54,7 @@ MAPPINGS: dict[str, Any] = {
         "city": {"type": "keyword"},
         "geo": {"type": "geo_point"},
         "deliveryArea": {"type": "geo_shape"},
+        "rating": {"properties": {"average": {"type": "float"}, "count": {"type": "integer"}}},
         "restaurantRevision": {"type": "integer"},
         "menuRevision": {"type": "integer"},
         "dishes": {
@@ -98,8 +99,13 @@ class SearchIndex:
     # --- writes -----------------------------------------------------------------
 
     def ensure(self) -> None:
-        """Creates the versioned index behind the alias, unless the alias exists."""
+        """
+        Creates the versioned index behind the alias, or adds fields new to
+        MAPPINGS to the existing one. Changing a field's type needs a new
+        INDEX_VERSION instead.
+        """
         if self.client.indices.exists_alias(name=self.alias):
+            self.client.indices.put_mapping(index=self.alias, properties=MAPPINGS["properties"])
             return
         name = f"{self.alias}-v{INDEX_VERSION}"
         try:
@@ -254,6 +260,16 @@ def _nearest(lat: float, lng: float) -> dict[str, Any]:
     return {"_geo_distance": {"geo": {"lat": lat, "lon": lng}, "order": "asc", "unit": "m"}}
 
 
+def _sort(sort: str, lat: float, lng: float, by_score: bool) -> list[Any]:
+    """Ties always go to the nearest, then the id, so pages are stable."""
+    tail = [_nearest(lat, lng), {"id": "asc"}]
+    if sort == "rating":
+        return [{"rating.average": {"order": "desc", "missing": "_last"}}, *tail]
+    if sort == "relevance" and by_score:
+        return ["_score", *tail]
+    return tail
+
+
 def search_body(
     lat: float, lng: float, q: str | None, cuisine: str | None, sort: str, offset: int, size: int
 ) -> dict[str, Any]:
@@ -266,9 +282,9 @@ def search_body(
         # Dishes come back through inner_hits; the whole menu would be dead weight.
         "_source": {"excludes": ["dishes", "deliveryArea", "geo"]},
     }
+    body["sort"] = _sort(sort, lat, lng, by_score=bool(q))
     if not q:
         body["query"] = {"bool": {"filter": filters}}
-        body["sort"] = [_nearest(lat, lng), {"id": "asc"}]
         return body
 
     matches = {
@@ -322,11 +338,6 @@ def search_body(
             "boost_mode": "multiply",
         }
     }
-    body["sort"] = (
-        [_nearest(lat, lng), {"id": "asc"}]
-        if sort == "distance"
-        else ["_score", _nearest(lat, lng), {"id": "asc"}]
-    )
     return body
 
 
@@ -422,6 +433,7 @@ def to_result(hit: dict[str, Any], lat: float, lng: float, now: datetime) -> dic
         "openNow": open_now,
         "pausedUntil": paused_until if paused else None,
         "acceptingOrders": open_now and not paused,
+        "rating": s.get("rating") or {"average": None, "count": 0},
         "delivery": {
             "zoneId": zone["id"],
             "deliveryFeePaisa": zone["deliveryFeePaisa"],

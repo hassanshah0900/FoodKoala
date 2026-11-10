@@ -27,6 +27,11 @@ class Address(_Event):
     province: str
 
 
+class Rating(_Event):
+    average: float | None = None
+    count: int = 0
+
+
 class Zone(_Event):
     id: UUID
     area: dict[str, Any]
@@ -48,6 +53,8 @@ class RestaurantUpdated(_Event):
     coverUrl: str | None
     hours: dict[str, Any]
     pausedUntil: datetime | None
+    # Absent from events published before restaurants had ratings.
+    rating: Rating = Rating()
     zones: list[Zone]
 
 
@@ -105,6 +112,7 @@ def restaurant_fields(e: RestaurantUpdated) -> dict[str, Any]:
         "coverUrl": e.coverUrl,
         "hours": e.hours,
         "pausedUntil": e.pausedUntil.isoformat() if e.pausedUntil else None,
+        "rating": e.rating.model_dump(),
         "zones": zones,
         # Indexed as geo_shape, so "delivers to this point" is a filter in the query.
         "deliveryArea": [z["area"] for z in zones],
