@@ -15,6 +15,16 @@ their menus. Signing in, the cart, checkout and order tracking come next, then t
 - **`/restaurant/{id}`**: the restaurant (restaurant-service), its delivery terms to the chosen area and its menu
   (menu-service), with sticky category tabs that follow the scroll.
 
+- **`/login`**: sign in or sign up with a mobile number and the 6-digit code texted to it (auth-service).
+
+## Sessions
+
+The access token (15 minutes) and the single-use refresh token are kept in httpOnly cookies, so scripts in the
+page never see them. `src/proxy.ts` runs before each page and server action: when the access token is missing
+or about to expire it trades the refresh token for a new pair, setting the cookies on both the request (so that
+render already uses them) and the response. A refresh token that auth-service refuses signs the user out.
+`lib/session.ts` gives pages `currentUser()`, `accessToken()` and `requireUser()`.
+
 ## Layout
 
 | Folder            | What it holds                                                                                            |

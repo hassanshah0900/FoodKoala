@@ -3,7 +3,7 @@ import 'server-only';
 /** api-gateway, as the Next.js server reaches it (in compose: http://api-gateway:8080). */
 const API_URL = process.env.API_URL ?? 'http://localhost:8080';
 
-/** A gateway answer other than 2xx. */
+/** A gateway answer other than 2xx, with the service's message. */
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -15,26 +15,45 @@ export class ApiError extends Error {
 
 type Query = Record<string, string | number | undefined>;
 
-/**
- * GETs /api/v1/<path> and parses the JSON. `revalidate` caches the answer for
- * that many seconds (menus change rarely); without it every request asks again.
- */
-export async function get<T>(path: string, query: Query = {}, revalidate?: number): Promise<T> {
+export interface RequestOptions {
+  query?: Query;
+  body?: unknown;
+  /** The caller's access token, for routes that need a signed-in user. */
+  token?: string | null;
+  /** Cache a GET for this many seconds (menus change rarely); otherwise every request asks again. */
+  revalidate?: number;
+}
+
+/** Calls /api/v1/<path> and parses the JSON answer (undefined for 204). */
+export async function request<T>(method: string, path: string, opts: RequestOptions = {}): Promise<T> {
   const url = new URL(`/api/v1/${path}`, API_URL);
-  for (const [k, v] of Object.entries(query)) if (v !== undefined) url.searchParams.set(k, String(v));
-  const res = await fetch(url, revalidate === undefined ? { cache: 'no-store' } : { next: { revalidate } });
+  for (const [k, v] of Object.entries(opts.query ?? {})) if (v !== undefined) url.searchParams.set(k, String(v));
+  const headers: Record<string, string> = {};
+  if (opts.body !== undefined) headers['content-type'] = 'application/json';
+  if (opts.token) headers.authorization = `Bearer ${opts.token}`;
+  const cacheable = method === 'GET' && opts.revalidate !== undefined && !opts.token;
+  const res = await fetch(url, {
+    method,
+    headers,
+    body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
+    ...(cacheable ? { next: { revalidate: opts.revalidate } } : { cache: 'no-store' }),
+  });
   if (!res.ok) {
     const body = (await res.json().catch(() => null)) as { message?: string | string[] } | null;
     const message = Array.isArray(body?.message) ? body.message.join('; ') : (body?.message ?? res.statusText);
     throw new ApiError(res.status, message);
   }
-  return (await res.json()) as T;
+  return res.status === 204 ? (undefined as T) : ((await res.json()) as T);
 }
 
+export const get = <T>(path: string, opts?: Omit<RequestOptions, 'body'>) => request<T>('GET', path, opts);
+export const post = <T>(path: string, body?: unknown, opts?: Omit<RequestOptions, 'body'>) =>
+  request<T>('POST', path, { ...opts, body });
+
 /** The value, or null when the gateway says 404. */
-export async function orNull<T>(request: Promise<T>): Promise<T | null> {
+export async function orNull<T>(pending: Promise<T>): Promise<T | null> {
   try {
-    return await request;
+    return await pending;
   } catch (err) {
     if (err instanceof ApiError && err.status === 404) return null;
     throw err;
