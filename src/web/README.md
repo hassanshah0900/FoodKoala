@@ -37,6 +37,9 @@ restaurant they own is a switch away. Only its owner can open a restaurant's con
   order-service gives to answer; the owner accepts with a prep time or rejects with a reason. Then "Food is ready"
   for the rider. Pausing new orders for 15 minutes to 2 hours, and taking them again.
 - **`/vendor/{restaurantId}/history`**: past orders, with why any were rejected or cancelled.
+- **`/vendor/{restaurantId}/reports`**: sales for the last 7, 30 or 90 days (Pakistan days, today included): sales,
+  delivered orders, average order and prep time, rejected or cancelled orders and voucher discounts, each against
+  the stretch just before; each day's sales as columns (hover a day, or open it as a table); and the best sellers.
 - **`/vendor/{restaurantId}/menu`**: the menu as customers will see it: add, rename, reorder and delete categories;
   reorder items, and mark one sold out or back in stock in one click.
 - **`/vendor/{restaurantId}/menu/new`** and **`/menu/items/{itemId}`**: a dish's name, price, description, photo
