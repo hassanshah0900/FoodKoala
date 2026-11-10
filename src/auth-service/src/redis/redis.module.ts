@@ -10,8 +10,7 @@ export const REDIS = Symbol('REDIS');
     {
       provide: REDIS,
       inject: [APP_CONFIG],
-      useFactory: (config: AppConfig) =>
-        new Redis(config.REDIS_URL, { lazyConnect: false, maxRetriesPerRequest: 2 }),
+      useFactory: (config: AppConfig) => new Redis(config.REDIS_URL, { lazyConnect: false, maxRetriesPerRequest: 2 }),
     },
   ],
   exports: [REDIS],

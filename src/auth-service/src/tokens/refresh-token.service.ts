@@ -1,10 +1,10 @@
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import { InjectDrizzle } from '@nestjs/drizzle';
 import { and, eq, isNull } from 'drizzle-orm';
-import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { APP_CONFIG, type AppConfig } from '../config/config';
 import type { Database } from '../db/database';
-import { refreshTokens, users, type User } from '../db/schema';
+import { refreshTokens, type User, users } from '../db/schema';
 
 type Tx = Parameters<Parameters<Database['transaction']>[0]>[0];
 

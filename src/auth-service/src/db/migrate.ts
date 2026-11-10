@@ -1,8 +1,9 @@
 // Applies the SQL migrations in ./drizzle. Run as a release step (`npm run db:migrate`), not on startup.
+
+import { join } from 'node:path';
 import { sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
-import { join } from 'node:path';
 
 /** unique_violation or duplicate_schema, through Drizzle's error wrapper: someone else created it. */
 function lostTheRace(err: unknown): boolean {

@@ -31,11 +31,15 @@ describe('loadConfig', () => {
 
   it('accepts Twilio in production with all of its settings', () => {
     const key = 'pem';
-    expect(loadConfig({ ...base, ...twilio, NODE_ENV: 'production', JWT_PRIVATE_KEY: key }).SMS_PROVIDER).toBe('twilio');
+    expect(loadConfig({ ...base, ...twilio, NODE_ENV: 'production', JWT_PRIVATE_KEY: key }).SMS_PROVIDER).toBe(
+      'twilio',
+    );
   });
 
   it('needs every Twilio setting, and treats empty ones as unset', () => {
-    expect(() => loadConfig({ ...base, SMS_PROVIDER: 'twilio' })).toThrow(/TWILIO_ACCOUNT_SID[\s\S]*TWILIO_AUTH_TOKEN[\s\S]*TWILIO_FROM/);
+    expect(() => loadConfig({ ...base, SMS_PROVIDER: 'twilio' })).toThrow(
+      /TWILIO_ACCOUNT_SID[\s\S]*TWILIO_AUTH_TOKEN[\s\S]*TWILIO_FROM/,
+    );
     expect(() => loadConfig({ ...base, ...twilio, TWILIO_AUTH_TOKEN: '' })).toThrow(/TWILIO_AUTH_TOKEN/);
     expect(loadConfig({ ...base, TWILIO_FROM: '' }).TWILIO_FROM).toBeUndefined();
     expect(() => loadConfig({ ...base, ...twilio, TWILIO_FROM: 'FoodKoala' })).toThrow(/TWILIO_FROM/);

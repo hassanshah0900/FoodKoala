@@ -1,4 +1,4 @@
-import { loadConfig, type AppConfig } from './config/config';
+import { type AppConfig, loadConfig } from './config/config';
 
 /** Valid config for tests; override what a test cares about. */
 export function testConfig(overrides: Partial<Record<keyof AppConfig, string>> = {}): AppConfig {

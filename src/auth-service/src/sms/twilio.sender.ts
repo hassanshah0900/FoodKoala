@@ -34,6 +34,8 @@ export class TwilioSmsSender extends SmsSender {
     });
     if (res.ok) return;
     const reply = (await res.json().catch(() => ({}))) as { code?: number; message?: string };
-    throw new Error(`Twilio answered ${res.status}${reply.code ? ` (${reply.code})` : ''}: ${reply.message ?? 'no message'}`);
+    throw new Error(
+      `Twilio answered ${res.status}${reply.code ? ` (${reply.code})` : ''}: ${reply.message ?? 'no message'}`,
+    );
   }
 }

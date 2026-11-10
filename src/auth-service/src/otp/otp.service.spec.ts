@@ -1,6 +1,6 @@
 import { ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
-import RedisMock from 'ioredis-mock';
 import type Redis from 'ioredis';
+import RedisMock from 'ioredis-mock';
 import { RateLimitedException } from '../common/rate-limited.exception';
 import { SmsSender } from '../sms/sms.sender';
 import { testConfig } from '../test-config';
