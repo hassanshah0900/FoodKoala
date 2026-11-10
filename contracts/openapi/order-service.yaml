@@ -45,6 +45,15 @@ info:
     from 1 to 5 when a rider delivered it, and an optional comment. A review
     can't be changed afterwards.
 
+    **Vouchers.** Admins create codes that take money off the subtotal: a
+    percent (optionally capped) or a flat amount, with a minimum subtotal,
+    a validity window, and optionally one restaurant, first orders only, a
+    total number of uses and uses per customer (1 by default). A customer
+    sees what a code takes off their cart with `GET /vouchers/{code}/discount`
+    and applies it with `voucherCode` at checkout. Uses are counted from the
+    orders that carry the voucher, so an order rejected or cancelled gives
+    its use back. Codes ignore case.
+
     **Events.** Every order placed, every status change and every review is
     written to an outbox in the same transaction as the change, for
     publishing to Kafka as `order.placed`, `order.status_changed` and
@@ -71,6 +80,8 @@ tags:
     description: A restaurant's incoming orders
   - name: reviews
     description: The customer's rating of a delivered order
+  - name: vouchers
+    description: Discount codes, managed by admins and applied at checkout
   - name: health
     description: Liveness and readiness probes
 
@@ -113,8 +124,9 @@ paths:
           description: |
             The order can't be placed as it is: a cart line has a problem, the
             address is unknown, the restaurant doesn't deliver there, the
-            subtotal is under the minimum order, or the payment method isn't
-            available yet. `message` lists every reason.
+            subtotal is under the minimum order, the payment method isn't
+            available yet, or the voucher can't be used (see
+            `VoucherRefused`). `message` lists every reason.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -260,6 +272,118 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
 
+  /vouchers:
+    post:
+      tags: [vouchers]
+      operationId: createVoucher
+      summary: Create a voucher (admins)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/VoucherCreate' }
+            example:
+              code: KOALA20
+              description: 20% off, up to Rs 150
+              kind: percent
+              value: 20
+              maxDiscountPaisa: 15000
+              minSubtotalPaisa: 50000
+              startsAt: '2026-11-10T00:00:00+05:00'
+              endsAt: '2026-12-01T00:00:00+05:00'
+      responses:
+        '201':
+          description: Voucher
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Voucher' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/AdminsOnly' }
+        '409':
+          description: The code is taken
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    get:
+      tags: [vouchers]
+      operationId: listVouchers
+      summary: Every voucher, newest first (admins)
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Page of vouchers
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VoucherPage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/AdminsOnly' }
+
+  /vouchers/{id}:
+    patch:
+      tags: [vouchers]
+      operationId: updateVoucher
+      summary: Pause, extend or limit a voucher (admins)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/VoucherUpdate' }
+            example: { active: false }
+      responses:
+        '200':
+          description: Voucher
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Voucher' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/AdminsOnly' }
+        '404':
+          description: No such voucher
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '422':
+          description: '`endsAt` is not after the voucher starts'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /vouchers/{code}/discount:
+    get:
+      tags: [vouchers]
+      operationId: voucherDiscount
+      summary: What a code takes off my cart now
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema: { type: string, pattern: '^[A-Za-z0-9_-]{3,32}$' }
+      responses:
+        '200':
+          description: The discount
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VoucherDiscount' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409':
+          description: The cart is empty
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '422': { $ref: '#/components/responses/VoucherRefused' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+
   /healthz:
     get:
       tags: [health]
@@ -335,6 +459,21 @@ components:
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
+    AdminsOnly:
+      description: Signed in, but not an admin
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    VoucherRefused:
+      description: |
+        The voucher can't be used on this cart, with the reason in `message`:
+        no such code, expired or paused, not valid yet, another restaurant's,
+        first orders only, already used by me, fully used, or the subtotal
+        is too small.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { statusCode: 422, error: Unprocessable Entity, message: ['You have already used this voucher'] }
     Unavailable:
       description: cart-service, user-service or restaurant-service could not be reached
       content:
@@ -391,6 +530,7 @@ components:
         addressId: { type: string, format: uuid, description: One of my saved addresses (user-service) }
         paymentMethod: { $ref: '#/components/schemas/PaymentMethod' }
         note: { type: [string, 'null'], minLength: 1, maxLength: 500, description: 'For the restaurant, e.g. "no cutlery"' }
+        voucherCode: { type: [string, 'null'], minLength: 1, maxLength: 32, description: Takes the voucher's discount off; 422 if it can't be used }
 
     StatusChange:
       type: object
@@ -455,6 +595,8 @@ components:
         - lines
         - subtotalPaisa
         - deliveryFeePaisa
+        - discountPaisa
+        - voucherCode
         - totalPaisa
         - paymentMethod
         - deliveryAddress
@@ -485,7 +627,9 @@ components:
           items: { $ref: '#/components/schemas/OrderLine' }
         subtotalPaisa: { type: integer }
         deliveryFeePaisa: { type: integer }
-        totalPaisa: { type: integer, description: subtotalPaisa + deliveryFeePaisa }
+        discountPaisa: { type: integer, description: Taken off the subtotal by the voucher; 0 without one }
+        voucherCode: { type: [string, 'null'] }
+        totalPaisa: { type: integer, description: subtotalPaisa + deliveryFeePaisa - discountPaisa }
         paymentMethod: { $ref: '#/components/schemas/PaymentMethod' }
         deliveryAddress: { $ref: '#/components/schemas/DeliveryAddress' }
         note: { type: [string, 'null'] }
@@ -500,6 +644,90 @@ components:
           items: { $ref: '#/components/schemas/TimelineEntry' }
         placedAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+
+    VoucherCreate:
+      type: object
+      required: [code, description, kind, value, startsAt, endsAt]
+      additionalProperties: false
+      properties:
+        code: { type: string, pattern: '^[A-Za-z0-9_-]{3,32}$', description: Stored in upper case }
+        description: { type: string, minLength: 1, maxLength: 200, description: What customers are told it gives }
+        kind: { type: string, enum: [percent, flat] }
+        value: { type: integer, minimum: 1, description: 'Percent off (at most 100) for `percent`, paisa off for `flat`' }
+        maxDiscountPaisa: { type: [integer, 'null'], minimum: 1, description: Caps a `percent` discount; only for `percent` }
+        minSubtotalPaisa: { type: integer, minimum: 0, default: 0 }
+        restaurantId: { type: [string, 'null'], format: uuid, description: Only at this restaurant; null for any }
+        firstOrderOnly: { type: boolean, default: false, description: Only for customers with no order that stands }
+        usageLimit: { type: [integer, 'null'], minimum: 1, description: Uses across all customers; null for no limit }
+        perCustomerLimit: { type: integer, minimum: 1, default: 1 }
+        startsAt: { type: string, format: date-time }
+        endsAt: { type: string, format: date-time, description: After startsAt }
+
+    VoucherUpdate:
+      type: object
+      minProperties: 1
+      additionalProperties: false
+      properties:
+        description: { type: string, minLength: 1, maxLength: 200 }
+        usageLimit: { type: [integer, 'null'], minimum: 1 }
+        endsAt: { type: string, format: date-time }
+        active: { type: boolean, description: false pauses it }
+
+    Voucher:
+      type: object
+      required:
+        - id
+        - code
+        - description
+        - kind
+        - value
+        - maxDiscountPaisa
+        - minSubtotalPaisa
+        - restaurantId
+        - firstOrderOnly
+        - usageLimit
+        - perCustomerLimit
+        - startsAt
+        - endsAt
+        - active
+        - used
+        - createdAt
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string }
+        description: { type: string }
+        kind: { type: string, enum: [percent, flat] }
+        value: { type: integer }
+        maxDiscountPaisa: { type: [integer, 'null'] }
+        minSubtotalPaisa: { type: integer }
+        restaurantId: { type: [string, 'null'], format: uuid }
+        firstOrderOnly: { type: boolean }
+        usageLimit: { type: [integer, 'null'] }
+        perCustomerLimit: { type: integer }
+        startsAt: { type: string, format: date-time }
+        endsAt: { type: string, format: date-time }
+        active: { type: boolean }
+        used: { type: integer, description: Orders that carry it and were not rejected or cancelled }
+        createdAt: { type: string, format: date-time }
+
+    VoucherPage:
+      type: object
+      required: [items, page, limit, hasMore]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Voucher' }
+        page: { type: integer }
+        limit: { type: integer }
+        hasMore: { type: boolean }
+
+    VoucherDiscount:
+      type: object
+      required: [code, description, discountPaisa]
+      properties:
+        code: { type: string }
+        description: { type: string }
+        discountPaisa: { type: integer, description: What it takes off the current cart's subtotal }
 
     OrderPage:
       type: object

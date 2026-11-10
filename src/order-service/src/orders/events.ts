@@ -51,6 +51,7 @@ export function orderPlaced(
     totals: {
       subtotalPaisa: order.subtotalPaisa,
       deliveryFeePaisa: order.deliveryFeePaisa,
+      discountPaisa: order.discountPaisa,
       totalPaisa: order.totalPaisa,
     },
     paymentMethod: order.paymentMethod,

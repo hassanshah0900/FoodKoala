@@ -1,6 +1,6 @@
 import { ConflictException, UnprocessableEntityException } from '@nestjs/common';
 import type { Address, Cart, DeliveryQuote } from '../clients/clients';
-import { checkCart, draftOrder, rupees } from './checkout';
+import { checkCart, draftOrder, withDiscount } from './checkout';
 
 const restaurantId = '0b9c1f9e-4a3f-4a59-9a43-5d1b5f0b7a10';
 const cart = (over: Partial<Omit<Cart, 'restaurantId'>> = {}): Cart & { restaurantId: string } => ({
@@ -52,14 +52,6 @@ const messages = (fn: () => unknown) => {
   throw new Error('did not throw');
 };
 
-describe('rupees', () => {
-  it.each([
-    [50000, 'Rs 500'],
-    [49950, 'Rs 499.50'],
-    [5, 'Rs 0.05'],
-  ])('%i paisa reads as %s', (paisa, text) => expect(rupees(paisa)).toBe(text));
-});
-
 describe('checkCart', () => {
   it('refuses an empty cart with 409', () => {
     expect(() => checkCart({ restaurantId: null, lines: [], subtotalPaisa: 0, problems: [] }, 'cod')).toThrow(
@@ -90,6 +82,8 @@ describe('draftOrder', () => {
       deliveryZoneId: 'z1',
       subtotalPaisa: 110000,
       deliveryFeePaisa: 9900,
+      voucherId: null,
+      discountPaisa: 0,
       totalPaisa: 119900,
       estimatedDeliveryAt: new Date('2026-11-08T10:35:00Z'),
       deliveryAddress: {
@@ -152,5 +146,17 @@ describe('draftOrder', () => {
     expect(messages(() => draftOrder({ cart: small, address, restaurant, quote: q, now }))).toEqual([
       'The minimum order here is Rs 600; add Rs 50 more',
     ]);
+  });
+});
+
+describe('withDiscount', () => {
+  it('takes the discount off the total and records the voucher', () => {
+    const draft = draftOrder({ cart: cart(), address, restaurant, quote: quote(), now });
+    expect(withDiscount(draft, { voucherId: 'v1', discountPaisa: 22000 })).toEqual({
+      ...draft,
+      voucherId: 'v1',
+      discountPaisa: 22000,
+      totalPaisa: 97900,
+    });
   });
 });

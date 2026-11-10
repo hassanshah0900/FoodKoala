@@ -15,6 +15,8 @@ export const checkoutSchema = z.strictObject({
   addressId: z.uuid(),
   paymentMethod: z.enum(PAYMENT_METHODS),
   note: text(500).nullable().default(null),
+  /** Checked against the vouchers at checkout; a bad code fails it with 422. */
+  voucherCode: z.string().trim().min(1).max(32).nullable().default(null),
 });
 export type CheckoutDto = z.output<typeof checkoutSchema>;
 

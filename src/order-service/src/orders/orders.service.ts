@@ -5,9 +5,19 @@ import { CartClient, RestaurantClient, UserClient } from '../clients/clients';
 import { APP_CONFIG, type AppConfig } from '../config/config';
 import type { Database, Tx } from '../db/database';
 import { isUniqueViolation } from '../db/errors';
-import { type Actor, type OrderRow, orderLines, orderStatusHistory, orders, outbox, type Status } from '../db/schema';
+import {
+  type Actor,
+  type OrderRow,
+  orderLines,
+  orderStatusHistory,
+  orders,
+  outbox,
+  type Status,
+  vouchers,
+} from '../db/schema';
 import { type Identity, isAdmin } from '../identity/identity';
-import { checkCart, draftOrder } from './checkout';
+import { VouchersService } from '../vouchers/vouchers.service';
+import { checkCart, draftOrder, withDiscount } from './checkout';
 import { orderPlaced, orderStatusChanged } from './events';
 import { decide, estimateOnAccept, LABEL, needsOwnership, ruleFor } from './lifecycle';
 import { type Order, type Page, toOrder } from './order.view';
@@ -27,6 +37,7 @@ export class OrdersService {
     private readonly cart: CartClient,
     private readonly users: UserClient,
     private readonly restaurants: RestaurantClient,
+    private readonly vouchers: VouchersService,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 
@@ -59,7 +70,14 @@ export class OrdersService {
     let orderId: string;
     try {
       orderId = await this.db.transaction(async (tx) => {
-        const { lines, ...fields } = draft;
+        const redemption = dto.voucherCode
+          ? await this.vouchers.redeem(tx, me.userId, dto.voucherCode, {
+              restaurantId: draft.restaurantId,
+              subtotalPaisa: draft.subtotalPaisa,
+              now,
+            })
+          : null;
+        const { lines, ...fields } = redemption ? withDiscount(draft, redemption) : draft;
         const [order] = await tx
           .insert(orders)
           .values({
@@ -282,14 +300,21 @@ export class OrdersService {
     return { items: await this.views(this.db, rows.slice(0, limit)), page, limit, hasMore: rows.length > limit };
   }
 
-  /** Lines and timelines of several orders in two queries. */
+  /**
+   * Lines, timelines and voucher codes of several orders in at most three
+   * queries, one after another: `db` may be a transaction, whose one
+   * connection can't run queries side by side.
+   */
   private async views(db: Database | Tx, rows: OrderRow[]): Promise<Order[]> {
     if (!rows.length) return [];
     const ids = rows.map((r) => r.id);
-    const [lines, history] = await Promise.all([
-      db.select().from(orderLines).where(inArray(orderLines.orderId, ids)),
-      db.select().from(orderStatusHistory).where(inArray(orderStatusHistory.orderId, ids)),
-    ]);
-    return rows.map((r) => toOrder(r, lines, history));
+    const voucherIds = [...new Set(rows.flatMap((r) => (r.voucherId ? [r.voucherId] : [])))];
+    const lines = await db.select().from(orderLines).where(inArray(orderLines.orderId, ids));
+    const history = await db.select().from(orderStatusHistory).where(inArray(orderStatusHistory.orderId, ids));
+    const codes = voucherIds.length
+      ? await db.select({ id: vouchers.id, code: vouchers.code }).from(vouchers).where(inArray(vouchers.id, voucherIds))
+      : [];
+    const voucherCodes = new Map(codes.map((v) => [v.id, v.code]));
+    return rows.map((r) => toOrder(r, lines, history, voucherCodes));
   }
 }

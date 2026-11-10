@@ -13,6 +13,8 @@ import { OutboxRelay } from './outbox/outbox-relay';
 import { EVENT_PUBLISHER, KafkaPublisher } from './outbox/publisher';
 import { ReviewsController } from './reviews/reviews.controller';
 import { ReviewsService } from './reviews/reviews.service';
+import { VouchersController } from './vouchers/vouchers.controller';
+import { VouchersService } from './vouchers/vouchers.service';
 
 @Module({
   imports: [
@@ -22,10 +24,12 @@ import { ReviewsService } from './reviews/reviews.service';
       useFactory: (config: AppConfig) => ({ drizzle, connection: config.DATABASE_URL }),
     }),
   ],
-  controllers: [HealthController, OrdersController, ReviewsController],
+  // VouchersController comes before OrdersController, whose GET /:id would otherwise take GET /vouchers.
+  controllers: [HealthController, VouchersController, OrdersController, ReviewsController],
   providers: [
     OrdersService,
     ReviewsService,
+    VouchersService,
     AcceptTimeouts,
     CartClient,
     UserClient,
