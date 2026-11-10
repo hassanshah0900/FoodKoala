@@ -355,3 +355,12 @@ export interface SalesReport {
   /** Only days with orders, oldest first. */
   days: { date: string; placed: number; delivered: number; salesPaisa: number }[];
 }
+
+/** Review in order-service.yaml: a customer's rating of a delivered order. */
+export interface OrderReview {
+  orderId: string;
+  restaurantRating: number;
+  riderRating: number | null;
+  comment: string | null;
+  createdAt: string;
+}
