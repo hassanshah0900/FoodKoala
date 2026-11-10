@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { WaitingCard } from '@/components/admin/WaitingCard';
+import { WaitingCard } from '@/components/console/WaitingCard';
 import { deliveriesWithStatus, ridersWithStatus } from '@/lib/api/delivery';
 import { restaurantsWithStatus } from '@/lib/api/restaurants';
 import { dateTime, shortDate } from '@/lib/format';

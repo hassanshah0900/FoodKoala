@@ -1,9 +1,9 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { StatusActions } from '@/components/admin/StatusActions';
-import { StatusBadge } from '@/components/admin/StatusBadge';
 import { Section } from '@/components/checkout/Section';
+import { StatusActions } from '@/components/console/StatusActions';
+import { StatusBadge } from '@/components/console/StatusBadge';
 import { OrderLines } from '@/components/orders/OrderLines';
 import { deliveryOfOrder } from '@/lib/api/delivery';
 import { getOrder } from '@/lib/api/orders';

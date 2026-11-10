@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { Logo } from '@/components/Logo';
 import { AREAS } from '@/lib/location';
 
@@ -26,6 +27,11 @@ export function Footer() {
             <li>Delivery 7 days a week</li>
             <li>Cash on delivery</li>
             <li>Live rider tracking</li>
+            <li>
+              <Link href="/vendor" className="font-semibold text-white hover:underline">
+                For restaurants
+              </Link>
+            </li>
           </ul>
         </div>
       </div>

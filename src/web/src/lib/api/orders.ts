@@ -23,9 +23,22 @@ export const getOrder = (token: string, id: string) => orNull(get<Order>(`orders
 export const voucherDiscount = (token: string, code: string) =>
   get<VoucherDiscount>(`orders/vouchers/${encodeURIComponent(code)}/discount`, { token });
 
-/** Moves an order on (or stops it); order-service decides who may make which change. */
-export const setOrderStatus = (token: string, id: string, status: OrderStatus, reason?: string) =>
-  post<Order>(`orders/${id}/status`, { status, reason }, { token });
+/**
+ * Moves an order on (or stops it); order-service decides who may make which change.
+ * Accepting needs a prep time, rejecting a reason, and an admin cancelling a reason.
+ */
+export const setOrderStatus = (
+  token: string,
+  id: string,
+  change: { status: OrderStatus; reason?: string; prepTimeMinutes?: number },
+) => post<Order>(`orders/${id}/status`, change, { token });
+
+/** A restaurant's orders in these statuses, newest first (its owner or an admin). */
+export const restaurantOrders = (token: string, restaurantId: string, statuses: OrderStatus[], page = 1, limit = 50) =>
+  get<Page<Order>>(`orders/restaurants/${restaurantId}/orders`, {
+    token,
+    query: { status: statuses.join(','), page, limit },
+  });
 
 // Admin: the vouchers customers apply at checkout.
 

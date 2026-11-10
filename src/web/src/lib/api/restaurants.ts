@@ -1,4 +1,4 @@
-import { get, orNull, post } from './http';
+import { del, get, orNull, post, put } from './http';
 import type {
   DeliveryQuote,
   DeliveryZone,
@@ -45,3 +45,14 @@ export const restaurantZones = (token: string, id: string) => get<DeliveryZone[]
 
 export const setRestaurantStatus = (token: string, id: string, status: RestaurantStatus, reason?: string) =>
   post<ManagedRestaurant>(`restaurants/${id}/status`, { status, reason }, { token });
+
+// Owners: their own restaurants.
+
+/** Restaurants the caller owns, in any status, newest first. */
+export const myRestaurants = (token: string) => get<ManagedRestaurant[]>('restaurants/mine', { token });
+
+/** Stops new orders for a while, e.g. when the kitchen is full. */
+export const pauseOrders = (token: string, id: string, minutes: number) =>
+  put<ManagedRestaurant>(`restaurants/${id}/pause`, { minutes }, { token });
+
+export const resumeOrders = (token: string, id: string) => del<ManagedRestaurant>(`restaurants/${id}/pause`, { token });

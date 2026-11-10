@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { Pager } from '@/components/admin/Pager';
-import { StatusTabs } from '@/components/admin/StatusTabs';
-import { Table } from '@/components/admin/Table';
+import { Pager } from '@/components/console/Pager';
+import { StatusTabs } from '@/components/console/StatusTabs';
+import { Table } from '@/components/console/Table';
 import { Cover } from '@/components/restaurants/Cover';
 import { restaurantsWithStatus } from '@/lib/api/restaurants';
 import { cuisineLabel } from '@/lib/cuisines';

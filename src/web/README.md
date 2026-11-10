@@ -28,6 +28,16 @@ their menus. Signing in, the cart, checkout and order tracking come next, then t
   it is delivered, rejected or cancelled; then what was ordered, the money and the address.
 - **`/login`**: sign in or sign up with a mobile number and the 6-digit code texted to it (auth-service).
 
+### Restaurant console (`/vendor`)
+
+For owners: `/vendor` opens their restaurant (someone without one is told how to get listed), and another
+restaurant they own is a switch away. Only its owner can open a restaurant's console.
+
+- **`/vendor/{restaurantId}`**: the kitchen board, refreshed every 15 seconds. New orders count down the 10 minutes
+  order-service gives to answer; the owner accepts with a prep time or rejects with a reason. Then "Food is ready"
+  for the rider. Pausing new orders for 15 minutes to 2 hours, and taking them again.
+- **`/vendor/{restaurantId}/history`**: past orders, with why any were rejected or cancelled.
+
 ### Admin console (`/admin`)
 
 Only for users with the `admin` role (see `ADMIN_PHONES` in auth-service); guests are sent to log in and anyone
