@@ -243,7 +243,10 @@ describe('order-service (e2e)', () => {
       http.post(`/${order.id}/status`).set(s.owner).send({ status: 'accepted', prepTimeMinutes: 15 }),
       http.post(`/${order.id}/status`).set(s.customer).send({ status: 'cancelled' }),
     ]);
-    expect([accept.status, cancel.status].sort()).toEqual([200, 409]);
+    // The loser was judged against the winner's status: a cancel after the
+    // accept is the admin's to make (403); an accept after the cancel is too late (409).
+    if (accept.status === 200) expect(cancel.status).toBeOneOf([403, 409]);
+    else expect([accept.status, cancel.status]).toEqual([409, 200]);
     const final = await http.get(`/${order.id}`).set(s.customer).expect(200);
     expect(final.body.timeline).toHaveLength(2);
   });
