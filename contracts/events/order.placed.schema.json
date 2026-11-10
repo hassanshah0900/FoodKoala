@@ -34,12 +34,13 @@
     },
     "totals": {
       "type": "object",
-      "required": ["subtotalPaisa", "deliveryFeePaisa", "discountPaisa", "totalPaisa"],
+      "required": ["subtotalPaisa", "deliveryFeePaisa", "discountPaisa", "tipPaisa", "totalPaisa"],
       "properties": {
         "subtotalPaisa": { "type": "integer" },
         "deliveryFeePaisa": { "type": "integer" },
         "discountPaisa": { "type": "integer", "description": "Taken off the subtotal by a voucher; 0 without one" },
-        "totalPaisa": { "type": "integer", "description": "What the customer pays: subtotal + delivery fee - discount. Menu prices include sales tax" }
+        "tipPaisa": { "type": "integer", "description": "For the rider, in full; 0 without one" },
+        "totalPaisa": { "type": "integer", "description": "What the customer pays: subtotal + delivery fee - discount + tip. Menu prices include sales tax" }
       }
     },
     "paymentMethod": { "enum": ["cod", "card", "jazzcash", "easypaisa"] },
