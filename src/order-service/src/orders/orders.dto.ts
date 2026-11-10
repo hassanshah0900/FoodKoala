@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import { PAYMENT_METHODS, STATUSES } from '../db/schema';
 
-const text = (max: number) => z.string().trim().min(1).max(max);
+/** Trimmed, non-empty text of at most `max` characters. */
+export const text = (max: number) => z.string().trim().min(1).max(max);
 
 export const idSchema = z.uuid();
 

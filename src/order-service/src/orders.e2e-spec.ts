@@ -12,6 +12,7 @@ import type { Database } from './db/database';
 import { orders, outbox } from './db/schema';
 import { DeliveryEventConsumer } from './delivery/delivery-event-consumer';
 import { AcceptTimeouts } from './orders/accept-timeouts';
+import { OrdersService } from './orders/orders.service';
 import { setupApp } from './setup-app';
 
 type Headers = Record<'X-User-Id' | 'X-User-Phone' | 'X-User-Roles', string>;
@@ -515,6 +516,97 @@ describe('order-service (e2e)', () => {
       await http.post(`/${order.id}/status`).set(s.owner).send({ status: 'accepted', prepTimeMinutes: 15 }).expect(200);
       const res = await http.post(`/${order.id}/status`).set(admin).send({ status: 'picked_up' }).expect(403);
       expect(res.body.message).toBe('Only the rider can mark picked up this order');
+    });
+  });
+
+  describe('reviews', () => {
+    const rider = randomUUID();
+
+    /** An order the rider delivered `daysAgo` days ago. */
+    const delivered = async (s: ReturnType<typeof scenario>, daysAgo = 0) => {
+      const order = await place(s);
+      await http.post(`/${order.id}/status`).set(s.owner).send({ status: 'accepted', prepTimeMinutes: 15 }).expect(200);
+      const at = new Date(Date.now() - daysAgo * 24 * 3600_000);
+      await app.get(OrdersService).applyRiderEvent(order.id, 'delivered', rider, at);
+      return order;
+    };
+    const review = (who: Headers, orderId: string, body: object) => http.post(`/${orderId}/review`).set(who).send(body);
+
+    it('lets the customer rate a delivered order once, and publishes order.reviewed', async () => {
+      const s = scenario();
+      const order = await delivered(s);
+      await http.get(`/${order.id}/review`).set(s.customer).expect(404);
+
+      const res = await review(s.customer, order.id, {
+        restaurantRating: 5,
+        riderRating: 4,
+        comment: '  Hot and on time  ',
+      }).expect(201);
+      expect(res.body).toEqual({
+        orderId: order.id,
+        restaurantId: s.restaurantId,
+        riderId: rider,
+        restaurantRating: 5,
+        riderRating: 4,
+        comment: 'Hot and on time',
+        createdAt: expect.any(String),
+      });
+      // The restaurant's owner sees it too; strangers don't.
+      await http.get(`/${order.id}/review`).set(s.owner).expect(200, res.body);
+      await http.get(`/${order.id}/review`).set(newUser()).expect(404);
+
+      const again = await review(s.customer, order.id, { restaurantRating: 1 }).expect(409);
+      expect(again.body.message).toBe('This order has already been reviewed');
+
+      const events = await db.select().from(outbox).where(eq(outbox.key, order.id));
+      expect(events.find((e) => e.topic === 'order.reviewed')?.payload).toMatchObject({
+        type: 'order.reviewed',
+        source: 'order-service',
+        data: {
+          orderId: order.id,
+          customerId: s.customer['X-User-Id'],
+          restaurantId: s.restaurantId,
+          riderId: rider,
+          restaurantRating: 5,
+          riderRating: 4,
+          comment: 'Hot and on time',
+          reviewedAt: res.body.createdAt,
+        },
+      });
+    });
+
+    it('only the customer, only once delivered, only within the window', async () => {
+      const s = scenario();
+      const order = await place(s);
+      await review(s.customer, order.id, { restaurantRating: 4 }).expect(409); // still placed
+      await review(s.owner, order.id, { restaurantRating: 5 }).expect(403);
+      await review(newUser(), order.id, { restaurantRating: 5 }).expect(404);
+
+      const old = scenario();
+      const order8DaysAgo = await delivered(old, 8);
+      const late = await review(old.customer, order8DaysAgo.id, { restaurantRating: 3 }).expect(409);
+      expect(late.body.message).toBe('Orders can be reviewed within 7 days of delivery');
+    });
+
+    it('rejects ratings out of range, and a rider rating when no rider delivered', async () => {
+      const s = scenario();
+      const order = await delivered(s);
+      await review(s.customer, order.id, { restaurantRating: 6 }).expect(400);
+      await review(s.customer, order.id, { restaurantRating: 4, riderRating: 0 }).expect(400);
+      await review(s.customer, order.id, { restaurantRating: 4, extra: true }).expect(400);
+
+      const byAdmin = scenario();
+      const handed = await place(byAdmin);
+      for (const to of ['accepted', 'ready'] as const) {
+        const body = to === 'accepted' ? { status: to, prepTimeMinutes: 15 } : { status: to };
+        await http.post(`/${handed.id}/status`).set(byAdmin.owner).send(body).expect(200);
+      }
+      await http.post(`/${handed.id}/status`).set(admin).send({ status: 'picked_up' }).expect(200);
+      await http.post(`/${handed.id}/status`).set(admin).send({ status: 'delivered' }).expect(200);
+      const res = await review(byAdmin.customer, handed.id, { restaurantRating: 4, riderRating: 5 }).expect(400);
+      expect(res.body.message).toBe('No rider delivered this order; leave out riderRating');
+      const ok = await review(byAdmin.customer, handed.id, { restaurantRating: 4 }).expect(201);
+      expect(ok.body).toMatchObject({ riderId: null, riderRating: null, comment: null });
     });
   });
 });

@@ -11,6 +11,8 @@ import { OrdersController } from './orders/orders.controller';
 import { OrdersService } from './orders/orders.service';
 import { OutboxRelay } from './outbox/outbox-relay';
 import { EVENT_PUBLISHER, KafkaPublisher } from './outbox/publisher';
+import { ReviewsController } from './reviews/reviews.controller';
+import { ReviewsService } from './reviews/reviews.service';
 
 @Module({
   imports: [
@@ -20,9 +22,10 @@ import { EVENT_PUBLISHER, KafkaPublisher } from './outbox/publisher';
       useFactory: (config: AppConfig) => ({ drizzle, connection: config.DATABASE_URL }),
     }),
   ],
-  controllers: [HealthController, OrdersController],
+  controllers: [HealthController, OrdersController, ReviewsController],
   providers: [
     OrdersService,
+    ReviewsService,
     AcceptTimeouts,
     CartClient,
     UserClient,

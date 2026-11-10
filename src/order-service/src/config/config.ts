@@ -20,6 +20,8 @@ const configSchema = z.object({
   RIDE_MINUTES: z.coerce.number().int().min(0).default(15),
   /** An order the restaurant hasn't accepted or rejected this many minutes after it was placed is rejected for it. */
   ACCEPT_TIMEOUT_MINUTES: z.coerce.number().int().positive().default(10),
+  /** How long after delivery the customer can still review the order. */
+  REVIEW_WINDOW_DAYS: z.coerce.number().int().positive().default(7),
   /** How often to look for such orders. */
   ACCEPT_CHECK_MS: z.coerce.number().int().positive().default(15_000),
   /** `host:port,host:port`. Unset, the outbox is not published (fine for local runs without Kafka). */
