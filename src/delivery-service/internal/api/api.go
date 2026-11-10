@@ -209,6 +209,14 @@ func New(d Deps) http.Handler {
 		p, err := d.Riders.List(r.Context(), status, page, limit)
 		return reply(w, http.StatusOK, p, err)
 	}))
+	mux.Handle("GET /riders/{userId}", admin(func(w http.ResponseWriter, r *http.Request) error {
+		userID, err := id(r, "userId")
+		if err != nil {
+			return err
+		}
+		rider, err := d.Riders.Get(r.Context(), userID)
+		return reply(w, http.StatusOK, rider, err)
+	}))
 	mux.Handle("POST /riders/{userId}/status", admin(func(w http.ResponseWriter, r *http.Request) error {
 		userID, err := id(r, "userId")
 		if err != nil {
