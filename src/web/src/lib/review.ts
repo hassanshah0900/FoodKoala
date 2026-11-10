@@ -1,4 +1,4 @@
-import type { Hours, RestaurantStatus, RiderStatus } from './api/types';
+import type { DeliveryStatus, Hours, OrderStatus, PaymentStatus, RestaurantStatus, RiderStatus } from './api/types';
 
 /** A status change an admin can make from here. */
 export interface StatusAction<S extends string> {
@@ -66,4 +66,58 @@ export const RIDER_STATUSES: readonly StatusLabel<RiderStatus>[] = [
   { status: 'pending', label: 'Waiting for approval', tone: 'waiting' },
   { status: 'approved', label: 'Approved', tone: 'good' },
   { status: 'suspended', label: 'Suspended', tone: 'bad' },
+];
+
+const cancel: StatusAction<OrderStatus> = { to: 'cancelled', label: 'Cancel order', needsReason: true, tone: 'danger' };
+
+/**
+ * What an admin can do to an order (order-service's life cycle): stop it with a
+ * reason, or step in for a rider who can't mark the pickup or drop-off.
+ */
+const ORDER_ACTIONS: Record<OrderStatus, StatusAction<OrderStatus>[]> = {
+  placed: [{ to: 'rejected', label: 'Reject for the restaurant', needsReason: true, tone: 'danger' }, cancel],
+  accepted: [cancel],
+  ready: [{ to: 'picked_up', label: 'Mark picked up', needsReason: false, tone: 'plain' }, cancel],
+  picked_up: [{ to: 'delivered', label: 'Mark delivered', needsReason: false, tone: 'primary' }],
+  delivered: [],
+  rejected: [],
+  cancelled: [],
+};
+
+export const orderActions = (status: OrderStatus) => ORDER_ACTIONS[status];
+
+export const ORDER_STATUSES: readonly StatusLabel<OrderStatus>[] = [
+  { status: 'placed', label: 'Waiting for the restaurant', tone: 'waiting' },
+  { status: 'accepted', label: 'Being prepared', tone: 'good' },
+  { status: 'ready', label: 'Ready for pickup', tone: 'good' },
+  { status: 'picked_up', label: 'On its way', tone: 'good' },
+  { status: 'delivered', label: 'Delivered', tone: 'neutral' },
+  { status: 'rejected', label: 'Rejected', tone: 'bad' },
+  { status: 'cancelled', label: 'Cancelled', tone: 'bad' },
+];
+
+/** Each step of an order's timeline as an event: "Placed by customer", "Picked up by rider". */
+export const ORDER_EVENTS: Record<OrderStatus, string> = {
+  placed: 'Placed',
+  accepted: 'Accepted',
+  ready: 'Ready',
+  picked_up: 'Picked up',
+  delivered: 'Delivered',
+  rejected: 'Rejected',
+  cancelled: 'Cancelled',
+};
+
+export const DELIVERY_STATUSES: readonly StatusLabel<DeliveryStatus>[] = [
+  { status: 'searching', label: 'Looking for a rider', tone: 'waiting' },
+  { status: 'waiting', label: 'Restaurant to accept', tone: 'neutral' },
+  { status: 'assigned', label: 'Rider on the way', tone: 'good' },
+  { status: 'picked_up', label: 'Picked up', tone: 'good' },
+  { status: 'delivered', label: 'Delivered', tone: 'neutral' },
+  { status: 'cancelled', label: 'Cancelled', tone: 'bad' },
+];
+
+export const PAYMENT_STATUSES: readonly StatusLabel<PaymentStatus>[] = [
+  { status: 'pending', label: 'To collect', tone: 'waiting' },
+  { status: 'collected', label: 'Collected', tone: 'good' },
+  { status: 'cancelled', label: 'Cancelled', tone: 'neutral' },
 ];

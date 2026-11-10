@@ -33,7 +33,12 @@ their menus. Signing in, the cart, checkout and order tracking come next, then t
 Only for users with the `admin` role (see `ADMIN_PHONES` in auth-service); guests are sent to log in and anyone
 else gets a 404. It has its own frame, with the sections down the side.
 
-- **`/admin`**: what is waiting: the oldest restaurant and rider applications.
+- **`/admin`**: what is waiting: deliveries no rider has taken, and the oldest restaurant and rider applications.
+- **`/admin/deliveries`**: deliveries by where they are, "looking for a rider" first; each links to its order.
+- **`/admin/orders/{id}`**: one order across the services: what was ordered and the money, its timeline (who did
+  what, and why), its delivery and rider, and its payment. An admin can reject or cancel it with a reason, or mark
+  the pickup or drop-off for a rider who can't. `/admin/orders` finds one by its id.
+- **`/admin/payments`**: payments to collect, collected and cancelled.
 - **`/admin/restaurants`**: restaurants by status (waiting for review, live, suspended, rejected).
 - **`/admin/restaurants/{id}`**: the details, opening hours and delivery zones an admin checks, what still stops
   an approval, and the decision: approve, reject or suspend (with a reason the owner sees), reinstate.

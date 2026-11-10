@@ -1,5 +1,5 @@
 import type { Hours } from './api/types';
-import { approvalBlockers, restaurantActions, riderActions } from './review';
+import { approvalBlockers, orderActions, restaurantActions, riderActions } from './review';
 
 describe('restaurant review', () => {
   it('offers approve or reject for an application, both ways a reason only for rejecting', () =>
@@ -24,5 +24,15 @@ describe('restaurant review', () => {
     expect(riderActions('pending').map((a) => a.to)).toEqual(['approved']);
     expect(riderActions('approved').map((a) => a.to)).toEqual(['suspended']);
     expect(riderActions('suspended').map((a) => a.to)).toEqual(['approved', 'pending']);
+  });
+
+  it('lets an admin stop an order with a reason, or step in for the rider, and do nothing once it is final', () => {
+    expect(orderActions('placed').map((a) => [a.to, a.needsReason])).toEqual([
+      ['rejected', true],
+      ['cancelled', true],
+    ]);
+    expect(orderActions('ready').map((a) => a.to)).toEqual(['picked_up', 'cancelled']);
+    expect(orderActions('picked_up').map((a) => a.to)).toEqual(['delivered']);
+    expect(orderActions('delivered')).toEqual([]);
   });
 });
