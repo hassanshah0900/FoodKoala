@@ -1,0 +1,271 @@
+openapi: 3.1.0
+info:
+  title: search-service
+  version: 0.1.0
+  description: |
+    Find restaurants and dishes that deliver to where the customer is.
+
+    The index is built from `restaurant.updated` and `menu.updated`
+    (`contracts/events`), so it trails restaurant-service and menu-service
+    by about a second. Only approved restaurants are returned, and only
+    those with a delivery zone containing the given point. Delivery terms
+    are those of the cheapest such zone, as in restaurant-service.
+
+    **Matching** is forgiving: "biriyani" finds biryani. A query matches a
+    restaurant's name, cuisines and description, and the names,
+    descriptions and categories of its dishes. Closer restaurants rank
+    higher among equally good matches.
+
+    Everything here is public: no identity headers needed.
+
+    **Money** is in paisa (integer, 1 PKR = 100 paisa). **Hours** are
+    Asia/Karachi local time.
+servers:
+  - url: http://localhost:8080/api/v1/search
+    description: Through api-gateway
+  - url: http://localhost:8002
+    description: Service directly
+
+tags:
+  - name: search
+    description: Restaurant and dish search
+  - name: health
+    description: Liveness and readiness probes
+
+paths:
+  /restaurants:
+    get:
+      tags: [search]
+      operationId: searchRestaurants
+      summary: Restaurants delivering to a point, optionally matching a query
+      description: |
+        Without `q`, every restaurant delivering to the point, nearest first.
+        With `q`, best match first (`sort=relevance`) or nearest first
+        (`sort=distance`). Each result lists up to three of its dishes that
+        match `q`.
+      parameters:
+        - $ref: '#/components/parameters/lat'
+        - $ref: '#/components/parameters/lng'
+        - name: q
+          in: query
+          schema: { type: string, minLength: 1, maxLength: 100 }
+          example: biryani
+        - name: cuisine
+          in: query
+          description: Only restaurants with this cuisine (as listed by GET /cuisines)
+          schema: { type: string, maxLength: 50 }
+        - name: sort
+          in: query
+          schema: { type: string, enum: [relevance, distance], default: relevance }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 50, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+      responses:
+        '200':
+          description: Page of restaurants
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SearchPage' }
+        '422': { $ref: '#/components/responses/Invalid' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+
+  /suggest:
+    get:
+      tags: [search]
+      operationId: suggest
+      summary: Search-as-you-type suggestions near a point
+      description: |
+        Restaurants, dishes and cuisines whose names start with the words
+        typed so far ("chick bir" suggests Chicken Biryani), from
+        restaurants delivering to the point.
+      parameters:
+        - $ref: '#/components/parameters/lat'
+        - $ref: '#/components/parameters/lng'
+        - name: q
+          in: query
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 100 }
+          example: chick bir
+      responses:
+        '200':
+          description: Up to 5 restaurants, 5 dishes and 5 cuisines
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Suggestions' }
+        '422': { $ref: '#/components/responses/Invalid' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+
+  /cuisines:
+    get:
+      tags: [search]
+      operationId: listCuisines
+      summary: Cuisines available at a point, most common first
+      description: For the cuisine chips on the home screen.
+      parameters:
+        - $ref: '#/components/parameters/lat'
+        - $ref: '#/components/parameters/lng'
+      responses:
+        '200':
+          description: Up to 50 cuisines
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required: [cuisine, restaurants]
+                  properties:
+                    cuisine: { type: string, example: biryani }
+                    restaurants: { type: integer, description: How many deliver to the point }
+        '422': { $ref: '#/components/responses/Invalid' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+
+  /healthz:
+    get:
+      tags: [health]
+      operationId: liveness
+      summary: Liveness probe
+      responses:
+        '200': { description: Process is up }
+
+  /readyz:
+    get:
+      tags: [health]
+      operationId: readiness
+      summary: Readiness probe
+      description: Elasticsearch reachable and the index created; the event consumer running when Kafka is configured.
+      responses:
+        '200': { description: Ready }
+        '503': { description: Not ready }
+
+components:
+  parameters:
+    lat:
+      name: lat
+      in: query
+      required: true
+      description: Where to deliver
+      schema: { type: number, minimum: -90, maximum: 90 }
+      example: 24.92
+    lng:
+      name: lng
+      in: query
+      required: true
+      schema: { type: number, minimum: -180, maximum: 180 }
+      example: 67.09
+
+  responses:
+    Invalid:
+      description: Invalid query (FastAPI validation error)
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              detail: { type: array, items: { type: object } }
+    Unavailable:
+      description: Elasticsearch is unreachable or the index is not created yet
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+  schemas:
+    Location:
+      type: object
+      required: [lat, lng]
+      properties:
+        lat: { type: number }
+        lng: { type: number }
+
+    Delivery:
+      type: object
+      required: [zoneId, deliveryFeePaisa, minimumOrderPaisa, deliveryTimeMinutes]
+      properties:
+        zoneId: { type: string, format: uuid }
+        deliveryFeePaisa: { type: integer }
+        minimumOrderPaisa: { type: integer }
+        deliveryTimeMinutes: { type: integer }
+
+    Dish:
+      type: object
+      required: [id, name, description, category, imageUrl, pricePaisa, isAvailable]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        description: { type: [string, 'null'] }
+        category: { type: string }
+        imageUrl: { type: [string, 'null'] }
+        pricePaisa: { type: integer, description: Base price, before options }
+        isAvailable: { type: boolean }
+
+    SearchResult:
+      type: object
+      description: RestaurantSummary of restaurant-service, plus the dishes that matched.
+      required:
+        [id, name, cuisines, area, city, logoUrl, coverUrl, location, distanceMeters, openNow, pausedUntil, acceptingOrders, delivery, matchingDishes]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        cuisines: { type: array, items: { type: string } }
+        area: { type: string }
+        city: { type: string }
+        logoUrl: { type: [string, 'null'] }
+        coverUrl: { type: [string, 'null'] }
+        location: { $ref: '#/components/schemas/Location' }
+        distanceMeters: { type: integer, description: Straight-line distance from the point }
+        openNow: { type: boolean }
+        pausedUntil: { type: [string, 'null'], format: date-time }
+        acceptingOrders: { type: boolean, description: Open now and not paused }
+        delivery: { $ref: '#/components/schemas/Delivery' }
+        matchingDishes:
+          type: array
+          maxItems: 3
+          description: Best matching dishes first; empty without `q`
+          items: { $ref: '#/components/schemas/Dish' }
+
+    SearchPage:
+      type: object
+      required: [items, page, limit, hasMore]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/SearchResult' }
+        page: { type: integer }
+        limit: { type: integer }
+        hasMore: { type: boolean }
+
+    Suggestions:
+      type: object
+      required: [restaurants, dishes, cuisines]
+      properties:
+        restaurants:
+          type: array
+          items:
+            type: object
+            required: [id, name, logoUrl]
+            properties:
+              id: { type: string, format: uuid }
+              name: { type: string }
+              logoUrl: { type: [string, 'null'] }
+        dishes:
+          type: array
+          items:
+            type: object
+            required: [id, name, restaurantId, restaurantName]
+            properties:
+              id: { type: string, format: uuid }
+              name: { type: string }
+              restaurantId: { type: string, format: uuid }
+              restaurantName: { type: string }
+        cuisines:
+          type: array
+          items: { type: string }
+
+    Error:
+      type: object
+      required: [detail]
+      properties:
+        detail: { type: string }
