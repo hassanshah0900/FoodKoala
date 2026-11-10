@@ -1,4 +1,4 @@
-import type { Hours, RestaurantStatus } from './api/types';
+import type { Hours, RestaurantStatus, RiderStatus } from './api/types';
 
 /** A status change an admin can make from here. */
 export interface StatusAction<S extends string> {
@@ -49,3 +49,21 @@ export function approvalBlockers(hours: Hours, zoneCount: number): string[] {
   if (zoneCount === 0) blockers.push('No delivery zone');
   return blockers;
 }
+
+/** The admin's moves for a rider (POST /riders/{userId}/status); a rider isn't told a reason. */
+const RIDER_ACTIONS: Record<RiderStatus, StatusAction<RiderStatus>[]> = {
+  pending: [{ to: 'approved', label: 'Approve', needsReason: false, tone: 'primary' }],
+  approved: [{ to: 'suspended', label: 'Suspend', needsReason: false, tone: 'danger' }],
+  suspended: [
+    { to: 'approved', label: 'Reinstate', needsReason: false, tone: 'primary' },
+    { to: 'pending', label: 'Back to review', needsReason: false, tone: 'plain' },
+  ],
+};
+
+export const riderActions = (status: RiderStatus) => RIDER_ACTIONS[status];
+
+export const RIDER_STATUSES: readonly StatusLabel<RiderStatus>[] = [
+  { status: 'pending', label: 'Waiting for approval', tone: 'waiting' },
+  { status: 'approved', label: 'Approved', tone: 'good' },
+  { status: 'suspended', label: 'Suspended', tone: 'bad' },
+];

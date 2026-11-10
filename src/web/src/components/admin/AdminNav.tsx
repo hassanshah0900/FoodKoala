@@ -2,11 +2,12 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { GridIcon, StoreIcon } from '@/components/icons';
+import { BikeIcon, GridIcon, StoreIcon } from '@/components/icons';
 
 const LINKS = [
   { href: '/admin', label: 'Overview', Icon: GridIcon },
   { href: '/admin/restaurants', label: 'Restaurants', Icon: StoreIcon },
+  { href: '/admin/riders', label: 'Riders', Icon: BikeIcon },
 ];
 
 /** The console's sections; a column beside the page on wide screens, a scrolling row on phones. */

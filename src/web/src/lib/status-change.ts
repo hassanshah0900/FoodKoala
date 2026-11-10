@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { ApiError } from '@/lib/api/http';
+import { refusal } from '@/lib/api/http';
 
 export type StatusChangeState = { error?: string };
 
@@ -19,7 +19,8 @@ export async function statusChange(
     await apply(to, reason);
     return {};
   } catch (err) {
-    if (err instanceof ApiError && err.status < 500) return { error: err.message };
-    throw err;
+    const error = refusal(err);
+    if (error === null) throw err;
+    return { error };
   }
 }

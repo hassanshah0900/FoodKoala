@@ -1,5 +1,5 @@
 import type { Hours } from './api/types';
-import { approvalBlockers, restaurantActions } from './review';
+import { approvalBlockers, restaurantActions, riderActions } from './review';
 
 describe('restaurant review', () => {
   it('offers approve or reject for an application, both ways a reason only for rejecting', () =>
@@ -18,5 +18,11 @@ describe('restaurant review', () => {
   it('lists what stops an approval', () => {
     expect(approvalBlockers(open, 1)).toEqual([]);
     expect(approvalBlockers({ weekly: { mon: [] }, special: [] }, 0)).toEqual(['No opening hours', 'No delivery zone']);
+  });
+
+  it('approves a rider, suspends them, and from suspended reinstates or reviews again', () => {
+    expect(riderActions('pending').map((a) => a.to)).toEqual(['approved']);
+    expect(riderActions('approved').map((a) => a.to)).toEqual(['suspended']);
+    expect(riderActions('suspended').map((a) => a.to)).toEqual(['approved', 'pending']);
   });
 });
