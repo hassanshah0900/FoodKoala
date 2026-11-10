@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, useTransition } from 'react';
-import { addToCart } from '@/app/cart/actions';
+import { addToCart } from '@/app/(shop)/cart/actions';
 import type { MenuItem } from '@/lib/api/types';
 import { groupRule, toggle, unitPrice, unmetGroups } from '@/lib/choices';
 import { rupees } from '@/lib/format';

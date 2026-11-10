@@ -1,7 +1,8 @@
-import { logout } from '@/app/login/actions';
+import Link from 'next/link';
+import { logout } from '@/app/(shop)/login/actions';
 import { ChevronDownIcon } from '@/components/icons';
 import { formatPhone } from '@/lib/phone';
-import type { Claims } from '@/lib/session-tokens';
+import { type Claims, isAdmin } from '@/lib/session-tokens';
 
 /** The signed-in user's menu: a <details> dropdown, so it needs no JavaScript. */
 export function AccountMenu({ user }: { user: Claims }) {
@@ -14,7 +15,12 @@ export function AccountMenu({ user }: { user: Claims }) {
         <span className="hidden sm:inline">{formatPhone(user.phone)}</span>
         <ChevronDownIcon className="size-4 text-muted transition-transform group-open:rotate-180" />
       </summary>
-      <div className="absolute right-0 mt-2 w-52 rounded-xl border border-line bg-white p-2 shadow-lg">
+      <div className="absolute right-0 z-30 mt-2 w-52 rounded-xl border border-line bg-white p-2 shadow-lg">
+        {isAdmin(user) && (
+          <Link href="/admin" className="block rounded-lg px-3 py-2 text-sm font-semibold hover:bg-brand-50">
+            Admin console
+          </Link>
+        )}
         <form action={logout}>
           <button
             type="submit"

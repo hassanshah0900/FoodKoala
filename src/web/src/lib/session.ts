@@ -1,7 +1,7 @@
 import 'server-only';
 import { cookies } from 'next/headers';
-import { redirect } from 'next/navigation';
-import { ACCESS_COOKIE, type Claims, claimsOf, isFresh } from './session-tokens';
+import { notFound, redirect } from 'next/navigation';
+import { ACCESS_COOKIE, type Claims, claimsOf, isAdmin, isFresh } from './session-tokens';
 
 /**
  * The signed-in user, from the access token proxy.ts keeps fresh; null for guests.
@@ -21,4 +21,11 @@ export async function requireUser(here: string): Promise<Claims> {
   const user = await currentUser();
   if (!user) redirect(`/login?next=${encodeURIComponent(here)}`);
   return user;
+}
+
+/** An admin and their token; guests sign in first, and anyone else gets a 404 so the console isn't advertised. */
+export async function requireAdmin(here: string): Promise<{ user: Claims; token: string }> {
+  const user = await requireUser(here);
+  if (!isAdmin(user)) notFound();
+  return { user, token: (await accessToken())! };
 }

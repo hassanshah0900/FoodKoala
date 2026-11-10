@@ -1,3 +1,5 @@
+const PKT = 'Asia/Karachi';
+
 /** Rs 500, or Rs 499.50: money as customers read it (paisa in, rupees out). */
 export function rupees(paisa: number): string {
   const whole = paisa % 100 === 0;
@@ -30,5 +32,13 @@ export const clockTime = (iso: string) =>
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,
-    timeZone: 'Asia/Karachi',
+    timeZone: PKT,
   });
+
+/** "10 Nov 2026" in Pakistan time. */
+export const shortDate = (iso: string) =>
+  new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: PKT });
+
+/** "10 Nov, 13:30" in Pakistan time. */
+export const dateTime = (iso: string) =>
+  `${new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: PKT })}, ${clockTime(iso)}`;

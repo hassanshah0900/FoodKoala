@@ -62,6 +62,41 @@ export interface Restaurant {
   pausedUntil: string | null;
   acceptingOrders: boolean;
   rating: Rating;
+  hours: Hours;
+}
+
+export interface TimeRange {
+  opens: string;
+  closes: string;
+}
+
+export type Weekday = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
+
+export interface Hours {
+  weekly: Partial<Record<Weekday, TimeRange[]>>;
+  special: { name: string; startsOn: string; endsOn: string; ranges: TimeRange[] }[];
+}
+
+export type RestaurantStatus = 'pending' | 'approved' | 'rejected' | 'suspended';
+
+/** ManagedRestaurant: what its owner and admins see. */
+export interface ManagedRestaurant extends Restaurant {
+  ownerId: string;
+  phone: string;
+  status: RestaurantStatus;
+  /** Why it was rejected or suspended. */
+  statusReason: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** DeliveryZone, without the polygon. */
+export interface DeliveryZone {
+  id: string;
+  name: string;
+  deliveryFeePaisa: number;
+  minimumOrderPaisa: number;
+  deliveryTimeMinutes: number;
 }
 
 export interface DeliveryQuote {

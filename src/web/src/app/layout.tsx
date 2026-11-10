@@ -1,8 +1,4 @@
 import type { Metadata, Viewport } from 'next';
-import { Footer } from '@/components/layout/Footer';
-import { Header } from '@/components/layout/Header';
-import { currentLocation } from '@/lib/current-location';
-import { currentUser } from '@/lib/session';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -12,14 +8,11 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = { themeColor: '#7a1fb3' };
 
-export default async function RootLayout({ children }: { children: React.ReactNode }) {
+/** The document only: customers' pages and the admin console each bring their own frame. */
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className="flex min-h-screen flex-col">
-        <Header location={await currentLocation()} user={await currentUser()} />
-        <main className="flex-1">{children}</main>
-        <Footer />
-      </body>
+      <body className="flex min-h-screen flex-col">{children}</body>
     </html>
   );
 }

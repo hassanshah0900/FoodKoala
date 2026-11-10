@@ -36,6 +36,8 @@ export function claimsOf(token: string | undefined): Claims | null {
   }
 }
 
+export const isAdmin = (claims: Claims | null): boolean => claims?.roles.includes('admin') ?? false;
+
 /** Still good for at least `marginSeconds`, so a page rendered now won't send a token that expires mid-way. */
 export const isFresh = (claims: Claims | null, now = Date.now(), marginSeconds = 30): claims is Claims =>
   claims !== null && claims.exp * 1000 > now + marginSeconds * 1000;

@@ -1,4 +1,4 @@
-import { chooseArea } from '@/app/actions';
+import { chooseArea } from '@/app/(shop)/actions';
 import { BikeIcon, CashIcon, MapIcon } from '@/components/icons';
 import { KoalaMark } from '@/components/Logo';
 import { LocationPicker } from '@/components/location/LocationPicker';

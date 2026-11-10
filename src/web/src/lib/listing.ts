@@ -1,3 +1,5 @@
+import { one, type Params } from './params';
+
 /** The restaurant list's filters, read from and written to its URL. */
 export const SORTS = [
   { value: 'relevance', label: 'Relevance' },
@@ -12,9 +14,6 @@ export interface ListingQuery {
   sort: Sort;
   page: number;
 }
-
-type Params = Record<string, string | string[] | undefined>;
-const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v)?.trim() || undefined;
 
 /** Unknown or out-of-range values fall back to the defaults instead of failing. */
 export function parseListing(params: Params): ListingQuery {

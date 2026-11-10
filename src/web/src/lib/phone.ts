@@ -9,5 +9,6 @@ export function normalizePhone(input: string): string | null {
   return match ? `+92${match[1]}` : null;
 }
 
-/** +923001234567 → +92 300 1234567. */
-export const formatPhone = (e164: string) => e164.replace(/^\+92(\d{3})(\d{7})$/, '+92 $1 $2');
+/** +923001234567 → +92 300 1234567; a landline keeps its digits together after +92, as area codes vary in length. */
+export const formatPhone = (e164: string) =>
+  e164.replace(/^\+92(3\d{2})(\d{7})$/, '+92 $1 $2').replace(/^\+92([1-9]\d+)$/, '+92 $1');

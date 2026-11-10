@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { addAddress } from '@/app/checkout/actions';
+import { addAddress } from '@/app/(shop)/checkout/actions';
 import { PinIcon } from '@/components/icons';
 import { addressLine, addressTitle, areaAndCity } from '@/lib/addresses';
 import type { Address } from '@/lib/api/types';

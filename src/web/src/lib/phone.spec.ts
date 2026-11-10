@@ -10,5 +10,8 @@ describe('phone numbers', () => {
     expect(normalizePhone(input)).toBeNull(),
   );
 
-  it('formats for reading', () => expect(formatPhone('+923001234567')).toBe('+92 300 1234567'));
+  it('formats for reading', () => {
+    expect(formatPhone('+923001234567')).toBe('+92 300 1234567');
+    expect(formatPhone('+922134567890')).toBe('+92 2134567890');
+  });
 });
