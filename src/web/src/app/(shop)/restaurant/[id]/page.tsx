@@ -7,10 +7,11 @@ import { MobileCartBar } from '@/components/menu/MobileCartBar';
 import { RestaurantHeader } from '@/components/restaurant/RestaurantHeader';
 import { getMenu } from '@/lib/api/menus';
 import { deliveryQuote, getRestaurant } from '@/lib/api/restaurants';
+import { myFavourites } from '@/lib/api/users';
 import { currentCart } from '@/lib/cart';
 import { currentLocation } from '@/lib/current-location';
 import { isUuid } from '@/lib/params';
-import { currentUser } from '@/lib/session';
+import { accessToken } from '@/lib/session';
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -30,18 +31,24 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function RestaurantPage({ params }: Props) {
   const { id } = await params;
   const location = await currentLocation();
-  const [restaurant, menu, quote, cart, user] = await Promise.all([
+  const [restaurant, menu, quote, cart, token] = await Promise.all([
     load(id),
     getMenu(id),
     location ? deliveryQuote(id, location) : null,
     currentCart(),
-    currentUser(),
+    accessToken(),
   ]);
+  // Favourites only set the heart, so the page still shows if user-service can't answer.
+  const favourite = token
+    ? await myFavourites(token)
+        .then((fs) => fs.some((f) => f.restaurantId === id))
+        .catch(() => false)
+    : null;
   const categories = (menu?.categories ?? []).filter((c) => c.items.length > 0);
 
   return (
     <div className="mx-auto max-w-7xl px-4 pb-24 lg:pb-10">
-      <RestaurantHeader restaurant={restaurant} quote={quote} location={location} />
+      <RestaurantHeader restaurant={restaurant} quote={quote} location={location} favourite={favourite} />
       <div className="mt-6 flex gap-8">
         <div className="min-w-0 flex-1">
           <MenuNav categories={categories} />
@@ -55,7 +62,7 @@ export default async function RestaurantPage({ params }: Props) {
           cart={cart}
           restaurantId={id}
           delivery={quote?.deliverable ? quote.delivery : null}
-          signedIn={user !== null}
+          signedIn={token !== null}
           className="sticky top-24 hidden w-[340px] shrink-0 lg:block"
         />
       </div>

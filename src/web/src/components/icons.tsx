@@ -139,3 +139,19 @@ export const ChartIcon = (p: IconProps) => (
     <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />
   </Svg>
 );
+
+export function HeartIcon({ className = 'size-5', filled = false }: IconProps & { filled?: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={className}
+      fill={filled ? 'currentColor' : 'none'}
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M12 20s-7-4.4-9.2-9A5 5 0 0 1 12 6a5 5 0 0 1 9.2 5C19 15.6 12 20 12 20Z" />
+    </svg>
+  );
+}

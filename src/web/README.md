@@ -29,6 +29,9 @@ their menus. Signing in, the cart, checkout and order tracking come next, then t
 - **`/orders`**: the customer's orders, newest first: follow one, see it, order it again (the cart is filled at
   today's prices, asking before replacing another restaurant's cart, and saying what couldn't be added), and rate
   it. On a delivered order's page the customer rates the food, and the rider when a rider brought it, within 7 days.
+- **`/account`**: the customer's name, email and the language texts come in; saved addresses (make one the
+  default, delete, add one at the chosen area with the same fields as checkout); and favourite restaurants, kept
+  with the heart on each restaurant's page.
 - **`/login`**: sign in or sign up with a mobile number and the 6-digit code texted to it (auth-service).
 
 ### Restaurant console (`/vendor`)

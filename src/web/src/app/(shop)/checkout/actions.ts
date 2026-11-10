@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
+import { readAddress } from '@/lib/address-form';
 import { ApiError } from '@/lib/api/http';
 import { placeOrder } from '@/lib/api/orders';
 import { saveAddress } from '@/lib/api/users';
@@ -16,17 +17,10 @@ export async function addAddress(form: FormData) {
   const [token, location] = await Promise.all([accessToken(), currentLocation()]);
   if (!token) redirect('/login?next=/checkout');
   if (!location) redirect('/');
-  const label = String(form.get('label'));
-  const address = await saveAddress(token, {
-    label: label === 'work' || label === 'other' ? label : 'home',
-    labelText: label === 'other' ? text(form, 'labelText') : null,
-    line1: text(form, 'line1') ?? '',
-    area: text(form, 'area') ?? '',
-    city: text(form, 'city') ?? '',
-    landmark: text(form, 'landmark'),
-    instructions: text(form, 'instructions'),
-    location: { lat: location.lat, lng: location.lng },
-  });
+  const address = await saveAddress(
+    token,
+    readAddress((name) => String(form.get(name) ?? ''), location),
+  );
   const choices = parseCheckout(Object.fromEntries(new URLSearchParams(String(form.get('choices') ?? ''))));
   redirect(checkoutHref(choices, { addressId: address.id }));
 }
