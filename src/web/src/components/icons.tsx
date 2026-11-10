@@ -126,3 +126,10 @@ export const MenuIcon = (p: IconProps) => (
     <path d="M17 21V3c-2 1-3 4-3 7s1 4 3 4" />
   </Svg>
 );
+
+export const CalendarIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="3" y="5" width="18" height="16" rx="2" />
+    <path d="M3 10h18M8 3v4M16 3v4" />
+  </Svg>
+);
