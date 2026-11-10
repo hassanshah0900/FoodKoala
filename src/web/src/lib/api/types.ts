@@ -128,3 +128,61 @@ export interface CartLine {
   unitPricePaisa: number;
   lineTotalPaisa: number;
 }
+
+/** Address in user-service.yaml: one of the customer's saved places. */
+export interface Address {
+  id: string;
+  label: 'home' | 'work' | 'other';
+  labelText: string | null;
+  line1: string;
+  area: string;
+  city: string;
+  landmark: string | null;
+  instructions: string | null;
+  location: Point;
+  isDefault: boolean;
+}
+
+export type OrderStatus = 'placed' | 'accepted' | 'ready' | 'picked_up' | 'delivered' | 'rejected' | 'cancelled';
+
+/** Order in order-service.yaml. */
+export interface Order {
+  id: string;
+  status: OrderStatus;
+  restaurant: { id: string; name: string; location: Point | null };
+  lines: {
+    itemId: string;
+    name: string;
+    quantity: number;
+    options: { name: string }[];
+    note: string | null;
+    lineTotalPaisa: number;
+  }[];
+  subtotalPaisa: number;
+  deliveryFeePaisa: number;
+  discountPaisa: number;
+  voucherCode: string | null;
+  tipPaisa: number;
+  totalPaisa: number;
+  paymentMethod: 'cod' | 'card' | 'jazzcash' | 'easypaisa';
+  deliveryAddress: {
+    label: string;
+    line1: string;
+    area: string;
+    city: string;
+    landmark: string | null;
+    instructions: string | null;
+    location: Point;
+  };
+  note: string | null;
+  prepTimeMinutes: number | null;
+  estimatedDeliveryAt: string;
+  timeline: { status: OrderStatus; at: string; by: string; reason: string | null }[];
+  placedAt: string;
+}
+
+export interface VoucherDiscount {
+  code: string;
+  description: string;
+  discountPaisa: number;
+}

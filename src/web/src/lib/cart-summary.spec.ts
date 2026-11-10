@@ -9,6 +9,8 @@ describe('summarize', () => {
       items: 3,
       subtotalPaisa: 102000,
       deliveryFeePaisa: 9900,
+      discountPaisa: 0,
+      tipPaisa: 0,
       totalPaisa: 111900,
       shortOfMinimumPaisa: 0,
     });
@@ -23,4 +25,12 @@ describe('summarize', () => {
       totalPaisa: 35000,
       shortOfMinimumPaisa: 0,
     }));
+
+  it('takes off the discount, never more than the food, and adds the tip', () => {
+    const cart = { lines: [line(1, 60000)], subtotalPaisa: 60000 };
+    expect(summarize(cart, delivery, { discountPaisa: 15000, tipPaisa: 5000 }).totalPaisa).toBe(
+      60000 + 9900 - 15000 + 5000,
+    );
+    expect(summarize(cart, delivery, { discountPaisa: 90000 }).discountPaisa).toBe(60000);
+  });
 });
