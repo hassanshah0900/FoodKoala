@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { WaitingCard } from '@/components/admin/WaitingCard';
+import { ridersWithStatus } from '@/lib/api/delivery';
 import { restaurantsWithStatus } from '@/lib/api/restaurants';
-import { ridersWithStatus } from '@/lib/api/riders';
 import { shortDate } from '@/lib/format';
 import { requireAdmin } from '@/lib/session';
 

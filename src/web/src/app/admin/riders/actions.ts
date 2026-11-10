@@ -2,8 +2,8 @@
 
 import { revalidatePath } from 'next/cache';
 import { paisaFrom } from '@/lib/amount';
+import { setRiderStatus, settleWithRider } from '@/lib/api/delivery';
 import { refusal } from '@/lib/api/http';
-import { setRiderStatus, settleWithRider } from '@/lib/api/riders';
 import type { RiderStatus, SettlementKind } from '@/lib/api/types';
 import { requireAdmin } from '@/lib/session';
 import { SETTLEMENT_KINDS } from '@/lib/settlements';

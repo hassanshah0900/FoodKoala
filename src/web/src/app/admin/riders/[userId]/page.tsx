@@ -8,7 +8,7 @@ import { StatusBadge } from '@/components/admin/StatusBadge';
 import { Section } from '@/components/checkout/Section';
 import { RatingLabel } from '@/components/restaurants/RatingLabel';
 import { rupeesField } from '@/lib/amount';
-import { getRider, riderEarnings, riderSettlements } from '@/lib/api/riders';
+import { getRider, riderEarnings, riderSettlements } from '@/lib/api/delivery';
 import { dateTime, rupees, shortDate } from '@/lib/format';
 import { pageParam } from '@/lib/paging';
 import { isUuid, one, type Params } from '@/lib/params';

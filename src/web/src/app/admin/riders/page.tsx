@@ -4,7 +4,7 @@ import { Pager } from '@/components/admin/Pager';
 import { StatusTabs } from '@/components/admin/StatusTabs';
 import { Table } from '@/components/admin/Table';
 import { RatingLabel } from '@/components/restaurants/RatingLabel';
-import { ridersWithStatus } from '@/lib/api/riders';
+import { ridersWithStatus } from '@/lib/api/delivery';
 import { shortDate } from '@/lib/format';
 import { pageParam } from '@/lib/paging';
 import { one, type Params } from '@/lib/params';
