@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "rider.location",
+  "title": "RiderLocation",
+  "description": "`data` of the rider.location event, published by delivery-service whenever a rider carrying an order (assigned or picked up) reports where they are. Keyed by orderId. Unlike other events it skips the outbox: a lost ping is superseded by the next one seconds later, so consumers keep the newest `at` and need not dedupe.",
+  "type": "object",
+  "required": ["deliveryId", "orderId", "riderId", "location", "at"],
+  "properties": {
+    "deliveryId": { "type": "string", "format": "uuid" },
+    "orderId": { "type": "string", "format": "uuid" },
+    "riderId": { "type": "string", "format": "uuid" },
+    "location": {
+      "type": "object",
+      "required": ["lat", "lng"],
+      "properties": {
+        "lat": { "type": "number", "minimum": 23.5, "maximum": 37.1 },
+        "lng": { "type": "number", "minimum": 60.8, "maximum": 77.9 }
+      }
+    },
+    "at": { "type": "string", "format": "date-time", "description": "When delivery-service received the ping" }
+  }
+}

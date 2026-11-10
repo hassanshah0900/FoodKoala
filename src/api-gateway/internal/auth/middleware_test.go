@@ -134,3 +134,25 @@ func TestHealthChecksBypassAuth(t *testing.T) {
 		t.Fatalf("status %d", rec.Code)
 	}
 }
+
+func TestWebSocketTokenComesFromTheSubprotocol(t *testing.T) {
+	proto := map[string]string{"Sec-WebSocket-Protocol": "foodkoala.tracking.v1, bearer." + goodToken}
+	rec, up := do(t, "/api/v1/tracking/orders/1/live", "", proto)
+	if rec.Code != http.StatusOK || up.got.Get(HeaderUserID) != "user-1" {
+		t.Fatalf("status %d, user %q", rec.Code, up.got.Get(HeaderUserID))
+	}
+	if got := up.got.Get("Sec-WebSocket-Protocol"); got != "foodkoala.tracking.v1" {
+		t.Errorf("forwarded protocols %q: the token must be removed", got)
+	}
+
+	rec, up = do(t, "/api/v1/tracking/orders/1/live", "", map[string]string{"Sec-WebSocket-Protocol": "bearer.forged"})
+	if rec.Code != http.StatusUnauthorized || up.got != nil {
+		t.Errorf("bad token: status %d", rec.Code)
+	}
+
+	// Even where tokens are ignored, one in the subprotocols never travels on.
+	_, up = do(t, "/api/v1/auth/x", "", map[string]string{"Sec-WebSocket-Protocol": "bearer." + goodToken})
+	if v := up.got.Values("Sec-WebSocket-Protocol"); len(v) != 0 {
+		t.Errorf("auth-service saw %q", v)
+	}
+}

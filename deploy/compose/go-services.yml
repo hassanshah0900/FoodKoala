@@ -31,4 +31,19 @@ services:
     restart: "no"
   tracking-service:
     build: ../../src/tracking-service
+    image: foodkoala/tracking-service:local
     ports: ["8082:8082"]
+    environment:
+      # Its own database number; keys are prefixed tracking: anyway
+      REDIS_URL: redis://redis:6379/2
+      # Order, delivery and rider.location events in
+      KAFKA_BROKERS: kafka:29092
+    depends_on:
+      redis: { condition: service_healthy }
+      kafka: { condition: service_started }
+    healthcheck:
+      test: ["CMD", "/server", "healthcheck"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 5s

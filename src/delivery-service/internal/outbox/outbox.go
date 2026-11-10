@@ -45,6 +45,29 @@ func Add(ctx context.Context, tx pgx.Tx, topic, key string, at time.Time, data a
 	return err
 }
 
+// Direct sends events straight to Kafka, skipping the outbox: for rider.location,
+// where a lost event is replaced by the next one seconds later and waiting on a
+// database write per ping isn't worth it. Send returns at once; failures are logged.
+type Direct struct{ Client *kgo.Client }
+
+func (d Direct) Send(ctx context.Context, topic, key string, at time.Time, data any) {
+	env := Envelope{ID: NewID(), Type: topic, Version: 1, OccurredAt: at.UTC(), Source: "delivery-service", Data: data}
+	payload, err := json.Marshal(env)
+	if err != nil {
+		slog.Error("encoding an event failed", "topic", topic, "err", err)
+		return
+	}
+	rec := &kgo.Record{Topic: topic, Key: []byte(key), Value: payload, Headers: []kgo.RecordHeader{
+		{Key: "event-id", Value: []byte(env.ID)}, {Key: "event-type", Value: []byte(topic)},
+	}}
+	// The request that triggered it may end before the broker answers.
+	d.Client.Produce(context.WithoutCancel(ctx), rec, func(_ *kgo.Record, err error) {
+		if err != nil {
+			slog.Warn("sending an event failed", "topic", topic, "key", key, "err", err)
+		}
+	})
+}
+
 // Publisher sends records and returns once the broker has all of them.
 type Publisher interface {
 	Publish(ctx context.Context, records []*kgo.Record) error

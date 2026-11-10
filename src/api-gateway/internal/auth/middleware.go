@@ -50,6 +50,9 @@ func Middleware(v TokenVerifier, p Policy, next http.Handler) http.Handler {
 		r.Header.Del(HeaderUserPhone)
 
 		authz := r.Header.Get("Authorization")
+		if token := takeProtocolToken(r.Header); token != "" && authz == "" {
+			authz = "Bearer " + token
+		}
 		if p.IgnoreToken[service] || authz == "" {
 			if p.Public[service] {
 				next.ServeHTTP(w, r)
@@ -76,6 +79,38 @@ func Middleware(v TokenVerifier, p Policy, next http.Handler) http.Handler {
 		r.Header.Set(HeaderUserPhone, claims.Phone)
 		next.ServeHTTP(w, r)
 	})
+}
+
+// ProtocolTokenPrefix marks the access token among a WebSocket's subprotocols:
+// browsers can't set Authorization on one (contracts/README.md#websockets).
+const ProtocolTokenPrefix = "bearer."
+
+// takeProtocolToken removes every bearer.<token> subprotocol from h, so the
+// token never reaches the service, and returns the first one's token.
+func takeProtocolToken(h http.Header) string {
+	values := h.Values("Sec-WebSocket-Protocol")
+	if len(values) == 0 {
+		return ""
+	}
+	var token string
+	var keep []string
+	for _, v := range values {
+		for _, p := range strings.Split(v, ",") {
+			p = strings.TrimSpace(p)
+			if t, ok := strings.CutPrefix(p, ProtocolTokenPrefix); ok {
+				if token == "" {
+					token = t
+				}
+			} else if p != "" {
+				keep = append(keep, p)
+			}
+		}
+	}
+	h.Del("Sec-WebSocket-Protocol")
+	if len(keep) > 0 {
+		h.Set("Sec-WebSocket-Protocol", strings.Join(keep, ", "))
+	}
+	return token
 }
 
 func bearer(h string) (string, bool) {
