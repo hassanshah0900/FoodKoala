@@ -179,7 +179,13 @@ export async function startApp() {
     async place(s: Scenario, body: CheckoutBody = {}) {
       const res = await checkout(s.customer, s.addressId, body).expect(201);
       placed.push(res.body.id);
-      return res.body as { id: string; totalPaisa: number; discountPaisa: number; voucherCode: string | null };
+      return res.body as {
+        id: string;
+        totalPaisa: number;
+        discountPaisa: number;
+        tipPaisa: number;
+        voucherCode: string | null;
+      };
     },
     /** Runs `fn` on close, once the orders placed are gone (e.g. to delete what they refer to). */
     onClose(fn: () => Promise<unknown>) {
@@ -200,4 +206,5 @@ export async function startApp() {
 interface CheckoutBody {
   key?: string;
   voucherCode?: string;
+  tipPaisa?: number;
 }

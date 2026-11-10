@@ -65,7 +65,7 @@ export class OrdersService {
         ])
       : [null, null];
     const now = new Date();
-    const draft = draftOrder({ cart, address, restaurant, quote, now });
+    const draft = draftOrder({ cart, address, restaurant, quote, now, tipPaisa: dto.tipPaisa });
 
     let orderId: string;
     try {

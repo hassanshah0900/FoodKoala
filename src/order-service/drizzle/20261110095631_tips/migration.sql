@@ -1,0 +1,3 @@
+ALTER TABLE "orders"."orders" ADD COLUMN "tip_paisa" integer DEFAULT 0 NOT NULL;--> statement-breakpoint
+ALTER TABLE "orders"."orders" ADD CONSTRAINT "orders_tip_not_negative" CHECK ("tip_paisa" >= 0);--> statement-breakpoint
+ALTER TABLE "orders"."orders" DROP CONSTRAINT "orders_total_adds_up", ADD CONSTRAINT "orders_total_adds_up" CHECK ("total_paisa" = "subtotal_paisa" + "delivery_fee_paisa" - "discount_paisa" + "tip_paisa");

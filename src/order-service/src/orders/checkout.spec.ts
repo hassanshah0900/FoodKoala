@@ -84,6 +84,7 @@ describe('draftOrder', () => {
       deliveryFeePaisa: 9900,
       voucherId: null,
       discountPaisa: 0,
+      tipPaisa: 0,
       totalPaisa: 119900,
       estimatedDeliveryAt: new Date('2026-11-08T10:35:00Z'),
       deliveryAddress: {
@@ -146,6 +147,14 @@ describe('draftOrder', () => {
     expect(messages(() => draftOrder({ cart: small, address, restaurant, quote: q, now }))).toEqual([
       'The minimum order here is Rs 600; add Rs 50 more',
     ]);
+  });
+});
+
+describe('tips', () => {
+  it('adds the tip to the total, after any discount', () => {
+    const draft = draftOrder({ cart: cart(), address, restaurant, quote: quote(), now, tipPaisa: 5000 });
+    expect(draft).toMatchObject({ tipPaisa: 5000, totalPaisa: 124900 });
+    expect(withDiscount(draft, { voucherId: 'v1', discountPaisa: 22000 }).totalPaisa).toBe(102900);
   });
 });
 

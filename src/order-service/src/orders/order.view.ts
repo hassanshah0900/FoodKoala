@@ -29,6 +29,7 @@ export interface Order {
   deliveryFeePaisa: number;
   discountPaisa: number;
   voucherCode: string | null;
+  tipPaisa: number;
   totalPaisa: number;
   paymentMethod: PaymentMethod;
   deliveryAddress: DeliveryAddress;
@@ -79,6 +80,7 @@ export function toOrder(
     deliveryFeePaisa: row.deliveryFeePaisa,
     discountPaisa: row.discountPaisa,
     voucherCode: row.voucherId ? (voucherCodes.get(row.voucherId) ?? null) : null,
+    tipPaisa: row.tipPaisa,
     totalPaisa: row.totalPaisa,
     paymentMethod: row.paymentMethod,
     deliveryAddress: row.deliveryAddress,
