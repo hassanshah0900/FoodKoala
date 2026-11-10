@@ -57,6 +57,15 @@ they own is a switch away. Only its owner can open a restaurant's console.
   its delivery fee, minimum order and time, drawn to scale. Where zones overlap the customer gets the cheapest, so a
   free nearby ring inside a wider paid one works. A zone drawn some other way keeps its shape unless given a distance.
 
+### Rider app (`/rider`)
+
+Made for a phone: one column, big buttons. Someone who isn't a rider applies (name, city, vehicle) and waits for
+FoodKoala's approval. An approved rider goes online with the phone's location, which is then sent every 20
+seconds (orders go to the nearest free rider with a fresh position; the customer follows the one carrying theirs).
+The delivery in hand shows where to go now, with directions in the maps app and the customer's number, what cash
+to collect, and one button for the next step: "I have the food", then "Delivered". Before pickup the rider can
+hand it back. Going offline isn't possible while carrying an order.
+
 ### Admin console (`/admin`)
 
 Only for users with the `admin` role (see `ADMIN_PHONES` in auth-service); guests are sent to log in and anyone
