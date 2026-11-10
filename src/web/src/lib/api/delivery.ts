@@ -1,5 +1,14 @@
 import { get, orNull, post } from './http';
-import type { Delivery, DeliveryStatus, Earnings, Page, Rider, RiderStatus, Settlement, SettlementKind } from './types';
+import type {
+  DeliveryStatus,
+  Earnings,
+  OrderDelivery,
+  Page,
+  Rider,
+  RiderStatus,
+  Settlement,
+  SettlementKind,
+} from './types';
 
 // delivery-service, as an admin: reviewing riders, settling cash with them, and watching deliveries.
 
@@ -27,8 +36,8 @@ export const settleWithRider = (
 
 /** Deliveries with a status, newest first; `searching` ones have no rider yet. */
 export const deliveriesWithStatus = (token: string, status: DeliveryStatus, page = 1) =>
-  get<Page<Delivery>>('delivery/deliveries', { token, query: { status, page } });
+  get<Page<OrderDelivery>>('delivery/deliveries', { token, query: { status, page } });
 
 /** An order's delivery, or null when it never had one (e.g. rejected before it was created). */
 export const deliveryOfOrder = (token: string, orderId: string) =>
-  orNull(get<Delivery>(`delivery/deliveries/orders/${orderId}`, { token }));
+  orNull(get<OrderDelivery>(`delivery/deliveries/orders/${orderId}`, { token }));

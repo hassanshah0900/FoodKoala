@@ -296,8 +296,8 @@ export type VoucherUpdate = Partial<Pick<Voucher, 'description' | 'usageLimit' |
 
 export type DeliveryStatus = 'waiting' | 'searching' | 'assigned' | 'picked_up' | 'delivered' | 'cancelled';
 
-/** Delivery in delivery-service.yaml. */
-export interface Delivery {
+/** Delivery in delivery-service.yaml (not a zone's delivery terms, `Delivery` above). */
+export interface OrderDelivery {
   id: string;
   orderId: string;
   status: DeliveryStatus;
