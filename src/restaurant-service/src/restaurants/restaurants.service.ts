@@ -8,12 +8,12 @@ import {
 import { InjectDrizzle } from '@nestjs/drizzle';
 import { asc, count, desc, eq } from 'drizzle-orm';
 import type { Database, Tx } from '../db/database';
-import { deliveryZones, restaurants, type RestaurantRow, type Status } from '../db/schema';
+import { deliveryZones, type RestaurantRow, restaurants, type Status } from '../db/schema';
 import { recordRestaurantChange } from '../events/restaurant-events';
-import { hasWeeklyHours, type HoursDto } from '../hours/hours';
-import { isAdmin, type Identity } from '../identity/identity';
+import { type HoursDto, hasWeeklyHours } from '../hours/hours';
+import { type Identity, isAdmin } from '../identity/identity';
 import type { RestaurantCreateDto, RestaurantUpdateDto, ReviewQuery, StatusChangeDto } from './restaurants.dto';
-import { toManagedRestaurant, toRestaurant, type ManagedRestaurant, type Restaurant } from './restaurants.view';
+import { type ManagedRestaurant, type Restaurant, toManagedRestaurant, toRestaurant } from './restaurants.view';
 
 /** Allowed status changes; see POST /{id}/status in the contract. */
 const TRANSITIONS: Partial<Record<`${Status}>${Status}`, { adminOnly: boolean; needsReason: boolean }>> = {
@@ -104,7 +104,8 @@ export class RestaurantsService {
       const rule = TRANSITIONS[`${row.status}>${status}`];
       if (!rule) throw new ConflictException(`A ${row.status} restaurant cannot become ${status}`);
       if (rule.adminOnly && !isAdmin(me)) throw new ForbiddenException(`Only admins can make a restaurant ${status}`);
-      if (rule.needsReason && !reason) throw new BadRequestException(`Give a reason when making a restaurant ${status}`);
+      if (rule.needsReason && !reason)
+        throw new BadRequestException(`Give a reason when making a restaurant ${status}`);
 
       if (status === 'approved') {
         const [{ zones }] = await tx

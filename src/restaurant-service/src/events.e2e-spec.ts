@@ -1,8 +1,8 @@
+import { randomUUID } from 'node:crypto';
 import { INestApplication } from '@nestjs/common';
 import { getDrizzleToken } from '@nestjs/drizzle';
 import { Test } from '@nestjs/testing';
 import { asc, eq, inArray } from 'drizzle-orm';
-import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { AppModule } from './app.module';
 import type { Database } from './db/database';
@@ -26,7 +26,10 @@ const application = {
 };
 
 const allDay = [{ opens: '00:00', closes: '24:00' }];
-const hours = { weekly: { mon: allDay, tue: allDay, wed: allDay, thu: allDay, fri: allDay, sat: allDay, sun: allDay }, special: [] };
+const hours = {
+  weekly: { mon: allDay, tue: allDay, wed: allDay, thu: allDay, fri: allDay, sat: allDay, sun: allDay },
+  special: [],
+};
 
 const gulberg = {
   type: 'Polygon',
@@ -64,7 +67,13 @@ describe('restaurant.updated (e2e)', () => {
 
   afterAll(async () => {
     const mine = await db.select({ id: restaurants.id }).from(restaurants).where(inArray(restaurants.ownerId, owners));
-    if (mine.length) await db.delete(outbox).where(inArray(outbox.key, mine.map((r) => r.id)));
+    if (mine.length)
+      await db.delete(outbox).where(
+        inArray(
+          outbox.key,
+          mine.map((r) => r.id),
+        ),
+      );
     await db.delete(restaurants).where(inArray(restaurants.ownerId, owners));
     await app.close();
   });
@@ -107,7 +116,13 @@ describe('restaurant.updated (e2e)', () => {
     const zone = await http
       .post(`/${id}/zones`)
       .set(owner)
-      .send({ name: 'Gulberg', area: gulberg, deliveryFeePaisa: 7900, minimumOrderPaisa: 40000, deliveryTimeMinutes: 30 })
+      .send({
+        name: 'Gulberg',
+        area: gulberg,
+        deliveryFeePaisa: 7900,
+        minimumOrderPaisa: 40000,
+        deliveryTimeMinutes: 30,
+      })
       .expect(201);
     await http.patch(`/${id}/zones/${zone.body.id}`).set(owner).send({ deliveryFeePaisa: 5900 }).expect(200);
     await http.post(`/${id}/status`).set(admin).send({ status: 'approved' }).expect(200);

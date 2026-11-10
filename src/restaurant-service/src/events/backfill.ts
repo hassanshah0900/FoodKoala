@@ -28,7 +28,9 @@ async function main(): Promise<void> {
       total += ids.length;
       after = ids[ids.length - 1].id;
     }
-    console.log(JSON.stringify({ level: 'log', context: 'restaurant-service', message: `backfilled ${total} restaurants` }));
+    console.log(
+      JSON.stringify({ level: 'log', context: 'restaurant-service', message: `backfilled ${total} restaurants` }),
+    );
   } finally {
     await db.$client.end();
   }

@@ -1,4 +1,9 @@
-import { restaurantCreateSchema, restaurantUpdateSchema, reviewQuerySchema, statusChangeSchema } from './restaurants.dto';
+import {
+  restaurantCreateSchema,
+  restaurantUpdateSchema,
+  reviewQuerySchema,
+  statusChangeSchema,
+} from './restaurants.dto';
 
 const valid = {
   name: 'Karachi Biryani House',

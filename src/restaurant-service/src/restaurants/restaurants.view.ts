@@ -1,5 +1,5 @@
 import type { RestaurantRow, Status } from '../db/schema';
-import { isOpenAt, type Hours } from '../hours/hours';
+import { type Hours, isOpenAt } from '../hours/hours';
 
 /** API shape of Restaurant in the contract (what anyone may see). */
 export interface Restaurant {

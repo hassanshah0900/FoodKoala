@@ -80,7 +80,12 @@ export class OutboxRelay implements OnApplicationBootstrap, OnApplicationShutdow
       await tx
         .update(outbox)
         .set({ publishedAt: new Date() })
-        .where(inArray(outbox.id, rows.map((r) => r.id)));
+        .where(
+          inArray(
+            outbox.id,
+            rows.map((r) => r.id),
+          ),
+        );
       return rows.length;
     });
   }
@@ -118,7 +123,9 @@ export class OutboxRelay implements OnApplicationBootstrap, OnApplicationShutdow
     } catch (err) {
       this.failures++;
       next = Math.min(this.config.OUTBOX_POLL_MS * 2 ** this.failures, MAX_BACKOFF_MS);
-      this.logger.error(`Publishing the outbox failed (attempt ${this.failures}), retrying in ${next} ms: ${String(err)}`);
+      this.logger.error(
+        `Publishing the outbox failed (attempt ${this.failures}), retrying in ${next} ms: ${String(err)}`,
+      );
     }
     this.schedule(next);
   }

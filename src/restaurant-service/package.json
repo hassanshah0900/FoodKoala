@@ -12,7 +12,10 @@
     "test:e2e": "vitest run --config vitest.e2e.config.mts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node --env-file-if-exists=.env dist/db/migrate.js",
-    "events:backfill": "node --env-file-if-exists=.env dist/events/backfill.js"
+    "events:backfill": "node --env-file-if-exists=.env dist/events/backfill.js",
+    "lint": "biome lint .",
+    "format": "biome check --write .",
+    "format:check": "biome check --linter-enabled=false ."
   },
   "dependencies": {
     "@confluentinc/kafka-javascript": "^1.11.0",
@@ -27,6 +30,7 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.6.6",
     "@nestjs/testing": "^12.4.0",
     "@swc/core": "^1.16.22",
     "@types/express": "^5.0.6",
