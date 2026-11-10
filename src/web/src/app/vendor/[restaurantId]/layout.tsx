@@ -29,25 +29,32 @@ export default async function VendorLayout({
         { href: `${base}/menu`, label: 'Menu', icon: 'menu' },
         { href: `${base}/hours`, label: 'Opening hours', icon: 'calendar' },
         { href: `${base}/zones`, label: 'Delivery zones', icon: 'map' },
+        { href: `${base}/details`, label: 'Restaurant details', icon: 'store' },
       ]}
       side={
-        others.length > 0 && (
-          <details className="relative">
-            <summary className="cursor-pointer list-none px-3 py-2 text-sm font-semibold text-brand-700">
-              Switch restaurant
-            </summary>
-            <ul className="absolute right-0 z-30 mt-1 w-56 rounded-xl border border-line bg-white p-2 shadow-lg lg:static lg:w-auto lg:border-0 lg:p-0 lg:shadow-none">
-              {others.map((r) => (
-                <li key={r.id}>
-                  <Link href={`/vendor/${r.id}`} className="block rounded-lg px-3 py-2 text-sm hover:bg-brand-50">
-                    {r.name}
-                    <span className="block text-xs text-muted">{r.address.area}</span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </details>
-        )
+        <details className="relative">
+          <summary className="cursor-pointer list-none px-3 py-2 text-sm font-semibold text-brand-700">
+            {others.length > 0 ? 'Switch restaurant' : 'Your restaurants'}
+          </summary>
+          <ul className="absolute right-0 z-30 mt-1 w-56 rounded-xl border border-line bg-white p-2 shadow-lg lg:static lg:w-auto lg:border-0 lg:p-0 lg:shadow-none">
+            {others.map((r) => (
+              <li key={r.id}>
+                <Link href={`/vendor/${r.id}`} className="block rounded-lg px-3 py-2 text-sm hover:bg-brand-50">
+                  {r.name}
+                  <span className="block text-xs text-muted">{r.address.area}</span>
+                </Link>
+              </li>
+            ))}
+            <li>
+              <Link
+                href="/vendor/new"
+                className="block rounded-lg px-3 py-2 text-sm font-semibold text-brand-700 hover:bg-brand-50"
+              >
+                + List another restaurant
+              </Link>
+            </li>
+          </ul>
+        </details>
       }
     >
       {children}

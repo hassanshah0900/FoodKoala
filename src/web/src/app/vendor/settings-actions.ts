@@ -1,11 +1,21 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 import { refusal } from '@/lib/api/http';
-import { addZone, deleteZone, setHours, updateZone } from '@/lib/api/restaurants';
+import {
+  addZone,
+  applyRestaurant,
+  deleteZone,
+  setHours,
+  setRestaurantStatus,
+  updateRestaurant,
+  updateZone,
+} from '@/lib/api/restaurants';
 import { formValues } from '@/lib/form-values';
 import { type HoursDraft, readHoursDraft } from '@/lib/hours-editing';
-import { requireOwner } from '@/lib/owner';
+import { ownRestaurants, requireOwner } from '@/lib/owner';
+import { readRestaurantForm } from '@/lib/restaurant-form';
 import { readZoneForm } from '@/lib/zones';
 
 export type SettingsState = { errors?: string[]; saved?: boolean; values?: Record<string, string> };
@@ -63,5 +73,47 @@ export async function saveZone(
 export async function removeZone(restaurantId: string, zoneId: string): Promise<void> {
   const { token } = await requireOwner(restaurantId);
   await deleteZone(token, restaurantId, zoneId);
+  revalidatePath(`/vendor/${restaurantId}`, 'layout');
+}
+
+/** What was typed, to put back after a refusal; the cuisines, a list, as one comma-separated value. */
+const restaurantValues = (form: FormData) => ({ ...formValues(form), cuisines: form.getAll('cuisines').join(',') });
+
+const restaurantFrom = (form: FormData) =>
+  readRestaurantForm(
+    (name) => String(form.get(name) ?? ''),
+    (name) => form.getAll(name).map(String),
+  );
+
+/** Lists a new restaurant for the signed-in user, then opens its console (pending review). */
+export async function applyAction(_prev: SettingsState, form: FormData): Promise<SettingsState> {
+  const { token } = await ownRestaurants('/vendor/new');
+  const values = restaurantValues(form);
+  const read = restaurantFrom(form);
+  if ('errors' in read) return { errors: read.errors, values };
+  let id: string;
+  try {
+    id = (await applyRestaurant(token, read.restaurant)).id;
+  } catch (err) {
+    const error = refusal(err);
+    if (error === null) throw err;
+    return { errors: error.split('; '), values };
+  }
+  redirect(`/vendor/${id}`);
+}
+
+/** Saves the restaurant's details. */
+export async function saveDetails(restaurantId: string, _prev: SettingsState, form: FormData): Promise<SettingsState> {
+  const { token } = await requireOwner(restaurantId);
+  const values = restaurantValues(form);
+  const read = restaurantFrom(form);
+  if ('errors' in read) return { errors: read.errors, values };
+  return saved(restaurantId, () => updateRestaurant(token, restaurantId, read.restaurant), values);
+}
+
+/** Asks FoodKoala to review a rejected restaurant again, once its owner has fixed it. */
+export async function resubmit(restaurantId: string): Promise<void> {
+  const { token } = await requireOwner(restaurantId);
+  await setRestaurantStatus(token, restaurantId, 'pending');
   revalidatePath(`/vendor/${restaurantId}`, 'layout');
 }

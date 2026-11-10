@@ -1,12 +1,16 @@
 import { StatusBadge } from '@/components/console/StatusBadge';
 import { AutoRefresh } from '@/components/orders/AutoRefresh';
+import { SetupChecklist } from '@/components/vendor/SetupChecklist';
 import { Ticket } from '@/components/vendor/Ticket';
 import { TicketActions } from '@/components/vendor/TicketActions';
+import { freshMenu } from '@/lib/api/menus';
 import { restaurantOrders } from '@/lib/api/orders';
+import { restaurantZones } from '@/lib/api/restaurants';
 import type { ManagedRestaurant } from '@/lib/api/types';
 import { clockTime } from '@/lib/format';
 import { board, type Column, PAUSES } from '@/lib/kitchen';
 import { requireOwner } from '@/lib/owner';
+import { setupSteps } from '@/lib/restaurant-form';
 import { answerOrder, setPause } from '../actions';
 
 const COLUMNS: { column: Column; title: string; empty: string }[] = [
@@ -20,6 +24,19 @@ export default async function VendorOrders({ params }: { params: Promise<{ resta
   const { restaurantId } = await params;
   const { token, restaurant } = await requireOwner(restaurantId);
   const live = await restaurantOrders(token, restaurant.id, ['placed', 'accepted', 'ready']);
+  // Until it is live, the owner sees what is left to do.
+  const steps =
+    restaurant.status === 'approved'
+      ? null
+      : await Promise.all([freshMenu(token, restaurant.id), restaurantZones(token, restaurant.id)]).then(
+          ([menu, zones]) =>
+            setupSteps({
+              status: restaurant.status,
+              hasHours: Object.values(restaurant.hours.weekly).some((r) => r && r.length > 0),
+              zones: zones.length,
+              items: menu.categories.reduce((n, c) => n + c.items.length, 0),
+            }),
+        );
   const columns = board(live.items);
   const now = Date.now();
 
@@ -36,6 +53,7 @@ export default async function VendorOrders({ params }: { params: Promise<{ resta
         {restaurant.status === 'approved' && <PauseControl restaurant={restaurant} />}
       </div>
       <StatusNotice restaurant={restaurant} />
+      {steps && <SetupChecklist base={`/vendor/${restaurant.id}`} steps={steps} />}
       <div className="grid items-start gap-6 lg:grid-cols-3">
         {COLUMNS.map(({ column, title, empty }) => (
           <section key={column} className="space-y-3">
@@ -106,7 +124,7 @@ function StatusNotice({ restaurant }: { restaurant: ManagedRestaurant }) {
   const text = {
     approved: null,
     pending: 'FoodKoala is reviewing your restaurant. Customers will see it once it is approved.',
-    rejected: `Your application wasn't approved: ${restaurant.statusReason}. Fix it and ask FoodKoala to review it again.`,
+    rejected: `Your application wasn't approved: ${restaurant.statusReason}. Fix it, then ask for review again under Restaurant details.`,
     suspended: `Your restaurant is suspended: ${restaurant.statusReason}. Customers can't order until FoodKoala reinstates it.`,
   }[restaurant.status];
   if (!text) return null;
