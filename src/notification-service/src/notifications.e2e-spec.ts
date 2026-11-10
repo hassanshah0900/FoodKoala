@@ -1,17 +1,17 @@
+import { randomUUID } from 'node:crypto';
 import { INestApplication } from '@nestjs/common';
 import { getDrizzleToken } from '@nestjs/drizzle';
 import { Test } from '@nestjs/testing';
 import { eq, inArray } from 'drizzle-orm';
-import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { AppModule } from './app.module';
 import { loadConfig } from './config/config';
 import type { Database } from './db/database';
 import { notifications, smsMessages } from './db/schema';
 import { OrderEventConsumer } from './orders/order-event-consumer';
+import { setupApp } from './setup-app';
 import { SmsDispatcher } from './sms/sms-dispatcher';
 import { SMS_SENDER, SmsError, type SmsSender } from './sms/sms-sender';
-import { setupApp } from './setup-app';
 
 /** Records texts; `next` decides how the following sends go. */
 class FakeSender implements SmsSender {
@@ -110,13 +110,21 @@ describe('notification-service (e2e)', () => {
     await deliver(event, '1'); // Kafka redelivers
 
     const inbox = await http.get('/').set(as(me)).expect(200);
-    expect(inbox.body).toMatchObject({ unreadCount: 1, hasMore: false, items: [{ kind: 'order_accepted', title: 'Order accepted', read: false }] });
+    expect(inbox.body).toMatchObject({
+      unreadCount: 1,
+      hasMore: false,
+      items: [{ kind: 'order_accepted', title: 'Order accepted', read: false }],
+    });
     expect(inbox.body.items[0].data).toEqual({ orderId: event.data.orderId });
-    expect(await smsOf(me)).toEqual([expect.objectContaining({ status: 'queued', phone: event.data.customerPhone, attempts: 0 })]);
+    expect(await smsOf(me)).toEqual([
+      expect.objectContaining({ status: 'queued', phone: event.data.customerPhone, attempts: 0 }),
+    ]);
 
     await dispatcher.sendDue();
     expect(sender.sent.filter((s) => s.phone === event.data.customerPhone)).toHaveLength(1);
-    expect(await smsOf(me)).toEqual([expect.objectContaining({ status: 'sent', providerId: expect.stringMatching(/^SM/), attempts: 1 })]);
+    expect(await smsOf(me)).toEqual([
+      expect.objectContaining({ status: 'sent', providerId: expect.stringMatching(/^SM/), attempts: 1 }),
+    ]);
   });
 
   it('tells the customer who their rider is and texts the rider the job, once each', async () => {
@@ -129,15 +137,29 @@ describe('notification-service (e2e)', () => {
       occurredAt: new Date().toISOString(),
       source: 'delivery-service',
       data: {
-        deliveryId: randomUUID(), orderId: randomUUID(), riderId: rider, riderName: 'Ali Raza', riderPhone, vehicle: 'motorbike',
-        at: new Date().toISOString(), customerId: me, customerPhone: phone(), restaurantName: 'Karachi Broast',
+        deliveryId: randomUUID(),
+        orderId: randomUUID(),
+        riderId: rider,
+        riderName: 'Ali Raza',
+        riderPhone,
+        vehicle: 'motorbike',
+        at: new Date().toISOString(),
+        customerId: me,
+        customerPhone: phone(),
+        restaurantName: 'Karachi Broast',
       },
     };
     await consumer.handle('delivery.assigned', 0, { value: Buffer.from(JSON.stringify(event)), offset: '0' });
     await consumer.handle('delivery.assigned', 0, { value: Buffer.from(JSON.stringify(event)), offset: '1' }); // redelivered
 
     const mine = (await http.get('/').set(as(me)).expect(200)).body.items;
-    expect(mine).toEqual([expect.objectContaining({ kind: 'rider_assigned', title: 'Rider assigned', data: { orderId: event.data.orderId, riderId: rider } })]);
+    expect(mine).toEqual([
+      expect.objectContaining({
+        kind: 'rider_assigned',
+        title: 'Rider assigned',
+        data: { orderId: event.data.orderId, riderId: rider },
+      }),
+    ]);
     expect(mine[0].body).toContain('Ali Raza is bringing your order');
     const theirs = (await http.get('/').set(as(rider)).expect(200)).body.items;
     expect(theirs).toEqual([expect.objectContaining({ kind: 'delivery_assigned', title: 'New delivery' })]);
@@ -168,7 +190,11 @@ describe('notification-service (e2e)', () => {
     await deliver(statusChanged(hopeless, 'picked_up', { from: 'ready', by: 'admin' }));
     const order = [flaky, bad, hopeless];
     // Sends go oldest first: flaky's outage, bad's invalid number, hopeless's outage.
-    sender.next = [new SmsError('Twilio answered 503', true), new SmsError('invalid number', false), new Error('socket hang up')];
+    sender.next = [
+      new SmsError('Twilio answered 503', true),
+      new SmsError('invalid number', false),
+      new Error('socket hang up'),
+    ];
     const now = new Date();
     await dispatcher.sendDue(now);
 
@@ -197,7 +223,12 @@ describe('notification-service (e2e)', () => {
   it('never texts twice when two senders run at once', async () => {
     const me = user();
     for (let i = 0; i < 5; i++) await deliver(statusChanged(me, 'accepted'));
-    const slow = { send: async (p: string, b: string) => (await new Promise((r) => setTimeout(r, 20)), sender.send(p, b)) };
+    const slow = {
+      send: async (p: string, b: string) => {
+        await new Promise((r) => setTimeout(r, 20));
+        return sender.send(p, b);
+      },
+    };
     const other = new SmsDispatcher(db, loadConfig(), slow);
     await Promise.all([dispatcher.sendDue(), other.sendDue()]);
     const mine = await smsOf(me);
@@ -225,7 +256,11 @@ describe('notification-service (e2e)', () => {
     await deliver(statusChanged(other, 'accepted'));
 
     const all = (await http.get('/').set(as(me)).expect(200)).body;
-    expect(all.items.map((n: { kind: string }) => n.kind)).toEqual(['order_picked_up', 'order_ready', 'order_accepted']);
+    expect(all.items.map((n: { kind: string }) => n.kind)).toEqual([
+      'order_picked_up',
+      'order_ready',
+      'order_accepted',
+    ]);
     expect(all.unreadCount).toBe(3);
 
     const page = (await http.get('/?limit=2').set(as(me)).expect(200)).body;

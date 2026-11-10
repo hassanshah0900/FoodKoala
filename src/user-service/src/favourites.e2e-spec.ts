@@ -1,10 +1,10 @@
+import { randomUUID } from 'node:crypto';
+import { createServer, type Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { INestApplication } from '@nestjs/common';
 import { getDrizzleToken } from '@nestjs/drizzle';
 import { Test } from '@nestjs/testing';
 import { inArray } from 'drizzle-orm';
-import { randomUUID } from 'node:crypto';
-import { createServer, type Server } from 'node:http';
-import type { AddressInfo } from 'node:net';
 import request from 'supertest';
 import { AppModule } from './app.module';
 import type { Database } from './db/database';
@@ -116,8 +116,15 @@ describe('favourites (e2e)', () => {
 
   it('limits how many', async () => {
     const me = newUser();
-    for (const name of ['A', 'B', 'C']) await http.put(`/me/favourites/${restaurant(name).id}`).set(me).expect(204);
-    const res = await http.put(`/me/favourites/${restaurant('D').id}`).set(me).expect(409);
+    for (const name of ['A', 'B', 'C'])
+      await http
+        .put(`/me/favourites/${restaurant(name).id}`)
+        .set(me)
+        .expect(204);
+    const res = await http
+      .put(`/me/favourites/${restaurant('D').id}`)
+      .set(me)
+      .expect(409);
     expect(res.body.message).toMatch(/up to 3 favourites/);
   });
 
@@ -126,7 +133,10 @@ describe('favourites (e2e)', () => {
     const r = restaurant('Fine');
     await http.put(`/me/favourites/${r.id}`).set(me).expect(204);
     restaurantServiceDown = true;
-    await http.put(`/me/favourites/${restaurant('Other').id}`).set(me).expect(503);
+    await http
+      .put(`/me/favourites/${restaurant('Other').id}`)
+      .set(me)
+      .expect(503);
     await http.get('/me/favourites').set(me).expect(503);
     await http.delete(`/me/favourites/${r.id}`).set(me).expect(204); // removing needs no lookup
   });

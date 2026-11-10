@@ -1,5 +1,5 @@
-import { Inject, Injectable, Logger, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import { createHmac, randomInt, timingSafeEqual } from 'node:crypto';
+import { Inject, Injectable, Logger, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import type Redis from 'ioredis';
 import { RateLimitedException } from '../common/rate-limited.exception';
 import { APP_CONFIG, type AppConfig } from '../config/config';
@@ -67,7 +67,10 @@ export class OtpService {
       .exec();
 
     try {
-      await this.sms.send(phone, `${code} is your FoodKoala login code. It expires in ${Math.round(OTP_TTL_SECONDS / 60)} minutes.`);
+      await this.sms.send(
+        phone,
+        `${code} is your FoodKoala login code. It expires in ${Math.round(OTP_TTL_SECONDS / 60)} minutes.`,
+      );
     } catch (err) {
       // The code never arrived: drop it and the cooldown so the user can ask again right away.
       // The hourly count stays, so failures can't be used to send unlimited codes.

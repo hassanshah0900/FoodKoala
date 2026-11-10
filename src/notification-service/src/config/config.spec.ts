@@ -23,7 +23,10 @@ describe('loadConfig', () => {
   });
 
   it('splits the broker list and treats an empty one as unset', () => {
-    expect(loadConfig({ ...base, KAFKA_BROKERS: 'kafka:29092,k2:9092' }).KAFKA_BROKERS).toEqual(['kafka:29092', 'k2:9092']);
+    expect(loadConfig({ ...base, KAFKA_BROKERS: 'kafka:29092,k2:9092' }).KAFKA_BROKERS).toEqual([
+      'kafka:29092',
+      'k2:9092',
+    ]);
     expect(loadConfig({ ...base, KAFKA_BROKERS: '' }).KAFKA_BROKERS).toBeUndefined();
   });
 
@@ -33,12 +36,16 @@ describe('loadConfig', () => {
   });
 
   it('treats empty Twilio settings as unset', () => {
-    expect(loadConfig({ ...base, TWILIO_ACCOUNT_SID: '', TWILIO_AUTH_TOKEN: '', TWILIO_FROM: '' }).TWILIO_FROM).toBeUndefined();
+    expect(
+      loadConfig({ ...base, TWILIO_ACCOUNT_SID: '', TWILIO_AUTH_TOKEN: '', TWILIO_FROM: '' }).TWILIO_FROM,
+    ).toBeUndefined();
     expect(() => loadConfig({ ...base, ...twilio, TWILIO_AUTH_TOKEN: '' })).toThrow(/TWILIO_AUTH_TOKEN/);
   });
 
   it('needs every Twilio setting for Twilio', () => {
-    expect(() => loadConfig({ ...base, SMS_PROVIDER: 'twilio' })).toThrow(/TWILIO_ACCOUNT_SID[\s\S]*TWILIO_AUTH_TOKEN[\s\S]*TWILIO_FROM/);
+    expect(() => loadConfig({ ...base, SMS_PROVIDER: 'twilio' })).toThrow(
+      /TWILIO_ACCOUNT_SID[\s\S]*TWILIO_AUTH_TOKEN[\s\S]*TWILIO_FROM/,
+    );
     expect(() => loadConfig({ ...base, ...twilio, TWILIO_FROM: 'FoodKoala' })).toThrow(/TWILIO_FROM/);
   });
 });

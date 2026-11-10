@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
-import { OtpService } from '../otp/otp.service';
 import { APP_CONFIG, type AppConfig } from '../config/config';
+import { OtpService } from '../otp/otp.service';
 import { LogSmsSender, SmsSender } from '../sms/sms.sender';
 import { TwilioSmsSender } from '../sms/twilio.sender';
 import { AccessTokenService } from '../tokens/access-token.service';

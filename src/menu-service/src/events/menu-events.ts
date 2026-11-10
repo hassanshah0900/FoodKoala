@@ -1,7 +1,7 @@
-import { asc, eq, sql } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
+import { asc, eq, sql } from 'drizzle-orm';
 import type { Tx } from '../db/database';
-import { categories, items, menus, outbox, type CategoryRow, type ItemRow } from '../db/schema';
+import { type CategoryRow, categories, type ItemRow, items, menus, outbox } from '../db/schema';
 
 export const MENU_UPDATED = 'menu.updated';
 

@@ -50,10 +50,9 @@ const specialHours = z
   });
 
 export const hoursSchema = z.strictObject({
-  weekly: z.strictObject(Object.fromEntries(DAYS.map((d) => [d, dayRanges.optional()])) as Record<
-    Day,
-    z.ZodOptional<typeof dayRanges>
-  >),
+  weekly: z.strictObject(
+    Object.fromEntries(DAYS.map((d) => [d, dayRanges.optional()])) as Record<Day, z.ZodOptional<typeof dayRanges>>,
+  ),
   special: z
     .array(specialHours)
     .max(20)
@@ -100,10 +99,12 @@ export function rangesOn(hours: Hours, date: string): TimeRange[] {
 /** Whether the restaurant's hours include the instant `at`, counting yesterday's ranges that run past midnight. */
 export function isOpenAt(hours: Hours, at: Date): boolean {
   const { date, minutes } = localTime(at);
-  if (rangesOn(hours, date).some((r) => {
-    const s = span(r);
-    return minutes >= s.start && minutes < s.end;
-  })) {
+  if (
+    rangesOn(hours, date).some((r) => {
+      const s = span(r);
+      return minutes >= s.start && minutes < s.end;
+    })
+  ) {
     return true;
   }
   return rangesOn(hours, previousDate(date)).some((r) => minutes < span(r).end - MINUTES_PER_DAY);

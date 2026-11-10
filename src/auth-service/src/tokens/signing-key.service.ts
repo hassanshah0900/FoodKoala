@@ -1,13 +1,6 @@
-import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import {
-  calculateJwkThumbprint,
-  exportJWK,
-  generateKeyPair,
-  importPKCS8,
-  type CryptoKey,
-  type JWK,
-} from 'jose';
 import { createPublicKey } from 'node:crypto';
+import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { type CryptoKey, calculateJwkThumbprint, exportJWK, generateKeyPair, importPKCS8, type JWK } from 'jose';
 import { APP_CONFIG, type AppConfig } from '../config/config';
 
 export const ALG = 'RS256';

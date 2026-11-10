@@ -1,4 +1,4 @@
-import { hasWeeklyHours, hoursSchema, isOpenAt, localTime, type Hours } from './hours';
+import { type Hours, hasWeeklyHours, hoursSchema, isOpenAt, localTime } from './hours';
 
 /** An instant given in Pakistan local time. 2026-11-09 is a Monday. */
 const pk = (local: string) => new Date(`${local}:00+05:00`);
@@ -12,7 +12,10 @@ describe('localTime', () => {
 describe('isOpenAt', () => {
   const hours: Hours = {
     weekly: {
-      mon: [{ opens: '11:00', closes: '15:00' }, { opens: '18:00', closes: '02:00' }],
+      mon: [
+        { opens: '11:00', closes: '15:00' },
+        { opens: '18:00', closes: '02:00' },
+      ],
       tue: [{ opens: '11:00', closes: '23:00' }],
       sun: [{ opens: '00:00', closes: '24:00' }],
     },
@@ -39,7 +42,12 @@ describe('isOpenAt', () => {
     const ramadan: Hours = {
       weekly: { mon: [{ opens: '11:00', closes: '23:00' }], tue: [{ opens: '11:00', closes: '23:00' }] },
       special: [
-        { name: 'Ramadan', startsOn: '2026-11-09', endsOn: '2026-11-09', ranges: [{ opens: '17:30', closes: '04:30' }] },
+        {
+          name: 'Ramadan',
+          startsOn: '2026-11-09',
+          endsOn: '2026-11-09',
+          ranges: [{ opens: '17:30', closes: '04:30' }],
+        },
         { name: 'Eid', startsOn: '2026-11-10', endsOn: '2026-11-10', ranges: [] },
       ],
     };
@@ -62,8 +70,20 @@ describe('hoursSchema', () => {
   it('accepts weekly and special hours', () => {
     expect(
       ok({
-        weekly: { fri: [{ opens: '11:00', closes: '13:00' }, { opens: '14:30', closes: '01:00' }] },
-        special: [{ name: 'Ramadan', startsOn: '2027-02-08', endsOn: '2027-03-09', ranges: [{ opens: '17:30', closes: '04:30' }] }],
+        weekly: {
+          fri: [
+            { opens: '11:00', closes: '13:00' },
+            { opens: '14:30', closes: '01:00' },
+          ],
+        },
+        special: [
+          {
+            name: 'Ramadan',
+            startsOn: '2027-02-08',
+            endsOn: '2027-03-09',
+            ranges: [{ opens: '17:30', closes: '04:30' }],
+          },
+        ],
       }),
     ).toBe(true);
   });
@@ -74,15 +94,37 @@ describe('hoursSchema', () => {
     ['24:00 as an opening time', { weekly: { mon: [{ opens: '24:00', closes: '02:00' }] }, special: [] }],
     [
       'overlapping ranges',
-      { weekly: { mon: [{ opens: '11:00', closes: '15:00' }, { opens: '14:00', closes: '18:00' }] }, special: [] },
+      {
+        weekly: {
+          mon: [
+            { opens: '11:00', closes: '15:00' },
+            { opens: '14:00', closes: '18:00' },
+          ],
+        },
+        special: [],
+      },
     ],
     [
       'an overnight range overlapping a later one',
-      { weekly: { mon: [{ opens: '20:00', closes: '02:00' }, { opens: '22:00', closes: '23:00' }] }, special: [] },
+      {
+        weekly: {
+          mon: [
+            { opens: '20:00', closes: '02:00' },
+            { opens: '22:00', closes: '23:00' },
+          ],
+        },
+        special: [],
+      },
     ],
     ['an unknown day', { weekly: { monday: [] }, special: [] }],
-    ['special hours ending before they start', { weekly: {}, special: [{ name: 'x', startsOn: '2027-01-02', endsOn: '2027-01-01', ranges: [] }] }],
-    ['special hours longer than 60 days', { weekly: {}, special: [{ name: 'x', startsOn: '2027-01-01', endsOn: '2027-03-02', ranges: [] }] }],
+    [
+      'special hours ending before they start',
+      { weekly: {}, special: [{ name: 'x', startsOn: '2027-01-02', endsOn: '2027-01-01', ranges: [] }] },
+    ],
+    [
+      'special hours longer than 60 days',
+      { weekly: {}, special: [{ name: 'x', startsOn: '2027-01-01', endsOn: '2027-03-02', ranges: [] }] },
+    ],
     [
       'overlapping special hours',
       {
@@ -93,7 +135,10 @@ describe('hoursSchema', () => {
         ],
       },
     ],
-    ['an invalid date', { weekly: {}, special: [{ name: 'x', startsOn: '2027-02-30', endsOn: '2027-03-01', ranges: [] }] }],
+    [
+      'an invalid date',
+      { weekly: {}, special: [{ name: 'x', startsOn: '2027-02-30', endsOn: '2027-03-01', ranges: [] }] },
+    ],
   ])('rejects %s', (_, body) => {
     expect(ok(body)).toBe(false);
   });

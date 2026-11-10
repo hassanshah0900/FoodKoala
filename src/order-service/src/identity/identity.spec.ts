@@ -1,7 +1,7 @@
 import { Controller, Get, INestApplication, UseGuards } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
-import { AdminGuard, CurrentUser, IdentityGuard, OptionalUser, type Identity } from './identity';
+import { AdminGuard, CurrentUser, type Identity, IdentityGuard, OptionalUser } from './identity';
 
 @Controller()
 class WhoAmIController {
@@ -54,7 +54,10 @@ describe('identity', () => {
     ['a non-uuid user id', { 'X-User-Id': 'admin' }],
     ['a non-Pakistani phone', { 'X-User-Phone': '+15551234567' }],
   ])('rejects %s', async (_, override) => {
-    await request(app.getHttpServer()).get('/whoami').set({ ...valid, ...override }).expect(401);
+    await request(app.getHttpServer())
+      .get('/whoami')
+      .set({ ...valid, ...override })
+      .expect(401);
   });
 
   it('lets admins through AdminGuard and stops everyone else', async () => {
@@ -70,6 +73,9 @@ describe('identity', () => {
     await request(app.getHttpServer()).get('/public').expect(200, { me: null });
     const res = await request(app.getHttpServer()).get('/public').set(valid).expect(200);
     expect(res.body.me.userId).toBe(valid['X-User-Id']);
-    await request(app.getHttpServer()).get('/public').set({ ...valid, 'X-User-Id': 'nope' }).expect(401);
+    await request(app.getHttpServer())
+      .get('/public')
+      .set({ ...valid, 'X-User-Id': 'nope' })
+      .expect(401);
   });
 });

@@ -17,7 +17,9 @@ describe('loadConfig', () => {
   });
 
   it('rejects a service URL that is not a URL', () => {
-    expect(() => loadConfig({ DATABASE_URL: 'postgres://u:p@h/db', CART_SERVICE_URL: 'cart' })).toThrow(/CART_SERVICE_URL/);
+    expect(() => loadConfig({ DATABASE_URL: 'postgres://u:p@h/db', CART_SERVICE_URL: 'cart' })).toThrow(
+      /CART_SERVICE_URL/,
+    );
   });
 });
 
@@ -33,7 +35,10 @@ describe('loadConfig: Kafka', () => {
   });
 
   it('splits the broker list', () => {
-    expect(loadConfig({ ...base, KAFKA_BROKERS: 'kafka:29092, kafka-2:29092' }).KAFKA_BROKERS).toEqual(['kafka:29092', 'kafka-2:29092']);
+    expect(loadConfig({ ...base, KAFKA_BROKERS: 'kafka:29092, kafka-2:29092' }).KAFKA_BROKERS).toEqual([
+      'kafka:29092',
+      'kafka-2:29092',
+    ]);
   });
 
   it('rejects a broker without a port', () => {

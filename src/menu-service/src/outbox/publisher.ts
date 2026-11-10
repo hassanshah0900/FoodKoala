@@ -1,5 +1,5 @@
-import { Logger } from '@nestjs/common';
 import { KafkaJS } from '@confluentinc/kafka-javascript';
+import { Logger } from '@nestjs/common';
 
 /** One outbox row as a Kafka record. */
 export interface OutgoingEvent {

@@ -1,5 +1,5 @@
-import { createLocalJWKSet, jwtVerify } from 'jose';
 import { generateKeyPairSync } from 'node:crypto';
+import { createLocalJWKSet, jwtVerify } from 'jose';
 import { testConfig } from '../test-config';
 import { AccessTokenService } from './access-token.service';
 import { SigningKeyService } from './signing-key.service';

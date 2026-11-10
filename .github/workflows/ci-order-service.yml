@@ -1,0 +1,29 @@
+name: order-service
+
+on:
+  pull_request:
+    branches: [main]
+    paths: &paths
+      - src/order-service/**
+      - .github/workflows/ci-order-service.yml
+      - .github/workflows/node-service.yml
+      - biome.json
+  push:
+    branches: [main]
+    paths: *paths
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    uses: ./.github/workflows/node-service.yml
+    with:
+      service: order-service
+      postgres: true
+      kafka: true

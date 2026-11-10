@@ -1,10 +1,10 @@
+import { setTimeout as sleep } from 'node:timers/promises';
 import { KafkaJS } from '@confluentinc/kafka-javascript';
 import { Inject, Injectable, Logger, type OnApplicationBootstrap, type OnApplicationShutdown } from '@nestjs/common';
-import { setTimeout as sleep } from 'node:timers/promises';
 import { APP_CONFIG, type AppConfig } from '../config/config';
 import { InboxWriter } from './inbox-writer';
 import { messagesFor } from './messages';
-import { ORDER_TOPICS, orderEventSchema } from './order-events';
+import { ORDER_TOPICS, type OrderEvent, orderEventSchema } from './order-events';
 
 const RETRY_MS = 5000;
 
@@ -34,7 +34,11 @@ export class OrderEventConsumer implements OnApplicationBootstrap, OnApplication
       return;
     }
     const kafka = new KafkaJS.Kafka({
-      kafkaJS: { brokers: this.config.KAFKA_BROKERS, clientId: this.config.KAFKA_GROUP_ID, logLevel: KafkaJS.logLevel.WARN },
+      kafkaJS: {
+        brokers: this.config.KAFKA_BROKERS,
+        clientId: this.config.KAFKA_GROUP_ID,
+        logLevel: KafkaJS.logLevel.WARN,
+      },
     });
     this.consumer = kafka.consumer({
       kafkaJS: { groupId: this.config.KAFKA_GROUP_ID, fromBeginning: true },
@@ -58,7 +62,7 @@ export class OrderEventConsumer implements OnApplicationBootstrap, OnApplication
 
   /** Exposed for tests: what happens to one Kafka message. */
   async handle(topic: string, partition: number, message: { value: Buffer | null; offset: string }): Promise<void> {
-    let event;
+    let event: OrderEvent;
     try {
       event = orderEventSchema.parse(JSON.parse(message.value?.toString() ?? ''));
     } catch (err) {

@@ -1,7 +1,7 @@
 import { Controller, Get, INestApplication, UseGuards } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
-import { CurrentUser, IdentityGuard, type Identity } from './identity';
+import { CurrentUser, type Identity, IdentityGuard } from './identity';
 
 @Controller()
 @UseGuards(IdentityGuard)

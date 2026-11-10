@@ -46,7 +46,10 @@ describe('auth flow (e2e)', () => {
   async function login() {
     await app.get<Redis>(REDIS).del(`auth:otp:cooldown:${PHONE}`);
     await http.post('/otp/request').send({ phone: local }).expect(202);
-    const res = await http.post('/otp/verify').send({ phone: PHONE, code: sms.codes.get(PHONE) }).expect(200);
+    const res = await http
+      .post('/otp/verify')
+      .send({ phone: PHONE, code: sms.codes.get(PHONE) })
+      .expect(200);
     return res.body;
   }
 
@@ -68,7 +71,10 @@ describe('auth flow (e2e)', () => {
 
     await http.post('/otp/verify').send({ phone: PHONE, code: '12345' }).expect(400);
 
-    const res = await http.post('/otp/verify').send({ phone: PHONE, code: sms.codes.get(PHONE) }).expect(200);
+    const res = await http
+      .post('/otp/verify')
+      .send({ phone: PHONE, code: sms.codes.get(PHONE) })
+      .expect(200);
     expect(res.body).toMatchObject({
       tokenType: 'Bearer',
       expiresIn: 900,
@@ -85,7 +91,10 @@ describe('auth flow (e2e)', () => {
     expect(payload).toMatchObject({ sub: res.body.user.id, phone: PHONE, roles: ['customer'] });
 
     // The code works only once.
-    await http.post('/otp/verify').send({ phone: PHONE, code: sms.codes.get(PHONE) }).expect(401);
+    await http
+      .post('/otp/verify')
+      .send({ phone: PHONE, code: sms.codes.get(PHONE) })
+      .expect(401);
   });
 
   it('returns the same user on later logins', async () => {

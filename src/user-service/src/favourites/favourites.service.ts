@@ -6,7 +6,7 @@ import type { Database } from '../db/database';
 import { favouriteRestaurants, profiles } from '../db/schema';
 import type { Identity } from '../identity/identity';
 import { ProfilesService } from '../profiles/profiles.service';
-import { RestaurantDirectory, type Restaurant } from './restaurant-directory';
+import { type Restaurant, RestaurantDirectory } from './restaurant-directory';
 
 /** API shape of Favourite in the contract. */
 export interface Favourite {

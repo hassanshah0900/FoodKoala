@@ -1,0 +1,17 @@
+# Shared by every Go service: golangci-lint finds it by walking up from the service.
+version: "2"
+
+linters:
+  # errcheck, govet, ineffassign, staticcheck and unused.
+  default: standard
+  settings:
+    errcheck:
+      exclude-functions:
+        # Closing a WebSocket that is already going away; nothing to do with the error.
+        - (*github.com/coder/websocket.Conn).CloseNow
+  exclusions:
+    # Unchecked errors that Go code conventionally ignores, e.g. `defer x.Close()`.
+    presets: [std-error-handling]
+
+formatters:
+  enable: [gofmt, goimports]

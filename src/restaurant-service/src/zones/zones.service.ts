@@ -1,14 +1,14 @@
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectDrizzle } from '@nestjs/drizzle';
-import { and, asc, count, eq, sql, type SQL } from 'drizzle-orm';
+import { and, asc, count, eq, type SQL, sql } from 'drizzle-orm';
 import { APP_CONFIG, type AppConfig } from '../config/config';
 import type { Database } from '../db/database';
+import { deliveryZones, type Polygon, restaurants } from '../db/schema';
 import { recordRestaurantChange } from '../events/restaurant-events';
-import { deliveryZones, restaurants, type Polygon } from '../db/schema';
 import type { Location } from '../geo/geo';
 import type { Identity } from '../identity/identity';
 import type { PageQuery } from '../restaurants/restaurants.dto';
-import { RestaurantsService, type Page } from '../restaurants/restaurants.service';
+import { type Page, RestaurantsService } from '../restaurants/restaurants.service';
 import { availability } from '../restaurants/restaurants.view';
 import type { ZoneCreateDto, ZoneUpdateDto } from './zones.dto';
 
@@ -86,7 +86,11 @@ const distanceFrom = (at: Location): SQL<number> =>
   sql<number>`ST_Distance(ST_SetSRID(ST_MakePoint(${restaurants.lng}, ${restaurants.lat}), 4326)::geography, ${point(at)}::geography)`;
 
 /** When several zones contain the point, the customer gets the cheapest one. */
-const cheapestFirst = [asc(deliveryZones.deliveryFeePaisa), asc(deliveryZones.minimumOrderPaisa), asc(deliveryZones.id)];
+const cheapestFirst = [
+  asc(deliveryZones.deliveryFeePaisa),
+  asc(deliveryZones.minimumOrderPaisa),
+  asc(deliveryZones.id),
+];
 
 /** Turns PostGIS rejecting a shape (delivery_zones_area_valid) into a 400. */
 function rethrowInvalidShape(err: unknown): never {

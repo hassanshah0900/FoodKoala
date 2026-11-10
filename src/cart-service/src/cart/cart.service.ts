@@ -1,11 +1,11 @@
-import { Inject, Injectable, UnprocessableEntityException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
+import { Inject, Injectable, UnprocessableEntityException } from '@nestjs/common';
 import { APP_CONFIG, type AppConfig } from '../config/config';
 import type { Identity } from '../identity/identity';
-import { MenuClient, type LineToPrice } from '../menu/menu-client';
+import { type LineToPrice, MenuClient } from '../menu/menu-client';
 import { OrderClient } from '../orders/order-client';
 import type { AddLineDto, ReorderDto, UpdateLineDto } from './cart.dto';
-import { addLine, findLine, removeLine, replaceLine, sortedIds, toView, type CartView } from './cart.rules';
+import { addLine, type CartView, findLine, removeLine, replaceLine, sortedIds, toView } from './cart.rules';
 import { CartStore, type StoredCart, type StoredLine } from './cart.store';
 
 /** A line of a reordered order that could not be added. */

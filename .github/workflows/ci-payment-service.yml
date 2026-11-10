@@ -1,0 +1,28 @@
+name: payment-service
+
+on:
+  pull_request:
+    branches: [main]
+    paths: &paths
+      - src/payment-service/**
+      - .github/workflows/ci-payment-service.yml
+      - .github/workflows/python-service.yml
+  push:
+    branches: [main]
+    paths: *paths
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    uses: ./.github/workflows/python-service.yml
+    with:
+      service: payment-service
+      postgres: true
+      kafka: true

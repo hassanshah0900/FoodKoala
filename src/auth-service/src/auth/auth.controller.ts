@@ -1,12 +1,12 @@
 import { Body, Controller, Get, Header, HttpCode, HttpStatus, Post } from '@nestjs/common';
 import { SigningKeyService } from '../tokens/signing-key.service';
 import {
-  otpRequestSchema,
-  otpVerifySchema,
-  refreshTokenSchema,
   type OtpRequestDto,
   type OtpVerifyDto,
+  otpRequestSchema,
+  otpVerifySchema,
   type RefreshTokenDto,
+  refreshTokenSchema,
 } from './auth.dto';
 import { AuthService } from './auth.service';
 

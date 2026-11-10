@@ -1,7 +1,7 @@
-import { asc, eq, sql } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
+import { asc, eq, sql } from 'drizzle-orm';
 import type { Tx } from '../db/database';
-import { deliveryZones, outbox, restaurants, type Polygon, type RestaurantRow } from '../db/schema';
+import { deliveryZones, outbox, type Polygon, type RestaurantRow, restaurants } from '../db/schema';
 
 export const RESTAURANT_UPDATED = 'restaurant.updated';
 

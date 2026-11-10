@@ -11,10 +11,10 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { pointQuerySchema, type Location } from '../geo/geo';
-import { CurrentUser, IdentityGuard, type Identity } from '../identity/identity';
-import { idSchema, pageQuerySchema, type PageQuery } from '../restaurants/restaurants.dto';
-import { zoneCreateSchema, zoneUpdateSchema, type ZoneCreateDto, type ZoneUpdateDto } from './zones.dto';
+import { type Location, pointQuerySchema } from '../geo/geo';
+import { CurrentUser, type Identity, IdentityGuard } from '../identity/identity';
+import { idSchema, type PageQuery, pageQuerySchema } from '../restaurants/restaurants.dto';
+import { type ZoneCreateDto, type ZoneUpdateDto, zoneCreateSchema, zoneUpdateSchema } from './zones.dto';
 import { ZonesService } from './zones.service';
 
 /** Public: who delivers here, and on which terms. */
@@ -23,10 +23,7 @@ export class BrowseController {
   constructor(private readonly zones: ZonesService) {}
 
   @Get()
-  deliveringTo(
-    @Query({ schema: pointQuerySchema }) at: Location,
-    @Query({ schema: pageQuerySchema }) page: PageQuery,
-  ) {
+  deliveringTo(@Query({ schema: pointQuerySchema }) at: Location, @Query({ schema: pageQuerySchema }) page: PageQuery) {
     return this.zones.deliveringTo(at, page);
   }
 

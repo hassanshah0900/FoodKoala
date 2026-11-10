@@ -1,0 +1,132 @@
+# Reusable CI for one FastAPI service, called by ci-<service>.yml.
+name: python-service
+
+on:
+  workflow_call:
+    inputs:
+      service:
+        description: Folder under src/, e.g. payment-service
+        required: true
+        type: string
+      postgres:
+        type: boolean
+        default: false
+      kafka:
+        type: boolean
+        default: false
+      elasticsearch:
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Format, lint, types
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: src/${{ inputs.service }}
+    steps:
+      - uses: actions/checkout@v7
+
+      # Python comes from the service's .python-version (same as its Dockerfile).
+      # setup-uv publishes no moving v10 tag, hence the exact version.
+      - uses: astral-sh/setup-uv@v10.3.3
+        with:
+          working-directory: src/${{ inputs.service }}
+          enable-cache: true
+          cache-dependency-glob: src/${{ inputs.service }}/uv.lock
+
+      - run: uv sync --locked
+
+      - name: Format
+        run: uv run ruff format --check .
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Types
+        run: uv run mypy app tests
+
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: src/${{ inputs.service }}
+
+    # A service container whose image is '' is not started: each service
+    # opts in to the infrastructure its tests need.
+    services:
+      postgres:
+        image: ${{ inputs.postgres && 'postgis/postgis:16-3.4' || '' }}
+        env:
+          POSTGRES_USER: foodkoala
+          POSTGRES_PASSWORD: foodkoala
+          POSTGRES_DB: foodkoala
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U foodkoala"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+      kafka:
+        image: ${{ inputs.kafka && 'apache/kafka:3.8.1' || '' }}
+        ports: ['9092:9092']
+        options: >-
+          --health-cmd "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092"
+          --health-interval 5s --health-timeout 10s --health-retries 30
+      elasticsearch:
+        image: ${{ inputs.elasticsearch && 'docker.elastic.co/elasticsearch/elasticsearch:8.15.3' || '' }}
+        env:
+          discovery.type: single-node
+          xpack.security.enabled: 'false'
+          ES_JAVA_OPTS: -Xms512m -Xmx512m
+        ports: ['9200:9200']
+        options: >-
+          --health-cmd "curl -sf http://localhost:9200/_cluster/health"
+          --health-interval 5s --health-timeout 5s --health-retries 40
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v10.3.3
+        with:
+          working-directory: src/${{ inputs.service }}
+          enable-cache: true
+          cache-dependency-glob: src/${{ inputs.service }}/uv.lock
+
+      - run: uv sync --locked
+
+      # Integration tests skip when their variable is unset, so set only the
+      # ones whose container is running.
+      - name: Point the tests at the containers
+        run: |
+          if ${{ inputs.postgres }}; then echo "DATABASE_URL=postgres://foodkoala:foodkoala@localhost:5432/foodkoala" >> "$GITHUB_ENV"; fi
+          if ${{ inputs.kafka }}; then echo "KAFKA_BROKERS=localhost:9092" >> "$GITHUB_ENV"; fi
+          if ${{ inputs.elasticsearch }}; then echo "ELASTICSEARCH_URL=http://localhost:9200" >> "$GITHUB_ENV"; fi
+
+      - name: Migrate the database
+        if: inputs.postgres
+        run: uv run alembic upgrade head
+
+      - name: Tests
+        run: uv run pytest
+
+  docker:
+    name: Docker image
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      # Proves the Dockerfile still builds; not pushed until we deploy.
+      - uses: docker/build-push-action@v7
+        with:
+          context: src/${{ inputs.service }}
+          push: false
+          tags: foodkoala/${{ inputs.service }}:ci
+          cache-from: type=gha,scope=${{ inputs.service }}
+          cache-to: type=gha,mode=max,scope=${{ inputs.service }}

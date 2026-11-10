@@ -74,6 +74,6 @@ export const CurrentUser = createParamDecorator((_: unknown, ctx: ExecutionConte
 });
 
 /** The caller if signed in, for public routes that show more to owners and admins. */
-export const OptionalUser = createParamDecorator(
-  (_: unknown, ctx: ExecutionContext): Identity | undefined => readIdentity(ctx.switchToHttp().getRequest<Request>()),
+export const OptionalUser = createParamDecorator((_: unknown, ctx: ExecutionContext): Identity | undefined =>
+  readIdentity(ctx.switchToHttp().getRequest<Request>()),
 );

@@ -72,7 +72,9 @@ export class SmsDispatcher implements OnApplicationBootstrap, OnApplicationShutd
               nextAttemptAt: new Date(now.getTime() + retryDelayMs(attempts)),
             })
             .where(eq(smsMessages.id, sms.id));
-          this.logger.warn(`SMS ${sms.id} ${giveUp ? 'failed for good' : 'will be retried'} (attempt ${attempts}): ${String(err)}`);
+          this.logger.warn(
+            `SMS ${sms.id} ${giveUp ? 'failed for good' : 'will be retried'} (attempt ${attempts}): ${String(err)}`,
+          );
         }
       }
       return due.length;

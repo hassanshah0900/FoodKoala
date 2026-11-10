@@ -1,0 +1,27 @@
+name: api-gateway
+
+on:
+  pull_request:
+    branches: [main]
+    paths: &paths
+      - src/api-gateway/**
+      - .github/workflows/ci-api-gateway.yml
+      - .github/workflows/go-service.yml
+      - .golangci.yml
+  push:
+    branches: [main]
+    paths: *paths
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    uses: ./.github/workflows/go-service.yml
+    with:
+      service: api-gateway

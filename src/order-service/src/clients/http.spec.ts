@@ -11,7 +11,10 @@ describe('call', () => {
   beforeAll(async () => {
     server = createServer((req, res) => {
       seen = { url: req.url, headers: req.headers };
-      setTimeout(() => res.writeHead(reply.status, { 'content-type': 'application/json' }).end(reply.body), reply.delayMs ?? 0);
+      setTimeout(
+        () => res.writeHead(reply.status, { 'content-type': 'application/json' }).end(reply.body),
+        reply.delayMs ?? 0,
+      );
     });
     await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
     base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/base`;
@@ -26,7 +29,11 @@ describe('call', () => {
     const res = await call('svc', base, 'me/x', { as: me, query: { lat: 24.9, lng: 67.1 }, timeoutMs: 1000 });
     expect(res).toEqual({ status: 404, body: { statusCode: 404 } });
     expect(seen.url).toBe('/base/me/x?lat=24.9&lng=67.1');
-    expect(seen.headers).toMatchObject({ 'x-user-id': me.userId, 'x-user-phone': me.phone, 'x-user-roles': 'customer,vendor' });
+    expect(seen.headers).toMatchObject({
+      'x-user-id': me.userId,
+      'x-user-phone': me.phone,
+      'x-user-roles': 'customer,vendor',
+    });
   });
 
   it('sends no identity headers when calling anonymously', async () => {

@@ -1,10 +1,10 @@
+import { randomUUID } from 'node:crypto';
+import { createServer, type Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { INestApplication } from '@nestjs/common';
 import { getDrizzleToken } from '@nestjs/drizzle';
 import { Test } from '@nestjs/testing';
 import { eq, inArray } from 'drizzle-orm';
-import { randomUUID } from 'node:crypto';
-import { createServer, type Server } from 'node:http';
-import type { AddressInfo } from 'node:net';
 import request from 'supertest';
 import { AppModule } from './app.module';
 import type { Cart } from './clients/clients';
@@ -23,8 +23,14 @@ function newUser(roles = 'customer'): Headers {
 
 /** State of the stand-in cart, user and restaurant services. */
 const carts = new Map<string, Cart>();
-const addresses = new Map<string, { ownerId: string; area: string; city: string; location: { lat: number; lng: number } }>();
-const restaurants = new Map<string, { name: string; ownerId: string; acceptingOrders: boolean; deliverable: boolean }>();
+const addresses = new Map<
+  string,
+  { ownerId: string; area: string; city: string; location: { lat: number; lng: number } }
+>();
+const restaurants = new Map<
+  string,
+  { name: string; ownerId: string; acceptingOrders: boolean; deliverable: boolean }
+>();
 let restaurantDown = false;
 const cleared: string[] = [];
 
@@ -44,12 +50,24 @@ function fakeServices(): Server {
         cleared.push(userId);
         return send(204);
       }
-      return send(200, carts.get(userId) ?? { restaurantId: null, lines: [], subtotalPaisa: 0, problems: [], updatedAt: null });
+      return send(
+        200,
+        carts.get(userId) ?? { restaurantId: null, lines: [], subtotalPaisa: 0, problems: [], updatedAt: null },
+      );
     }
     if (service === 'user') {
       const address = addresses.get(rest[2]);
       if (!userId || !address || address.ownerId !== userId) return send(404, { statusCode: 404 });
-      return send(200, { id: rest[2], label: 'home', labelText: null, line1: 'House 7', landmark: null, instructions: null, isDefault: true, ...address });
+      return send(200, {
+        id: rest[2],
+        label: 'home',
+        labelText: null,
+        line1: 'House 7',
+        landmark: null,
+        instructions: null,
+        isDefault: true,
+        ...address,
+      });
     }
     if (service === 'restaurant') {
       if (restaurantDown) return send(503);
@@ -60,11 +78,18 @@ function fakeServices(): Server {
           deliverable: r.deliverable,
           acceptingOrders: r.acceptingOrders,
           distanceMeters: 1800,
-          delivery: r.deliverable ? { zoneId: randomUUID(), deliveryFeePaisa: 9900, minimumOrderPaisa: 50000, deliveryTimeMinutes: 35 } : null,
+          delivery: r.deliverable
+            ? { zoneId: randomUUID(), deliveryFeePaisa: 9900, minimumOrderPaisa: 50000, deliveryTimeMinutes: 35 }
+            : null,
         });
       }
       const owner = userId === r.ownerId || String(req.headers['x-user-roles']).split(',').includes('admin');
-      return send(200, { id: rest[0], name: r.name, location: { lat: 24.93, lng: 67.1 }, ...(owner ? { ownerId: r.ownerId } : {}) });
+      return send(200, {
+        id: rest[0],
+        name: r.name,
+        location: { lat: 24.93, lng: 67.1 },
+        ...(owner ? { ownerId: r.ownerId } : {}),
+      });
     }
     send(404);
   });
@@ -97,8 +122,19 @@ function scenario(over: { quantity?: number; acceptingOrders?: boolean; delivera
   const owner = newUser('customer,vendor');
   const restaurantId = randomUUID();
   const addressId = randomUUID();
-  restaurants.set(restaurantId, { name: 'Karachi Broast', ownerId: owner['X-User-Id'], acceptingOrders: true, deliverable: true, ...over });
-  addresses.set(addressId, { ownerId: customer['X-User-Id'], area: 'Gulshan-e-Iqbal', city: 'Karachi', location: { lat: 24.92, lng: 67.09 } });
+  restaurants.set(restaurantId, {
+    name: 'Karachi Broast',
+    ownerId: owner['X-User-Id'],
+    acceptingOrders: true,
+    deliverable: true,
+    ...over,
+  });
+  addresses.set(addressId, {
+    ownerId: customer['X-User-Id'],
+    area: 'Gulshan-e-Iqbal',
+    city: 'Karachi',
+    location: { lat: 24.92, lng: 67.09 },
+  });
   fillCart(customer, restaurantId, over.quantity ?? 2);
   return { customer, owner, restaurantId, addressId };
 }
@@ -164,7 +200,15 @@ describe('order-service (e2e)', () => {
       customerId: s.customer['X-User-Id'],
       customerPhone: s.customer['X-User-Phone'],
       restaurant: { id: s.restaurantId, name: 'Karachi Broast' },
-      lines: [{ name: 'Chicken Broast', quantity: 2, note: 'Extra garlic sauce', unitPricePaisa: 45000, lineTotalPaisa: 90000 }],
+      lines: [
+        {
+          name: 'Chicken Broast',
+          quantity: 2,
+          note: 'Extra garlic sauce',
+          unitPricePaisa: 45000,
+          lineTotalPaisa: 90000,
+        },
+      ],
       subtotalPaisa: 90000,
       deliveryFeePaisa: 9900,
       totalPaisa: 99900,
@@ -305,7 +349,9 @@ describe('order-service (e2e)', () => {
 
     const events = await db.select().from(outbox).where(eq(outbox.key, order.id)).orderBy(outbox.id);
     expect(events.map((e) => e.topic)).toEqual(['order.placed', ...Array(4).fill('order.status_changed')]);
-    expect(events[1].payload).toMatchObject({ data: { from: 'placed', to: 'accepted', by: 'restaurant', prepTimeMinutes: 40 } });
+    expect(events[1].payload).toMatchObject({
+      data: { from: 'placed', to: 'accepted', by: 'restaurant', prepTimeMinutes: 40 },
+    });
   });
 
   it('lets the customer cancel before acceptance and the restaurant reject with a reason', async () => {
@@ -318,8 +364,15 @@ describe('order-service (e2e)', () => {
     const second = await place(b);
     await http.post(`/${second.id}/status`).set(newUser()).send({ status: 'cancelled' }).expect(404);
     await http.post(`/${second.id}/status`).set(b.owner).send({ status: 'rejected' }).expect(400);
-    const rejected = await http.post(`/${second.id}/status`).set(b.owner).send({ status: 'rejected', reason: 'Out of chicken' }).expect(200);
-    expect(rejected.body).toMatchObject({ status: 'rejected', timeline: [{}, { by: 'restaurant', reason: 'Out of chicken' }] });
+    const rejected = await http
+      .post(`/${second.id}/status`)
+      .set(b.owner)
+      .send({ status: 'rejected', reason: 'Out of chicken' })
+      .expect(200);
+    expect(rejected.body).toMatchObject({
+      status: 'rejected',
+      timeline: [{}, { by: 'restaurant', reason: 'Out of chicken' }],
+    });
   });
 
   it('lets only one of two racing changes through', async () => {
@@ -339,9 +392,16 @@ describe('order-service (e2e)', () => {
     const lateOrder = await place(late);
     const freshOrder = await place(fresh);
     const answeredOrder = await place(answered);
-    await http.post(`/${answeredOrder.id}/status`).set(answered.owner).send({ status: 'accepted', prepTimeMinutes: 15 }).expect(200);
+    await http
+      .post(`/${answeredOrder.id}/status`)
+      .set(answered.owner)
+      .send({ status: 'accepted', prepTimeMinutes: 15 })
+      .expect(200);
     const longAgo = new Date(Date.now() - 11 * 60_000);
-    await db.update(orders).set({ placedAt: longAgo }).where(inArray(orders.id, [lateOrder.id, answeredOrder.id]));
+    await db
+      .update(orders)
+      .set({ placedAt: longAgo })
+      .where(inArray(orders.id, [lateOrder.id, answeredOrder.id]));
 
     // Two replicas at once: the order is still rejected only once.
     const timeouts = app.get(AcceptTimeouts);
@@ -356,13 +416,24 @@ describe('order-service (e2e)', () => {
     const events = await db.select().from(outbox).where(eq(outbox.key, lateOrder.id)).orderBy(outbox.id);
     expect(events.map((e) => e.payload)).toEqual([
       expect.objectContaining({ type: 'order.placed' }),
-      expect.objectContaining({ data: expect.objectContaining({ from: 'placed', to: 'rejected', by: 'system', reason: 'Not accepted within 10 minutes' }) }),
+      expect.objectContaining({
+        data: expect.objectContaining({
+          from: 'placed',
+          to: 'rejected',
+          by: 'system',
+          reason: 'Not accepted within 10 minutes',
+        }),
+      }),
     ]);
     expect((await http.get(`/${freshOrder.id}`).set(fresh.customer).expect(200)).body.status).toBe('placed');
     expect((await http.get(`/${answeredOrder.id}`).set(answered.customer).expect(200)).body.status).toBe('accepted');
 
     // Too late now for the restaurant.
-    await http.post(`/${lateOrder.id}/status`).set(late.owner).send({ status: 'accepted', prepTimeMinutes: 15 }).expect(409);
+    await http
+      .post(`/${lateOrder.id}/status`)
+      .set(late.owner)
+      .send({ status: 'accepted', prepTimeMinutes: 15 })
+      .expect(409);
   });
 
   describe('rider events from delivery-service', () => {
@@ -383,7 +454,9 @@ describe('order-service (e2e)', () => {
     const consume = (type: 'delivery.picked_up' | 'delivery.delivered', orderId: string) =>
       app.get(DeliveryEventConsumer).handle(type, 0, event(type, orderId));
     const timeline = async (s: ReturnType<typeof scenario>, id: string) =>
-      (await http.get(`/${id}`).set(s.customer).expect(200)).body.timeline.map((t: { status: string; by: string }) => `${t.status}:${t.by}`);
+      (await http.get(`/${id}`).set(s.customer).expect(200)).body.timeline.map(
+        (t: { status: string; by: string }) => `${t.status}:${t.by}`,
+      );
 
     it('moves the order when the rider picks up and delivers, once even if replayed', async () => {
       const s = scenario();
@@ -395,7 +468,12 @@ describe('order-service (e2e)', () => {
       await consume('delivery.delivered', order.id);
       await consume('delivery.delivered', order.id);
 
-      expect(await timeline(s, order.id)).toEqual(['placed:customer', 'accepted:restaurant', 'picked_up:rider', 'delivered:rider']);
+      expect(await timeline(s, order.id)).toEqual([
+        'placed:customer',
+        'accepted:restaurant',
+        'picked_up:rider',
+        'delivered:rider',
+      ]);
       const events = await db.select().from(outbox).where(eq(outbox.key, order.id)).orderBy(outbox.id);
       expect(events.at(-1)!.payload).toMatchObject({ data: { to: 'delivered', by: 'rider' } });
       const [history] = await db.select().from(orders).where(eq(orders.id, order.id));

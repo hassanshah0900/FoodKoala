@@ -72,7 +72,7 @@ def test_503_while_the_index_is_missing(index: SearchIndex) -> None:
     from elasticsearch import Elasticsearch
 
     with TestClient(app) as c:
-        c.app.state.index = SearchIndex(
+        app.state.index = SearchIndex(
             Elasticsearch(index.client.transport.node_pool.get().base_url), "missing-alias"
         )
         assert c.get("/restaurants", params={"lat": 24.9, "lng": 67}).status_code == 503

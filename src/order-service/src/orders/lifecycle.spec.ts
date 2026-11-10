@@ -11,7 +11,9 @@ describe('decide', () => {
 
   it('needs a prep time to accept, and only then', () => {
     expect(() => decide('placed', { to: 'accepted' }, as('restaurant'))).toThrow(BadRequestException);
-    expect(() => decide('accepted', { to: 'ready', prepTimeMinutes: 10 }, as('restaurant'))).toThrow(/only for accepting/);
+    expect(() => decide('accepted', { to: 'ready', prepTimeMinutes: 10 }, as('restaurant'))).toThrow(
+      /only for accepting/,
+    );
   });
 
   it('lets the customer cancel before the restaurant accepts, without a reason', () => {
@@ -25,13 +27,17 @@ describe('decide', () => {
   });
 
   it('needs a reason to reject, and from an admin to cancel', () => {
-    expect(() => decide('placed', { to: 'rejected' }, as('restaurant'))).toThrow(new BadRequestException('Give a reason to reject the order'));
+    expect(() => decide('placed', { to: 'rejected' }, as('restaurant'))).toThrow(
+      new BadRequestException('Give a reason to reject the order'),
+    );
     expect(() => decide('ready', { to: 'cancelled' }, as('admin'))).toThrow(BadRequestException);
     expect(decide('ready', { to: 'cancelled', reason: 'Rider had an accident' }, as('admin'))).toBe('admin');
   });
 
   it('records an owner who is also an admin as the restaurant', () => {
-    expect(decide('placed', { to: 'rejected', reason: 'Out of chicken' }, as('admin', 'restaurant'))).toBe('restaurant');
+    expect(decide('placed', { to: 'rejected', reason: 'Out of chicken' }, as('admin', 'restaurant'))).toBe(
+      'restaurant',
+    );
   });
 
   it('records a customer who is also an admin as the customer when cancelling their own order', () => {
@@ -49,8 +55,12 @@ describe('decide', () => {
   });
 
   it('refuses skipping steps and leaving a final status', () => {
-    expect(() => decide('placed', { to: 'delivered' }, as('admin'))).toThrow(new ConflictException('A placed order cannot become delivered'));
-    expect(() => decide('delivered', { to: 'cancelled', reason: 'x' }, as('admin'))).toThrow(new ConflictException('The order is already delivered'));
+    expect(() => decide('placed', { to: 'delivered' }, as('admin'))).toThrow(
+      new ConflictException('A placed order cannot become delivered'),
+    );
+    expect(() => decide('delivered', { to: 'cancelled', reason: 'x' }, as('admin'))).toThrow(
+      new ConflictException('The order is already delivered'),
+    );
     expect(() => decide('picked_up', { to: 'ready' }, as('admin'))).toThrow(/picked up order cannot become ready/);
   });
 
@@ -105,6 +115,8 @@ describe('estimateOnAccept', () => {
   });
 
   it('pushes the time when the kitchen needs longer', () => {
-    expect(estimateOnAccept(promised, new Date(placed.getTime() + 5 * 60_000), 45, 15)).toEqual(new Date('2026-11-08T11:05:00Z'));
+    expect(estimateOnAccept(promised, new Date(placed.getTime() + 5 * 60_000), 45, 15)).toEqual(
+      new Date('2026-11-08T11:05:00Z'),
+    );
   });
 });

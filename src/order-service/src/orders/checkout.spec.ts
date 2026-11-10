@@ -62,12 +62,17 @@ describe('rupees', () => {
 
 describe('checkCart', () => {
   it('refuses an empty cart with 409', () => {
-    expect(() => checkCart({ restaurantId: null, lines: [], subtotalPaisa: 0, problems: [] }, 'cod')).toThrow(ConflictException);
+    expect(() => checkCart({ restaurantId: null, lines: [], subtotalPaisa: 0, problems: [] }, 'cod')).toThrow(
+      ConflictException,
+    );
   });
 
   it('lists the cart problems and an unavailable payment method together', () => {
     const c = cart({ problems: [{ lineId: 'l1', message: 'Zinger burger is sold out' }] });
-    expect(messages(() => checkCart(c, 'card'))).toEqual(['Zinger burger is sold out', 'Only cash on delivery is available for now']);
+    expect(messages(() => checkCart(c, 'card'))).toEqual([
+      'Zinger burger is sold out',
+      'Only cash on delivery is available for now',
+    ]);
   });
 
   it('passes a clean cart paid in cash', () => {
@@ -87,9 +92,16 @@ describe('draftOrder', () => {
       deliveryFeePaisa: 9900,
       totalPaisa: 119900,
       estimatedDeliveryAt: new Date('2026-11-08T10:35:00Z'),
-      deliveryAddress: { label: 'home', area: 'DHA Phase 5', location: { lat: 31.46, lng: 74.41 }, instructions: 'Ring twice' },
+      deliveryAddress: {
+        label: 'home',
+        area: 'DHA Phase 5',
+        location: { lat: 31.46, lng: 74.41 },
+        instructions: 'Ring twice',
+      },
     });
-    expect(draft.lines).toEqual([expect.objectContaining({ itemId: 'i1', quantity: 2, unitPricePaisa: 55000, lineTotalPaisa: 110000 })]);
+    expect(draft.lines).toEqual([
+      expect.objectContaining({ itemId: 'i1', quantity: 2, unitPricePaisa: 55000, lineTotalPaisa: 110000 }),
+    ]);
   });
 
   it('recomputes line totals instead of trusting them', () => {
@@ -99,7 +111,13 @@ describe('draftOrder', () => {
   });
 
   it("uses the address's own name when it has one", () => {
-    const draft = draftOrder({ cart: cart(), address: { ...address, label: 'other', labelText: "Ammi's house" }, restaurant, quote: quote(), now });
+    const draft = draftOrder({
+      cart: cart(),
+      address: { ...address, label: 'other', labelText: "Ammi's house" },
+      restaurant,
+      quote: quote(),
+      now,
+    });
     expect(draft.deliveryAddress.label).toBe("Ammi's house");
   });
 
@@ -110,10 +128,12 @@ describe('draftOrder', () => {
   });
 
   it('refuses with 409 when the restaurant is gone or not taking orders', () => {
-    expect(() => draftOrder({ cart: cart(), address, restaurant: null, quote: null, now })).toThrow(/not taking orders any more/);
-    expect(() => draftOrder({ cart: cart(), address, restaurant, quote: quote({ acceptingOrders: false }), now })).toThrow(
-      new ConflictException('Karachi Broast is not taking orders right now'),
+    expect(() => draftOrder({ cart: cart(), address, restaurant: null, quote: null, now })).toThrow(
+      /not taking orders any more/,
     );
+    expect(() =>
+      draftOrder({ cart: cart(), address, restaurant, quote: quote({ acceptingOrders: false }), now }),
+    ).toThrow(new ConflictException('Karachi Broast is not taking orders right now'));
   });
 
   it("refuses an address outside the restaurant's zones", () => {
@@ -126,7 +146,9 @@ describe('draftOrder', () => {
   it('says how much more is needed for the minimum order', () => {
     const small = cart();
     small.lines[0].quantity = 1;
-    const q = quote({ delivery: { zoneId: 'z1', deliveryFeePaisa: 9900, minimumOrderPaisa: 60000, deliveryTimeMinutes: 35 } });
+    const q = quote({
+      delivery: { zoneId: 'z1', deliveryFeePaisa: 9900, minimumOrderPaisa: 60000, deliveryTimeMinutes: 35 },
+    });
     expect(messages(() => draftOrder({ cart: small, address, restaurant, quote: q, now }))).toEqual([
       'The minimum order here is Rs 600; add Rs 50 more',
     ]);

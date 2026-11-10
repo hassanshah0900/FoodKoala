@@ -1,5 +1,5 @@
 import { clock, messagesFor, ref, rupees } from './messages';
-import { orderEventSchema, type OrderEvent } from './order-events';
+import { type OrderEvent, orderEventSchema } from './order-events';
 
 const orderId = 'ab12cd34-0000-4000-8000-000000000000';
 const customerId = '7d3c8f8e-3a0e-4c55-9a6b-3f1c2b8a9d10';
@@ -9,7 +9,12 @@ const placed: OrderEvent = {
   id: crypto.randomUUID(),
   type: 'order.placed',
   occurredAt: '2026-11-08T14:10:00.000Z',
-  data: { ...common, totals: { totalPaisa: 99900 }, paymentMethod: 'cod', estimatedDeliveryAt: '2026-11-08T14:45:00.000Z' },
+  data: {
+    ...common,
+    totals: { totalPaisa: 99900 },
+    paymentMethod: 'cod',
+    estimatedDeliveryAt: '2026-11-08T14:45:00.000Z',
+  },
 };
 const changed = (to: string, extra: object = {}): OrderEvent =>
   ({
@@ -50,7 +55,10 @@ describe('messagesFor', () => {
 
   it('texts the customer when the restaurant accepts, with the time', () => {
     const m = messageFor(changed('accepted', { estimatedDeliveryAt: '2026-11-08T15:05:00.000Z' }));
-    expect(m).toMatchObject({ kind: 'order_accepted', body: 'Karachi Broast is preparing your order #AB12CD34. Expected around 8:05 pm.' });
+    expect(m).toMatchObject({
+      kind: 'order_accepted',
+      body: 'Karachi Broast is preparing your order #AB12CD34. Expected around 8:05 pm.',
+    });
     expect(m?.sms).toEqual({ phone: '+923001234567', body: `FoodKoala: ${m?.body}` });
   });
 
@@ -59,12 +67,17 @@ describe('messagesFor', () => {
       'FoodKoala: Your order #AB12CD34 from Karachi Broast is on its way.',
     );
     expect(messageFor(changed('ready', { from: 'accepted' }))?.sms).toBeNull();
-    expect(messageFor(changed('delivered', { from: 'picked_up', by: 'admin' }))).toMatchObject({ kind: 'order_delivered', sms: null });
+    expect(messageFor(changed('delivered', { from: 'picked_up', by: 'admin' }))).toMatchObject({
+      kind: 'order_delivered',
+      sms: null,
+    });
   });
 
   it('explains a rejection and says nothing was charged', () => {
     const m = messageFor(changed('rejected', { reason: 'Out of chicken' }));
-    expect(m?.body).toBe("Karachi Broast couldn't take your order #AB12CD34: Out of chicken. You have not been charged.");
+    expect(m?.body).toBe(
+      "Karachi Broast couldn't take your order #AB12CD34: Out of chicken. You have not been charged.",
+    );
     expect(m?.sms).not.toBeNull();
   });
 
@@ -78,7 +91,12 @@ describe('messagesFor', () => {
   });
 
   it('reads events from actors it does not know yet', () => {
-    const event = { id: crypto.randomUUID(), type: 'order.status_changed', occurredAt: new Date().toISOString(), data: { ...common, from: 'picked_up', to: 'delivered', by: 'rider', reason: null } };
+    const event = {
+      id: crypto.randomUUID(),
+      type: 'order.status_changed',
+      occurredAt: new Date().toISOString(),
+      data: { ...common, from: 'picked_up', to: 'delivered', by: 'rider', reason: null },
+    };
     expect(orderEventSchema.parse(event).data).toMatchObject({ by: 'rider' });
   });
 
@@ -89,8 +107,16 @@ describe('messagesFor', () => {
       type: 'delivery.assigned',
       occurredAt: new Date().toISOString(),
       data: {
-        deliveryId: crypto.randomUUID(), orderId, riderId, riderName: 'Ali Raza', riderPhone: '+923009876543', vehicle: 'motorbike',
-        at: new Date().toISOString(), customerId, customerPhone: '+923001234567', restaurantName: 'Karachi Broast',
+        deliveryId: crypto.randomUUID(),
+        orderId,
+        riderId,
+        riderName: 'Ali Raza',
+        riderPhone: '+923009876543',
+        vehicle: 'motorbike',
+        at: new Date().toISOString(),
+        customerId,
+        customerPhone: '+923001234567',
+        restaurantName: 'Karachi Broast',
       },
     });
     const [customer, rider] = messagesFor(event);
@@ -108,7 +134,10 @@ describe('messagesFor', () => {
       title: 'New delivery',
       body: "New delivery #AB12CD34: collect it from Karachi Broast. The customer's number is +923001234567.",
       data: { orderId },
-      sms: { phone: '+923009876543', body: 'FoodKoala: New delivery #AB12CD34: collect it from Karachi Broast. Open the rider app for the details.' },
+      sms: {
+        phone: '+923009876543',
+        body: 'FoodKoala: New delivery #AB12CD34: collect it from Karachi Broast. Open the rider app for the details.',
+      },
     });
   });
 });

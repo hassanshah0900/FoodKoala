@@ -41,7 +41,12 @@ const assignedData = z.object({
 
 /** The envelope of contracts/README.md#event-envelope, by type. */
 export const orderEventSchema = z.discriminatedUnion('type', [
-  z.object({ id: z.uuid(), type: z.literal('order.placed'), occurredAt: z.iso.datetime({ offset: true }), data: placedData }),
+  z.object({
+    id: z.uuid(),
+    type: z.literal('order.placed'),
+    occurredAt: z.iso.datetime({ offset: true }),
+    data: placedData,
+  }),
   z.object({
     id: z.uuid(),
     type: z.literal('order.status_changed'),

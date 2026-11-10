@@ -12,19 +12,19 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { hoursSchema, type HoursDto } from '../hours/hours';
-import { AdminGuard, CurrentUser, IdentityGuard, OptionalUser, type Identity } from '../identity/identity';
+import { type HoursDto, hoursSchema } from '../hours/hours';
+import { AdminGuard, CurrentUser, type Identity, IdentityGuard, OptionalUser } from '../identity/identity';
 import {
   idSchema,
   pauseSchema,
-  restaurantCreateSchema,
-  restaurantUpdateSchema,
-  reviewQuerySchema,
-  statusChangeSchema,
   type RestaurantCreateDto,
   type RestaurantUpdateDto,
   type ReviewQuery,
+  restaurantCreateSchema,
+  restaurantUpdateSchema,
+  reviewQuerySchema,
   type StatusChangeDto,
+  statusChangeSchema,
 } from './restaurants.dto';
 import { RestaurantsService } from './restaurants.service';
 

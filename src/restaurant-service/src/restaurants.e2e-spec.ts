@@ -1,8 +1,8 @@
+import { randomUUID } from 'node:crypto';
 import { INestApplication } from '@nestjs/common';
 import { getDrizzleToken } from '@nestjs/drizzle';
 import { Test } from '@nestjs/testing';
 import { inArray } from 'drizzle-orm';
-import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { AppModule } from './app.module';
 import type { Database } from './db/database';
@@ -85,8 +85,17 @@ describe('restaurant-service (e2e)', () => {
   });
 
   afterAll(async () => {
-    const mine = await db.select({ id: restaurants.id }).from(restaurants).where(inArray(restaurants.ownerId, createdUsers));
-    if (mine.length) await db.delete(outbox).where(inArray(outbox.key, mine.map((r) => r.id)));
+    const mine = await db
+      .select({ id: restaurants.id })
+      .from(restaurants)
+      .where(inArray(restaurants.ownerId, createdUsers));
+    if (mine.length)
+      await db.delete(outbox).where(
+        inArray(
+          outbox.key,
+          mine.map((r) => r.id),
+        ),
+      );
     await db.delete(restaurants).where(inArray(restaurants.ownerId, createdUsers));
     await app.close();
   });
@@ -181,7 +190,15 @@ describe('restaurant-service (e2e)', () => {
       const closedToday = { weekly: {}, special: [] };
       expect((await http.put(`/${r.id}/hours`).set(owner).send(closedToday).expect(200)).body.openNow).toBe(false);
 
-      const overlapping = { weekly: { mon: [{ opens: '11:00', closes: '15:00' }, { opens: '14:00', closes: '18:00' }] }, special: [] };
+      const overlapping = {
+        weekly: {
+          mon: [
+            { opens: '11:00', closes: '15:00' },
+            { opens: '14:00', closes: '18:00' },
+          ],
+        },
+        special: [],
+      };
       await http.put(`/${r.id}/hours`).set(owner).send(overlapping).expect(400);
     });
 
@@ -259,7 +276,11 @@ describe('restaurant-service (e2e)', () => {
       const owner = newUser();
       const r = await approved(owner);
       await http.post(`/${r.id}/status`).set(owner).send({ status: 'suspended', reason: 'x' }).expect(403);
-      await http.post(`/${r.id}/status`).set(admin).send({ status: 'suspended', reason: 'Food safety complaint' }).expect(200);
+      await http
+        .post(`/${r.id}/status`)
+        .set(admin)
+        .send({ status: 'suspended', reason: 'Food safety complaint' })
+        .expect(200);
       await http.get(`/${r.id}`).expect(404);
       await http.post(`/${r.id}/status`).set(admin).send({ status: 'approved' }).expect(200);
       await http.get(`/${r.id}`).expect(200);
@@ -270,7 +291,11 @@ describe('restaurant-service (e2e)', () => {
     it('are drawn, listed, changed and deleted by the owner', async () => {
       const owner = newUser();
       const r = await apply(owner);
-      const created = await http.post(`/${r.id}/zones`).set(owner).send({ ...zone(gulshan), name: 'Gulshan' }).expect(201);
+      const created = await http
+        .post(`/${r.id}/zones`)
+        .set(owner)
+        .send({ ...zone(gulshan), name: 'Gulshan' })
+        .expect(201);
       expect(created.body).toMatchObject({ name: 'Gulshan', area: gulshan, deliveryFeePaisa: 9900 });
 
       const zoneUrl = `/${r.id}/zones/${created.body.id}`;
@@ -287,13 +312,28 @@ describe('restaurant-service (e2e)', () => {
     it('rejects shapes that cross themselves, as PostGIS sees them', async () => {
       const owner = newUser();
       const r = await apply(owner);
-      const bowtie = { type: 'Polygon', coordinates: [[[67, 24], [68, 25], [68, 24], [67, 25], [67, 24]]] };
+      const bowtie = {
+        type: 'Polygon',
+        coordinates: [
+          [
+            [67, 24],
+            [68, 25],
+            [68, 24],
+            [67, 25],
+            [67, 24],
+          ],
+        ],
+      };
       const res = await http.post(`/${r.id}/zones`).set(owner).send(zone(bowtie)).expect(400);
       expect(res.body.message).toMatch(/crosses itself/);
 
       const ok = await http.post(`/${r.id}/zones`).set(owner).send(zone(gulshan)).expect(201);
       await http.patch(`/${r.id}/zones/${ok.body.id}`).set(owner).send({ area: bowtie }).expect(400);
-      await http.post(`/${r.id}/zones`).set(owner).send(zone({ ...gulshan, coordinates: [gulshan.coordinates[0].slice(0, 4)] })).expect(400);
+      await http
+        .post(`/${r.id}/zones`)
+        .set(owner)
+        .send(zone({ ...gulshan, coordinates: [gulshan.coordinates[0].slice(0, 4)] }))
+        .expect(400);
     });
 
     it('allows at most 10 per restaurant, even when created at once', async () => {
@@ -331,7 +371,10 @@ describe('restaurant-service (e2e)', () => {
     });
 
     it('lists approved restaurants whose zones contain the point, nearest first', async () => {
-      const res = await http.get('/').query({ ...customer, limit: 50 }).expect(200);
+      const res = await http
+        .get('/')
+        .query({ ...customer, limit: 50 })
+        .expect(200);
       const ids: string[] = res.body.items.map((r: { id: string }) => r.id);
       expect(ids.indexOf(near)).toBeGreaterThanOrEqual(0);
       expect(ids.indexOf(near)).toBeLessThan(ids.indexOf(far));
@@ -351,10 +394,16 @@ describe('restaurant-service (e2e)', () => {
     });
 
     it('pages through the results', async () => {
-      const first = await http.get('/').query({ ...customer, limit: 1 }).expect(200);
+      const first = await http
+        .get('/')
+        .query({ ...customer, limit: 1 })
+        .expect(200);
       expect(first.body).toMatchObject({ page: 1, limit: 1, hasMore: true });
       expect(first.body.items).toHaveLength(1);
-      const second = await http.get('/').query({ ...customer, limit: 1, page: 2 }).expect(200);
+      const second = await http
+        .get('/')
+        .query({ ...customer, limit: 1, page: 2 })
+        .expect(200);
       expect(second.body.items[0].id).not.toBe(first.body.items[0].id);
     });
 

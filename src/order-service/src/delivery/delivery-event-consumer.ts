@@ -1,6 +1,6 @@
+import { setTimeout as sleep } from 'node:timers/promises';
 import { KafkaJS } from '@confluentinc/kafka-javascript';
 import { Inject, Injectable, Logger, type OnApplicationBootstrap, type OnApplicationShutdown } from '@nestjs/common';
-import { setTimeout as sleep } from 'node:timers/promises';
 import { z } from 'zod';
 import { APP_CONFIG, type AppConfig } from '../config/config';
 import { OrdersService } from '../orders/orders.service';
@@ -38,7 +38,11 @@ export class DeliveryEventConsumer implements OnApplicationBootstrap, OnApplicat
   async onApplicationBootstrap(): Promise<void> {
     if (!this.config.KAFKA_BROKERS) return; // the outbox relay already warns that Kafka is off
     const kafka = new KafkaJS.Kafka({
-      kafkaJS: { brokers: this.config.KAFKA_BROKERS, clientId: this.config.KAFKA_CLIENT_ID, logLevel: KafkaJS.logLevel.WARN },
+      kafkaJS: {
+        brokers: this.config.KAFKA_BROKERS,
+        clientId: this.config.KAFKA_CLIENT_ID,
+        logLevel: KafkaJS.logLevel.WARN,
+      },
     });
     this.consumer = kafka.consumer({
       kafkaJS: { groupId: this.config.KAFKA_GROUP_ID, fromBeginning: true },
@@ -62,7 +66,7 @@ export class DeliveryEventConsumer implements OnApplicationBootstrap, OnApplicat
 
   /** Exposed for tests: what happens to one Kafka message. */
   async handle(topic: string, partition: number, message: { value: Buffer | null; offset: string }): Promise<void> {
-    let event;
+    let event: z.infer<typeof deliveryEventSchema>;
     try {
       event = deliveryEventSchema.parse(JSON.parse(message.value?.toString() ?? ''));
     } catch (err) {
@@ -72,7 +76,12 @@ export class DeliveryEventConsumer implements OnApplicationBootstrap, OnApplicat
     const to = event.type === 'delivery.picked_up' ? 'picked_up' : 'delivered';
     for (;;) {
       try {
-        const applied = await this.orders.applyRiderEvent(event.data.orderId, to, event.data.riderId, new Date(event.data.at));
+        const applied = await this.orders.applyRiderEvent(
+          event.data.orderId,
+          to,
+          event.data.riderId,
+          new Date(event.data.at),
+        );
         if (!applied) this.logger.log(`Nothing to do for ${event.type} of order ${event.data.orderId}`);
         return;
       } catch (err) {

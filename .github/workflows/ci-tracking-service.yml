@@ -1,0 +1,29 @@
+name: tracking-service
+
+on:
+  pull_request:
+    branches: [main]
+    paths: &paths
+      - src/tracking-service/**
+      - .github/workflows/ci-tracking-service.yml
+      - .github/workflows/go-service.yml
+      - .golangci.yml
+  push:
+    branches: [main]
+    paths: *paths
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    uses: ./.github/workflows/go-service.yml
+    with:
+      service: tracking-service
+      redis: true
+      kafka: true

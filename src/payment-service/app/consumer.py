@@ -69,9 +69,10 @@ class OrderEventConsumer:
                 message = self._consumer.poll(0.5)
                 if message is None:
                     continue
-                if message.error():
-                    if message.error().code() != KafkaError._PARTITION_EOF:
-                        log.warning("Kafka: %s", message.error())
+                error = message.error()
+                if error:
+                    if error.code() != KafkaError._PARTITION_EOF:
+                        log.warning("Kafka: %s", error)
                     continue
                 self._handle(message)
         except Exception:
@@ -112,5 +113,8 @@ class OrderEventConsumer:
 
     def _retry(self, message: Message, seconds: float) -> None:
         """Reads the same message again after a pause; later ones on its partition wait."""
-        self._consumer.seek(TopicPartition(message.topic(), message.partition(), message.offset()))
+        topic, partition, offset = message.topic(), message.partition(), message.offset()
+        # Always set on a consumed message; None only on errors, which never get here.
+        assert topic is not None and partition is not None and offset is not None
+        self._consumer.seek(TopicPartition(topic, partition, offset))
         self._stop.wait(seconds)

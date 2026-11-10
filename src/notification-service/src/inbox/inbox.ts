@@ -1,10 +1,21 @@
-import { Controller, Get, HttpCode, HttpStatus, Injectable, NotFoundException, Param, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Injectable,
+  NotFoundException,
+  Param,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { InjectDrizzle } from '@nestjs/drizzle';
 import { and, count, desc, eq, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Database } from '../db/database';
-import { notifications, type Kind, type NotificationRow } from '../db/schema';
-import { CurrentUser, IdentityGuard, type Identity } from '../identity/identity';
+import { type Kind, type NotificationRow, notifications } from '../db/schema';
+import { CurrentUser, type Identity, IdentityGuard } from '../identity/identity';
 
 export const inboxQuerySchema = z.object({
   unread: z
@@ -51,7 +62,10 @@ export class InboxService {
         .orderBy(desc(notifications.createdAt), desc(notifications.id))
         .limit(limit + 1)
         .offset((page - 1) * limit),
-      this.db.select({ unreadCount: count() }).from(notifications).where(and(mine, isNull(notifications.readAt))),
+      this.db
+        .select({ unreadCount: count() })
+        .from(notifications)
+        .where(and(mine, isNull(notifications.readAt))),
     ]);
     return { items: rows.slice(0, limit).map(toView), page, limit, hasMore: rows.length > limit, unreadCount };
   }

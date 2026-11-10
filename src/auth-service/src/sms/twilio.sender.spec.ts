@@ -48,11 +48,19 @@ describe('TwilioSmsSender', () => {
 
   it("throws with Twilio's error when it refuses", async () => {
     reply = { status: 400, body: { code: 21211, message: "The 'To' number is not valid." } };
-    await expect(sender('+15005550006').send('+920', 'x')).rejects.toThrow("Twilio answered 400 (21211): The 'To' number is not valid.");
+    await expect(sender('+15005550006').send('+920', 'x')).rejects.toThrow(
+      "Twilio answered 400 (21211): The 'To' number is not valid.",
+    );
   });
 
   it('throws when Twilio is unreachable', async () => {
-    const down = new TwilioSmsSender({ accountSid, authToken: 't', from: '+15005550006', apiUrl: 'http://127.0.0.1:1', timeoutMs: 500 });
+    const down = new TwilioSmsSender({
+      accountSid,
+      authToken: 't',
+      from: '+15005550006',
+      apiUrl: 'http://127.0.0.1:1',
+      timeoutMs: 500,
+    });
     await expect(down.send('+923001234567', 'x')).rejects.toThrow();
   });
 });

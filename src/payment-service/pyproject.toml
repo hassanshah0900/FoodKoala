@@ -16,12 +16,18 @@ dependencies = [
 [dependency-groups]
 dev = [
     "httpx2>=0.1",
+    "mypy>=1.18",
     "pytest>=8",
     "ruff>=0.7",
 ]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.13"
+# Libraries without type information (confluent-kafka ships partial stubs).
+ignore_missing_imports = true
 
 [tool.ruff]
 line-length = 100

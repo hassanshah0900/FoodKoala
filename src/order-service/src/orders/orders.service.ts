@@ -4,13 +4,13 @@ import { and, asc, desc, eq, inArray, lt, type SQL } from 'drizzle-orm';
 import { CartClient, RestaurantClient, UserClient } from '../clients/clients';
 import { APP_CONFIG, type AppConfig } from '../config/config';
 import type { Database, Tx } from '../db/database';
-import { orderLines, orders, orderStatusHistory, outbox, type Actor, type OrderRow, type Status } from '../db/schema';
-import { isAdmin, type Identity } from '../identity/identity';
+import { type Actor, type OrderRow, orderLines, orderStatusHistory, orders, outbox, type Status } from '../db/schema';
+import { type Identity, isAdmin } from '../identity/identity';
 import { checkCart, draftOrder } from './checkout';
 import { orderPlaced, orderStatusChanged } from './events';
 import { decide, estimateOnAccept, LABEL, needsOwnership, ruleFor } from './lifecycle';
+import { type Order, type Page, toOrder } from './order.view';
 import type { CheckoutDto, PageQuery, RestaurantOrdersQuery, StatusChangeDto } from './orders.dto';
-import { toOrder, type Order, type Page } from './order.view';
 
 /** How many unanswered orders one transaction rejects. */
 export const REJECT_BATCH = 50;
@@ -56,7 +56,10 @@ export class OrdersService {
       throw err;
     }
     const [restaurant, quote] = address
-      ? await Promise.all([this.restaurants.get(cart.restaurantId), this.restaurants.quote(cart.restaurantId, address.location)])
+      ? await Promise.all([
+          this.restaurants.get(cart.restaurantId),
+          this.restaurants.quote(cart.restaurantId, address.location),
+        ])
       : [null, null];
     const now = new Date();
     const draft = draftOrder({ cart, address, restaurant, quote, now });
@@ -133,7 +136,11 @@ export class OrdersService {
    * answers; the update then only applies if the status is still the one we
    * judged, otherwise 409.
    */
-  async changeStatus(me: Identity, id: string, { status: to, reason, prepTimeMinutes }: StatusChangeDto): Promise<Order> {
+  async changeStatus(
+    me: Identity,
+    id: string,
+    { status: to, reason, prepTimeMinutes }: StatusChangeDto,
+  ): Promise<Order> {
     const [row] = await this.db.select().from(orders).where(eq(orders.id, id));
     if (!row) throw new NotFoundException('Order not found');
     const from = row.status;
@@ -141,7 +148,8 @@ export class OrdersService {
     const roles = new Set<Actor>();
     if (row.customerId === me.userId) roles.add('customer');
     if (isAdmin(me)) roles.add('admin');
-    if (needsOwnership(from, to, roles) && (await this.restaurants.isOwner(me, row.restaurantId))) roles.add('restaurant');
+    if (needsOwnership(from, to, roles) && (await this.restaurants.isOwner(me, row.restaurantId)))
+      roles.add('restaurant');
     const by = decide(from, { to, reason, prepTimeMinutes }, roles);
 
     const now = new Date();
@@ -149,7 +157,12 @@ export class OrdersService {
       to === 'accepted'
         ? {
             prepTimeMinutes,
-            estimatedDeliveryAt: estimateOnAccept(row.estimatedDeliveryAt, now, prepTimeMinutes!, this.config.RIDE_MINUTES),
+            estimatedDeliveryAt: estimateOnAccept(
+              row.estimatedDeliveryAt,
+              now,
+              prepTimeMinutes!,
+              this.config.RIDE_MINUTES,
+            ),
           }
         : {};
     return this.db.transaction(async (tx) => {
@@ -172,7 +185,16 @@ export class OrdersService {
       let from = row.status;
       for (const step of steps) {
         if (!ruleFor(from, step)?.by.includes('rider')) return false;
-        await this.move(tx, { id: orderId, from, to: step, by: 'rider', actorId: riderId, reason: null, at, fields: {} });
+        await this.move(tx, {
+          id: orderId,
+          from,
+          to: step,
+          by: 'rider',
+          actorId: riderId,
+          reason: null,
+          at,
+          fields: {},
+        });
         from = step;
       }
       return true;
@@ -198,7 +220,16 @@ export class OrdersService {
       const minutes = this.config.ACCEPT_TIMEOUT_MINUTES;
       const reason = `Not accepted within ${minutes} minute${minutes === 1 ? '' : 's'}`;
       for (const { id } of stale) {
-        await this.move(tx, { id, from: 'placed', to: 'rejected', by: 'system', actorId: null, reason, at: now, fields: {} });
+        await this.move(tx, {
+          id,
+          from: 'placed',
+          to: 'rejected',
+          by: 'system',
+          actorId: null,
+          reason,
+          at: now,
+          fields: {},
+        });
       }
       return stale.map((r) => r.id);
     });
@@ -207,7 +238,16 @@ export class OrdersService {
   /** One status change with its timeline entry and event; 409 if the order moved on meanwhile. */
   private async move(
     tx: Tx,
-    c: { id: string; from: Status; to: Status; by: Actor; actorId: string | null; reason: string | null; at: Date; fields: Partial<OrderRow> },
+    c: {
+      id: string;
+      from: Status;
+      to: Status;
+      by: Actor;
+      actorId: string | null;
+      reason: string | null;
+      at: Date;
+      fields: Partial<OrderRow>;
+    },
   ): Promise<void> {
     const [updated] = await tx
       .update(orders)
