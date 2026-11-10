@@ -1,0 +1,108 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "edebad3d-41b5-4365-8167-00c8630d3de9",
+  "prevIds": [
+    "7f5acbff-1968-46ea-bc9f-0771859298b5"
+  ],
+  "footprints": [
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "orders",
+        "orders",
+        "tip_paisa"
+      ],
+      "writes": [
+        "s|col|orders.orders.tip_paisa",
+        "n|col|orders.orders.tip_paisa",
+        "e|col|orders.orders.tip_paisa"
+      ],
+      "reads": [
+        "n|tbl|orders.orders",
+        "n|sch|orders"
+      ]
+    },
+    {
+      "statementType": "add_check",
+      "statementTarget": [
+        "table",
+        "orders",
+        "orders"
+      ],
+      "writes": [
+        "s|ck|orders.orders.orders_tip_not_negative",
+        "n|ck|orders.orders.orders_tip_not_negative",
+        "e|ck|orders.orders.orders_tip_not_negative",
+        "n|con|orders.orders.orders_tip_not_negative"
+      ],
+      "reads": [
+        "n|tbl|orders.orders",
+        "n|sch|orders",
+        "n|col|orders.orders.tip_paisa"
+      ]
+    },
+    {
+      "statementType": "alter_check",
+      "statementTarget": [
+        "table",
+        "orders",
+        "orders"
+      ],
+      "writes": [
+        "s|ck|orders.orders.orders_total_adds_up"
+      ],
+      "reads": [
+        "n|tbl|orders.orders",
+        "n|sch|orders",
+        "n|col|orders.orders.total_paisa",
+        "n|col|orders.orders.subtotal_paisa",
+        "n|col|orders.orders.delivery_fee_paisa",
+        "n|col|orders.orders.discount_paisa",
+        "n|col|orders.orders.tip_paisa",
+        "e|col|orders.orders.total_paisa",
+        "e|col|orders.orders.subtotal_paisa",
+        "e|col|orders.orders.delivery_fee_paisa",
+        "e|col|orders.orders.discount_paisa"
+      ],
+      "sqlHash": "de667067d6535caf"
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "orders",
+        "table": "orders",
+        "name": "tip_paisa",
+        "type": "integer",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "0",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "orders",
+        "table": "orders",
+        "name": "orders_tip_not_negative",
+        "value": "\"tip_paisa\" >= 0",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "alter",
+      "key": "checks\u0000[\"orders\",\"orders\",\"orders_total_adds_up\"]",
+      "set": {
+        "value": "\"total_paisa\" = \"subtotal_paisa\" + \"delivery_fee_paisa\" - \"discount_paisa\" + \"tip_paisa\""
+      }
+    }
+  ]
+}

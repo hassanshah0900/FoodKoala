@@ -59,6 +59,7 @@ describe('order-service (e2e)', () => {
       deliveryFeePaisa: 9900,
       discountPaisa: 0,
       voucherCode: null,
+      tipPaisa: 0,
       totalPaisa: 99900,
       paymentMethod: 'cod',
       note: 'No cutlery',
@@ -78,6 +79,15 @@ describe('order-service (e2e)', () => {
       data: { orderId: res.body.id, totals: { totalPaisa: 99900 }, restaurantLocation: { lat: 24.93, lng: 67.1 } },
     });
     expect(res.body.restaurant.location).toEqual({ lat: 24.93, lng: 67.1 });
+  });
+
+  it('adds a tip for the rider to the total', async () => {
+    const s = scenario();
+    for (const tipPaisa of [-1, 100_001, 10.5]) await checkout(s.customer, s.addressId, { tipPaisa }).expect(400);
+    const order = await place(s, { tipPaisa: 5000 });
+    expect(order).toMatchObject({ tipPaisa: 5000, totalPaisa: 104900 });
+    const [event] = await db.select().from(outbox).where(eq(outbox.key, order.id));
+    expect(event.payload).toMatchObject({ data: { totals: { tipPaisa: 5000, totalPaisa: 104900 } } });
   });
 
   it('returns the first order when a checkout is retried with the same key, even concurrently', async () => {

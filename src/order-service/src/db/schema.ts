@@ -123,6 +123,8 @@ export const orders = ordersSchema.table(
     voucherId: uuid('voucher_id').references(() => vouchers.id),
     /** Taken off the subtotal by the voucher. */
     discountPaisa: integer('discount_paisa').notNull().default(0),
+    /** For the rider, all of it. */
+    tipPaisa: integer('tip_paisa').notNull().default(0),
     totalPaisa: integer('total_paisa').notNull(),
     prepTimeMinutes: smallint('prep_time_minutes'),
     estimatedDeliveryAt: timestamp('estimated_delivery_at', { withTimezone: true }).notNull(),
@@ -139,10 +141,11 @@ export const orders = ordersSchema.table(
     index('orders_voucher_id_idx').on(t.voucherId).where(sql`${t.voucherId} is not null`),
     check(
       'orders_total_adds_up',
-      sql`${t.totalPaisa} = ${t.subtotalPaisa} + ${t.deliveryFeePaisa} - ${t.discountPaisa}`,
+      sql`${t.totalPaisa} = ${t.subtotalPaisa} + ${t.deliveryFeePaisa} - ${t.discountPaisa} + ${t.tipPaisa}`,
     ),
     check('orders_money_not_negative', sql`${t.subtotalPaisa} >= 0 and ${t.deliveryFeePaisa} >= 0`),
     check('orders_discount_within_subtotal', sql`${t.discountPaisa} between 0 and ${t.subtotalPaisa}`),
+    check('orders_tip_not_negative', sql`${t.tipPaisa} >= 0`),
     check('orders_discount_needs_voucher', sql`${t.discountPaisa} = 0 or ${t.voucherId} is not null`),
   ],
 );

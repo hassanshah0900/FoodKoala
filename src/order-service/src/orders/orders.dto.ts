@@ -11,12 +11,17 @@ export const idempotencyKeySchema = z
   .string()
   .regex(/^[A-Za-z0-9_-]{8,64}$/, 'Idempotency-Key must be 8 to 64 letters, digits, - or _');
 
+/** Rs 1,000. */
+export const MAX_TIP_PAISA = 100_000;
+
 export const checkoutSchema = z.strictObject({
   addressId: z.uuid(),
   paymentMethod: z.enum(PAYMENT_METHODS),
   note: text(500).nullable().default(null),
   /** Checked against the vouchers at checkout; a bad code fails it with 422. */
   voucherCode: z.string().trim().min(1).max(32).nullable().default(null),
+  /** For the rider, added to the total. */
+  tipPaisa: z.int().min(0).max(MAX_TIP_PAISA).default(0),
 });
 export type CheckoutDto = z.output<typeof checkoutSchema>;
 

@@ -26,9 +26,14 @@ export interface OrderDraft {
   deliveryFeePaisa: number;
   voucherId: string | null;
   discountPaisa: number;
+  tipPaisa: number;
   totalPaisa: number;
   estimatedDeliveryAt: Date;
 }
+
+/** What the customer pays. */
+export const totalOf = (d: Pick<OrderDraft, 'subtotalPaisa' | 'deliveryFeePaisa' | 'discountPaisa' | 'tipPaisa'>) =>
+  d.subtotalPaisa + d.deliveryFeePaisa - d.discountPaisa + d.tipPaisa;
 
 /** 409 for a cart with nothing to order. */
 export function assertCartNotEmpty(cart: Cart): asserts cart is Cart & { restaurantId: string } {
@@ -56,8 +61,10 @@ export function draftOrder(input: {
   restaurant: Restaurant | null;
   quote: DeliveryQuote | null;
   now: Date;
+  /** For the rider. */
+  tipPaisa?: number;
 }): OrderDraft {
-  const { cart, address, restaurant, quote, now } = input;
+  const { cart, address, restaurant, quote, now, tipPaisa = 0 } = input;
   if (!address) throw new UnprocessableEntityException(['Choose one of your saved addresses']);
   if (!restaurant || !quote) throw new ConflictException('This restaurant is not taking orders any more');
   if (!quote.acceptingOrders) throw new ConflictException(`${restaurant.name} is not taking orders right now`);
@@ -82,6 +89,7 @@ export function draftOrder(input: {
     ]);
   }
 
+  const money = { subtotalPaisa, deliveryFeePaisa: delivery.deliveryFeePaisa, discountPaisa: 0, tipPaisa };
   return {
     restaurantId: cart.restaurantId,
     restaurantName: restaurant.name,
@@ -97,21 +105,15 @@ export function draftOrder(input: {
       location: { lat: address.location.lat, lng: address.location.lng },
     },
     lines,
-    subtotalPaisa,
-    deliveryFeePaisa: delivery.deliveryFeePaisa,
+    ...money,
     voucherId: null,
-    discountPaisa: 0,
-    totalPaisa: subtotalPaisa + delivery.deliveryFeePaisa,
+    totalPaisa: totalOf(money),
     estimatedDeliveryAt: new Date(now.getTime() + delivery.deliveryTimeMinutes * 60_000),
   };
 }
 
 /** The draft with a voucher's discount taken off its total. */
 export function withDiscount(draft: OrderDraft, voucher: { voucherId: string; discountPaisa: number }): OrderDraft {
-  return {
-    ...draft,
-    voucherId: voucher.voucherId,
-    discountPaisa: voucher.discountPaisa,
-    totalPaisa: draft.subtotalPaisa + draft.deliveryFeePaisa - voucher.discountPaisa,
-  };
+  const discounted = { ...draft, voucherId: voucher.voucherId, discountPaisa: voucher.discountPaisa };
+  return { ...discounted, totalPaisa: totalOf(discounted) };
 }
