@@ -1,0 +1,40 @@
+@import "tailwindcss";
+
+/*
+ * FoodKoala purple. 600 is the brand colour (buttons, links, the logo);
+ * 50-100 tint backgrounds and selected states; 700-800 are hover and pressed.
+ */
+@theme {
+  --color-brand-50: #f7f0fc;
+  --color-brand-100: #eedff9;
+  --color-brand-200: #dcc0f2;
+  --color-brand-300: #c193e8;
+  --color-brand-400: #a35fdb;
+  --color-brand-500: #8b35cc;
+  --color-brand-600: #7a1fb3;
+  --color-brand-700: #651a94;
+  --color-brand-800: #4f1673;
+  --color-brand-900: #3b1156;
+
+  --color-ink: #2b2b2b;
+  --color-muted: #707070;
+  --color-line: #e9e9e9;
+  --color-canvas: #f7f7f7;
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+body {
+  background: white;
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Rails of chips and tabs scroll sideways without a visible bar. */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
