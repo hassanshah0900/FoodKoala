@@ -1,0 +1,44 @@
+# The API contracts every service is built against. YAML that parses can
+# still be a wrong OpenAPI document (an unquoted comma in a flow mapping
+# silently becomes a second key), so validate the documents themselves.
+name: contracts
+
+on:
+  pull_request:
+    branches: [main]
+    paths: &paths
+      - contracts/**
+      - .github/workflows/contracts.yml
+  push:
+    branches: [main]
+    paths: *paths
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: OpenAPI and event schemas
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      # Fails on errors (invalid structure, undefined security); warnings are only printed.
+      - name: OpenAPI (Redocly, recommended rules)
+        run: npx --yes @redocly/cli@2.77.0 lint contracts/openapi/*.yaml
+
+      - uses: astral-sh/setup-uv@v10.3.3
+
+      # Each event schema is checked against the metaschema its $schema names (2020-12).
+      - name: Event JSON Schemas
+        run: uvx check-jsonschema@0.33.0 --check-metaschema contracts/events/*.json

@@ -12,6 +12,7 @@ and so does `main` itself after a merge. All of it lives in `.github/workflows/`
 ├── python-service.yml    ┘
 ├── ci-order-service.yml  ┐  one per service: *when* to run and *what the tests need*,
 ├── ci-...-service.yml    │  then `uses:` the language file with those inputs
+├── contracts.yml            OpenAPI documents and event schemas in contracts/
 └── commitlint.yml           commit messages of the PR
 ```
 
@@ -83,6 +84,12 @@ takes a fraction of the first.
 
 **Permissions.** Every workflow has `permissions: contents: read`: the job's
 token can read the code and nothing else.
+
+`contracts.yml` runs when `contracts/` changes. Redocly checks each OpenAPI
+document against the spec and its recommended rules (errors fail, warnings
+are printed), and `check-jsonschema` checks each event schema against the
+JSON Schema metaschema. Both catch what a YAML or JSON parser lets through,
+like an unquoted `description: a, b` in `{ ... }`, which becomes two keys.
 
 ## Tools and their config
 
