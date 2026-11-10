@@ -39,6 +39,8 @@ services:
       TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
       TWILIO_FROM: ${TWILIO_FROM:-}
       JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY:-}
+      # e.g. ADMIN_PHONES=03001234567 make up: that number signs in as an admin
+      ADMIN_PHONES: ${ADMIN_PHONES:-}
     depends_on:
       auth-migrate: { condition: service_completed_successfully }
       redis: { condition: service_healthy }

@@ -44,4 +44,13 @@ describe('loadConfig', () => {
     expect(loadConfig({ ...base, TWILIO_FROM: '' }).TWILIO_FROM).toBeUndefined();
     expect(() => loadConfig({ ...base, ...twilio, TWILIO_FROM: 'FoodKoala' })).toThrow(/TWILIO_FROM/);
   });
+
+  it('reads admin phones in any Pakistani format and refuses others', () => {
+    expect(loadConfig(base).ADMIN_PHONES).toEqual([]);
+    expect(loadConfig({ ...base, ADMIN_PHONES: '03001234567, +923111234567' }).ADMIN_PHONES).toEqual([
+      '+923001234567',
+      '+923111234567',
+    ]);
+    expect(() => loadConfig({ ...base, ADMIN_PHONES: '03001234567,12345' })).toThrow(/12345 is not a Pakistani mobile/);
+  });
 });
