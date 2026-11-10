@@ -30,3 +30,21 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
     restart: "no"
+
+  search-service:
+    build: ../../src/search-service
+    image: foodkoala/search-service:local
+    ports: ["8002:8002"]
+    environment:
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+      # Indexes restaurant.updated and menu.updated; creates the index once Elasticsearch is up
+      KAFKA_BROKERS: kafka:29092
+    depends_on:
+      elasticsearch: { condition: service_started }
+      kafka: { condition: service_started }
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8002/readyz', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 30
+      start_period: 30s
