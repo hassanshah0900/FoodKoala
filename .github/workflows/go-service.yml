@@ -1,0 +1,137 @@
+# Reusable CI for one Go service, called by ci-<service>.yml.
+#
+#   check   formatting, lint (incl. go vet), build
+#   test    all tests, with real Postgres / Redis / Kafka when the service needs them
+#   docker  builds the production image
+name: go-service
+
+on:
+  workflow_call:
+    inputs:
+      service:
+        description: Folder under src/, e.g. delivery-service
+        required: true
+        type: string
+      postgres:
+        type: boolean
+        default: false
+      redis:
+        type: boolean
+        default: false
+      kafka:
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Format, lint, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: src/${{ inputs.service }}
+    steps:
+      - uses: actions/checkout@v7
+
+      # Installs the Go version named in the service's go.mod and caches the
+      # module download and build caches, keyed on go.sum.
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: src/${{ inputs.service }}/go.mod
+          cache-dependency-path: src/${{ inputs.service }}/go.sum
+
+      # golangci-lint runs many linters in one pass; the set is in /.golangci.yml
+      # (go vet, errcheck, staticcheck, ...). The action installs a pinned
+      # version and caches its results between runs.
+      - name: Lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.15.0
+          working-directory: src/${{ inputs.service }}
+
+      # gofmt + goimports: prints a diff and fails if any file is not formatted.
+      - name: Format
+        run: |
+          diff=$(golangci-lint fmt --diff ./...)
+          if [ -n "$diff" ]; then
+            echo "$diff"
+            echo "::error::Run 'golangci-lint fmt' (or gofmt -w .) in src/${{ inputs.service }}"
+            exit 1
+          fi
+
+      # Compiles every package, the binaries in cmd/ included.
+      - name: Build
+        run: go build ./...
+
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: src/${{ inputs.service }}
+
+    # Service containers; an empty image means "not needed" (see node-service.yml).
+    services:
+      postgres:
+        image: ${{ inputs.postgres && 'postgis/postgis:16-3.4' || '' }}
+        env:
+          POSTGRES_USER: foodkoala
+          POSTGRES_PASSWORD: foodkoala
+          POSTGRES_DB: foodkoala
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U foodkoala"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+      redis:
+        image: ${{ inputs.redis && 'redis:7.4-alpine' || '' }}
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+      kafka:
+        image: ${{ inputs.kafka && 'apache/kafka:3.8.1' || '' }}
+        ports: ['9092:9092']
+        options: >-
+          --health-cmd "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092"
+          --health-interval 5s --health-timeout 10s --health-retries 30
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: src/${{ inputs.service }}/go.mod
+          cache-dependency-path: src/${{ inputs.service }}/go.sum
+
+      # Integration tests skip themselves when their variable is missing, so
+      # only set the ones whose container is running.
+      - name: Point the tests at the containers
+        run: |
+          if ${{ inputs.postgres }}; then echo "DATABASE_URL=postgres://foodkoala:foodkoala@localhost:5432/foodkoala" >> "$GITHUB_ENV"; fi
+          if ${{ inputs.redis }}; then echo "REDIS_URL=redis://localhost:6379" >> "$GITHUB_ENV"; fi
+          if ${{ inputs.kafka }}; then echo "KAFKA_BROKERS=localhost:9092" >> "$GITHUB_ENV"; fi
+
+      # -race finds data races between goroutines. -p 1 runs one package at a
+      # time: packages that share the database would otherwise migrate and
+      # empty its tables at the same time.
+      - name: Tests
+        run: go test -race -p 1 ./...
+
+  docker:
+    name: Docker image
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/build-push-action@v7
+        with:
+          context: src/${{ inputs.service }}
+          push: false
+          tags: foodkoala/${{ inputs.service }}:ci
+          cache-from: type=gha,scope=${{ inputs.service }}
+          cache-to: type=gha,mode=max,scope=${{ inputs.service }}

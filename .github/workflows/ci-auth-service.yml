@@ -1,0 +1,35 @@
+# CI for src/auth-service (node); the jobs are in node-service.yml.
+# Its tests need: postgres + redis.
+name: auth-service
+
+on:
+  # On pull requests into main, and on main itself after a merge, but only
+  # when something that affects this service changed.
+  pull_request:
+    branches: [main]
+    paths: &paths
+      - src/auth-service/**
+      - .github/workflows/ci-auth-service.yml
+      - .github/workflows/node-service.yml
+      - biome.json
+  push:
+    branches: [main]
+    paths: *paths
+  # Lets you start it by hand from the Actions tab.
+  workflow_dispatch:
+
+# A new push to the same PR cancels the run still going for the old commit.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    uses: ./.github/workflows/node-service.yml
+    with:
+      service: auth-service
+      postgres: true
+      redis: true
