@@ -1,0 +1,11 @@
+# The Next.js web app. Its server renders pages by calling api-gateway on the
+# compose network; browsers only ever talk to the web app and the gateway.
+services:
+  web:
+    build: ../../src/web
+    image: foodkoala/web:local
+    ports: ["3000:3000"]
+    environment:
+      API_URL: http://api-gateway:8080
+    depends_on:
+      - api-gateway
