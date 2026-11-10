@@ -1,4 +1,4 @@
-# Reusable CI for one NestJS service, called by ci-<service>.yml.
+# Reusable CI for one Node app (a NestJS service or the web app), called by ci-<name>.yml.
 name: node-service
 
 on:
@@ -17,6 +17,10 @@ on:
       kafka:
         type: boolean
         default: false
+      # The web app has no end-to-end suite yet.
+      e2e:
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -61,6 +65,7 @@ jobs:
 
   e2e:
     name: End-to-end tests
+    if: inputs.e2e
     runs-on: ubuntu-latest
     timeout-minutes: 20
     defaults:
