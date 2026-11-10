@@ -1,5 +1,4 @@
-# golangci-lint settings for every Go service (src/api-gateway, src/delivery-service,
-# src/tracking-service). golangci-lint finds this file by walking up from the service.
+# Shared by every Go service: golangci-lint finds it by walking up from the service.
 version: "2"
 
 linters:

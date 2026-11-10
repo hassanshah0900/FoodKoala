@@ -1,8 +1,4 @@
 # Reusable CI for one FastAPI service, called by ci-<service>.yml.
-#
-#   check   formatting, lint, types   (ruff and mypy; no infrastructure)
-#   test    pytest against real Postgres / Kafka / Elasticsearch containers
-#   docker  builds the production image
 name: python-service
 
 on:
@@ -13,7 +9,6 @@ on:
         required: true
         type: string
       postgres:
-        description: Start PostgreSQL and apply the Alembic migrations first
         type: boolean
         default: false
       kafka:
@@ -37,15 +32,14 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      # uv installs Python (the version in the service's .python-version, the
-      # same as its Dockerfile) and the dependencies; its cache is keyed on uv.lock.
-      - uses: astral-sh/setup-uv@v10.3.3 # this action publishes exact versions only, no moving v10 tag
+      # Python comes from the service's .python-version (same as its Dockerfile).
+      # setup-uv publishes no moving v10 tag, hence the exact version.
+      - uses: astral-sh/setup-uv@v10.3.3
         with:
           working-directory: src/${{ inputs.service }}
           enable-cache: true
           cache-dependency-glob: src/${{ inputs.service }}/uv.lock
 
-      # --locked fails if uv.lock is out of date with pyproject.toml (like npm ci).
       - run: uv sync --locked
 
       - name: Format
@@ -65,7 +59,8 @@ jobs:
       run:
         working-directory: src/${{ inputs.service }}
 
-    # Service containers; an empty image means "not needed" (see node-service.yml).
+    # A service container whose image is '' is not started: each service
+    # opts in to the infrastructure its tests need.
     services:
       postgres:
         image: ${{ inputs.postgres && 'postgis/postgis:16-3.4' || '' }}
@@ -97,7 +92,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: astral-sh/setup-uv@v10.3.3 # this action publishes exact versions only, no moving v10 tag
+      - uses: astral-sh/setup-uv@v10.3.3
         with:
           working-directory: src/${{ inputs.service }}
           enable-cache: true
@@ -105,7 +100,8 @@ jobs:
 
       - run: uv sync --locked
 
-      # Tests that need a broker skip themselves without KAFKA_BROKERS.
+      # Integration tests skip when their variable is unset, so set only the
+      # ones whose container is running.
       - name: Point the tests at the containers
         run: |
           if ${{ inputs.postgres }}; then echo "DATABASE_URL=postgres://foodkoala:foodkoala@localhost:5432/foodkoala" >> "$GITHUB_ENV"; fi
@@ -126,6 +122,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: docker/setup-buildx-action@v4
+      # Proves the Dockerfile still builds; not pushed until we deploy.
       - uses: docker/build-push-action@v7
         with:
           context: src/${{ inputs.service }}

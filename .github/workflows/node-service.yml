@@ -1,11 +1,4 @@
-# Reusable CI for one NestJS service. It does nothing on its own: each
-# ci-<service>.yml calls it with the service's folder and what its tests need.
-#
-#   check   format, lint, types, unit tests, compile   (no infrastructure)
-#   e2e     end-to-end tests against real Postgres / Redis / Kafka containers
-#   docker  builds the production image, so a broken Dockerfile fails the PR
-#
-# The three jobs run in parallel; the PR shows each as its own check.
+# Reusable CI for one NestJS service, called by ci-<service>.yml.
 name: node-service
 
 on:
@@ -16,7 +9,6 @@ on:
         required: true
         type: string
       postgres:
-        description: Start PostgreSQL (with PostGIS) for the e2e tests and run the migrations
         type: boolean
         default: false
       redis:
@@ -26,12 +18,10 @@ on:
         type: boolean
         default: false
 
-# The workflow only reads the code; nothing it runs can push or comment.
 permissions:
   contents: read
 
 env:
-  # Turn off npm's update notices and funding messages in the logs.
   NO_UPDATE_NOTIFIER: '1'
   npm_config_fund: 'false'
 
@@ -42,39 +32,30 @@ jobs:
     timeout-minutes: 15
     defaults:
       run:
-        # Every `run:` step below starts in the service's folder.
         working-directory: src/${{ inputs.service }}
     steps:
       - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v7
         with:
-          node-version: 24 # the same major as the Dockerfile's node:24-alpine
-          # Cache ~/.npm keyed on the lockfile, so `npm ci` mostly reads from cache.
+          node-version: 24 # matches the Dockerfile's node:24-alpine
           cache: npm
           cache-dependency-path: src/${{ inputs.service }}/package-lock.json
 
-      # `npm ci` installs exactly what package-lock.json says and fails if
-      # package.json and the lockfile disagree (unlike `npm install`).
       - run: npm ci
 
-      # Biome (configured in /biome.json): formatting and import order...
       - name: Format
         run: npm run format:check
 
-      # ...and lint rules (likely bugs and confusing code).
       - name: Lint
         run: npm run lint
 
-      # The TypeScript compiler checks every type without writing files.
       - name: Types
         run: npm run typecheck
 
-      # Vitest unit tests: plain functions, no database or network.
       - name: Unit tests
         run: npm test
 
-      # Compiles to dist/ as the Dockerfile does.
       - name: Build
         run: npm run build
 
@@ -86,11 +67,8 @@ jobs:
       run:
         working-directory: src/${{ inputs.service }}
 
-    # Service containers: Docker containers GitHub starts next to the job and
-    # removes afterwards. A service whose image is '' is not started, which is
-    # how one workflow serves services that need different infrastructure.
-    # `ports` publishes them on localhost; `options` makes the job wait until
-    # each one's health check passes.
+    # A service container whose image is '' is not started: each service
+    # opts in to the infrastructure its tests need.
     services:
       postgres:
         image: ${{ inputs.postgres && 'postgis/postgis:16-3.4' || '' }}
@@ -109,14 +87,13 @@ jobs:
           --health-cmd "redis-cli ping"
           --health-interval 5s --health-timeout 5s --health-retries 20
       kafka:
-        # The image's defaults are a single KRaft broker advertising localhost:9092.
         image: ${{ inputs.kafka && 'apache/kafka:3.8.1' || '' }}
         ports: ['9092:9092']
         options: >-
           --health-cmd "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092"
           --health-interval 5s --health-timeout 10s --health-retries 30
 
-    # Read by the services' config and test setup. Unused ones are harmless.
+    # Unconditional is safe here: the Node tests never skip on these.
     env:
       DATABASE_URL: postgres://foodkoala:foodkoala@localhost:5432/foodkoala
       REDIS_URL: redis://localhost:6379
@@ -132,14 +109,13 @@ jobs:
 
       - run: npm ci
 
-      # Some tests skip themselves without KAFKA_BROKERS, so set it only when
-      # there is a broker. Lines appended to $GITHUB_ENV become environment
-      # variables for every later step.
+      # Only with a broker: an empty KAFKA_BROKERS would make the Kafka tests
+      # run against a broker named ''.
       - name: Point the tests at Kafka
         if: inputs.kafka
         run: echo "KAFKA_BROKERS=localhost:9092" >> "$GITHUB_ENV"
 
-      # The migrate script is plain JS compiled into dist/, as in production.
+      # The migrate script runs from dist/, as in production.
       - name: Migrate the database
         if: inputs.postgres
         run: |
@@ -155,13 +131,8 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
-
-      # Buildx is Docker's BuildKit builder; needed for the cache below.
       - uses: docker/setup-buildx-action@v4
-
-      # Builds the image with the service's own Dockerfile and context. It is
-      # not pushed anywhere yet (that comes with deployment). Layers are cached
-      # in GitHub's Actions cache, one scope per service.
+      # Proves the Dockerfile still builds; not pushed until we deploy.
       - uses: docker/build-push-action@v7
         with:
           context: src/${{ inputs.service }}

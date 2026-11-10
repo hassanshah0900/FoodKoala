@@ -1,8 +1,4 @@
 # Reusable CI for one Go service, called by ci-<service>.yml.
-#
-#   check   formatting, lint (incl. go vet), build
-#   test    all tests, with real Postgres / Redis / Kafka when the service needs them
-#   docker  builds the production image
 name: go-service
 
 on:
@@ -36,23 +32,18 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      # Installs the Go version named in the service's go.mod and caches the
-      # module download and build caches, keyed on go.sum.
       - uses: actions/setup-go@v7
         with:
           go-version-file: src/${{ inputs.service }}/go.mod
           cache-dependency-path: src/${{ inputs.service }}/go.sum
 
-      # golangci-lint runs many linters in one pass; the set is in /.golangci.yml
-      # (go vet, errcheck, staticcheck, ...). The action installs a pinned
-      # version and caches its results between runs.
+      # Linters (go vet, errcheck, staticcheck, ...) are chosen in /.golangci.yml.
       - name: Lint
         uses: golangci/golangci-lint-action@v9
         with:
           version: v2.15.0
           working-directory: src/${{ inputs.service }}
 
-      # gofmt + goimports: prints a diff and fails if any file is not formatted.
       - name: Format
         run: |
           diff=$(golangci-lint fmt --diff ./...)
@@ -62,7 +53,6 @@ jobs:
             exit 1
           fi
 
-      # Compiles every package, the binaries in cmd/ included.
       - name: Build
         run: go build ./...
 
@@ -74,7 +64,8 @@ jobs:
       run:
         working-directory: src/${{ inputs.service }}
 
-    # Service containers; an empty image means "not needed" (see node-service.yml).
+    # A service container whose image is '' is not started: each service
+    # opts in to the infrastructure its tests need.
     services:
       postgres:
         image: ${{ inputs.postgres && 'postgis/postgis:16-3.4' || '' }}
@@ -107,17 +98,15 @@ jobs:
           go-version-file: src/${{ inputs.service }}/go.mod
           cache-dependency-path: src/${{ inputs.service }}/go.sum
 
-      # Integration tests skip themselves when their variable is missing, so
-      # only set the ones whose container is running.
+      # Integration tests skip when their variable is unset, so set only the
+      # ones whose container is running.
       - name: Point the tests at the containers
         run: |
           if ${{ inputs.postgres }}; then echo "DATABASE_URL=postgres://foodkoala:foodkoala@localhost:5432/foodkoala" >> "$GITHUB_ENV"; fi
           if ${{ inputs.redis }}; then echo "REDIS_URL=redis://localhost:6379" >> "$GITHUB_ENV"; fi
           if ${{ inputs.kafka }}; then echo "KAFKA_BROKERS=localhost:9092" >> "$GITHUB_ENV"; fi
 
-      # -race finds data races between goroutines. -p 1 runs one package at a
-      # time: packages that share the database would otherwise migrate and
-      # empty its tables at the same time.
+      # -p 1: packages share one database and would migrate and empty it at once.
       - name: Tests
         run: go test -race -p 1 ./...
 
@@ -128,6 +117,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: docker/setup-buildx-action@v4
+      # Proves the Dockerfile still builds; not pushed until we deploy.
       - uses: docker/build-push-action@v7
         with:
           context: src/${{ inputs.service }}

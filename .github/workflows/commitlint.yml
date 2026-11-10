@@ -1,5 +1,4 @@
-# Checks that every commit in a pull request follows Conventional Commits with
-# a scope from commitlint.config.cjs, as the Husky hook does locally.
+# Every commit of a PR must follow commitlint.config.cjs, as the Husky hook does locally.
 name: commitlint
 
 on:
@@ -21,15 +20,13 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          # The whole history, so the PR's commits between base and head exist locally.
-          fetch-depth: 0
+          fetch-depth: 0 # the PR's commits between base and head must exist locally
 
       - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
 
-      # The root package.json holds commitlint (and Husky).
       - run: npm ci
 
       - name: Check the PR's commits
