@@ -574,7 +574,7 @@ components:
         paymentMethod: { $ref: '#/components/schemas/PaymentMethod' }
         note: { type: [string, 'null'], minLength: 1, maxLength: 500, description: 'For the restaurant, e.g. "no cutlery"' }
         voucherCode: { type: [string, 'null'], minLength: 1, maxLength: 32, description: Takes the voucher's discount off; 422 if it can't be used }
-        tipPaisa: { type: integer, minimum: 0, maximum: 100000, default: 0, description: For the rider, added to the total }
+        tipPaisa: { type: integer, minimum: 0, maximum: 100000, default: 0, description: 'For the rider, added to the total' }
 
     StatusChange:
       type: object
