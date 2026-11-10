@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import {
   bigserial,
+  boolean,
   check,
   index,
   integer,
@@ -50,6 +51,56 @@ export interface LineOption {
   pricePaisa: number;
 }
 
+export const DISCOUNT_KINDS = ['percent', 'flat'] as const;
+export type DiscountKind = (typeof DISCOUNT_KINDS)[number];
+export const discountKindEnum = ordersSchema.enum('discount_kind', DISCOUNT_KINDS);
+
+/**
+ * A code customers enter at checkout for money off the subtotal. Its use is
+ * counted from the orders that carry it, so a rejected or cancelled order
+ * gives the use back.
+ */
+export const vouchers = ordersSchema.table(
+  'vouchers',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    /** Upper case, never changed: orders show it. */
+    code: text('code').notNull(),
+    description: text('description').notNull(),
+    kind: discountKindEnum('kind').notNull(),
+    /** Percent off for `percent` (1 to 100), paisa off for `flat`. */
+    value: integer('value').notNull(),
+    /** Caps a percent discount. */
+    maxDiscountPaisa: integer('max_discount_paisa'),
+    minSubtotalPaisa: integer('min_subtotal_paisa').notNull().default(0),
+    /** Only at this restaurant; null for any. */
+    restaurantId: uuid('restaurant_id'),
+    /** Only for a customer with no order yet, other than rejected or cancelled ones. */
+    firstOrderOnly: boolean('first_order_only').notNull().default(false),
+    /** Uses across all customers; null for no limit. */
+    usageLimit: integer('usage_limit'),
+    perCustomerLimit: integer('per_customer_limit').notNull().default(1),
+    startsAt: timestamp('starts_at', { withTimezone: true }).notNull(),
+    endsAt: timestamp('ends_at', { withTimezone: true }).notNull(),
+    active: boolean('active').notNull().default(true),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (t) => [
+    unique('vouchers_code_key').on(t.code),
+    check('vouchers_value_positive', sql`${t.value} > 0`),
+    check('vouchers_percent_at_most_100', sql`${t.kind} <> 'percent' or ${t.value} <= 100`),
+    check('vouchers_ends_after_start', sql`${t.endsAt} > ${t.startsAt}`),
+    check(
+      'vouchers_limits_positive',
+      sql`${t.perCustomerLimit} > 0 and (${t.usageLimit} is null or ${t.usageLimit} > 0) and (${t.maxDiscountPaisa} is null or ${t.maxDiscountPaisa} > 0) and ${t.minSubtotalPaisa} >= 0`,
+    ),
+  ],
+);
+
 export const orders = ordersSchema.table(
   'orders',
   {
@@ -69,6 +120,9 @@ export const orders = ordersSchema.table(
     note: text('note'),
     subtotalPaisa: integer('subtotal_paisa').notNull(),
     deliveryFeePaisa: integer('delivery_fee_paisa').notNull(),
+    voucherId: uuid('voucher_id').references(() => vouchers.id),
+    /** Taken off the subtotal by the voucher. */
+    discountPaisa: integer('discount_paisa').notNull().default(0),
     totalPaisa: integer('total_paisa').notNull(),
     prepTimeMinutes: smallint('prep_time_minutes'),
     estimatedDeliveryAt: timestamp('estimated_delivery_at', { withTimezone: true }).notNull(),
@@ -82,8 +136,14 @@ export const orders = ordersSchema.table(
     unique('orders_customer_id_idempotency_key_key').on(t.customerId, t.idempotencyKey),
     index('orders_customer_id_placed_at_idx').on(t.customerId, t.placedAt),
     index('orders_restaurant_id_placed_at_idx').on(t.restaurantId, t.placedAt),
-    check('orders_total_adds_up', sql`${t.totalPaisa} = ${t.subtotalPaisa} + ${t.deliveryFeePaisa}`),
+    index('orders_voucher_id_idx').on(t.voucherId).where(sql`${t.voucherId} is not null`),
+    check(
+      'orders_total_adds_up',
+      sql`${t.totalPaisa} = ${t.subtotalPaisa} + ${t.deliveryFeePaisa} - ${t.discountPaisa}`,
+    ),
     check('orders_money_not_negative', sql`${t.subtotalPaisa} >= 0 and ${t.deliveryFeePaisa} >= 0`),
+    check('orders_discount_within_subtotal', sql`${t.discountPaisa} between 0 and ${t.subtotalPaisa}`),
+    check('orders_discount_needs_voucher', sql`${t.discountPaisa} = 0 or ${t.voucherId} is not null`),
   ],
 );
 
@@ -176,3 +236,4 @@ export type OrderRow = typeof orders.$inferSelect;
 export type OrderLineRow = typeof orderLines.$inferSelect;
 export type StatusHistoryRow = typeof orderStatusHistory.$inferSelect;
 export type ReviewRow = typeof reviews.$inferSelect;
+export type VoucherRow = typeof vouchers.$inferSelect;

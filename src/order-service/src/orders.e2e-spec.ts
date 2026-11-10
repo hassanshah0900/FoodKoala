@@ -1,188 +1,33 @@
 import { randomUUID } from 'node:crypto';
-import { createServer, type Server } from 'node:http';
-import type { AddressInfo } from 'node:net';
-import { INestApplication } from '@nestjs/common';
-import { getDrizzleToken } from '@nestjs/drizzle';
-import { Test } from '@nestjs/testing';
+import type { INestApplication } from '@nestjs/common';
 import { eq, inArray } from 'drizzle-orm';
-import request from 'supertest';
-import { AppModule } from './app.module';
-import type { Cart } from './clients/clients';
+import type request from 'supertest';
 import type { Database } from './db/database';
 import { orders, outbox } from './db/schema';
 import { DeliveryEventConsumer } from './delivery/delivery-event-consumer';
 import { AcceptTimeouts } from './orders/accept-timeouts';
 import { OrdersService } from './orders/orders.service';
-import { setupApp } from './setup-app';
-
-type Headers = Record<'X-User-Id' | 'X-User-Phone' | 'X-User-Roles', string>;
-
-function newUser(roles = 'customer'): Headers {
-  const phone = `+923${String(Math.floor(Math.random() * 1e9)).padStart(9, '0')}`;
-  return { 'X-User-Id': randomUUID(), 'X-User-Phone': phone, 'X-User-Roles': roles };
-}
-
-/** State of the stand-in cart, user and restaurant services. */
-const carts = new Map<string, Cart>();
-const addresses = new Map<
-  string,
-  { ownerId: string; area: string; city: string; location: { lat: number; lng: number } }
->();
-const restaurants = new Map<
-  string,
-  { name: string; ownerId: string; acceptingOrders: boolean; deliverable: boolean }
->();
-let restaurantDown = false;
-const cleared: string[] = [];
-
-/** cart-service (GET/DELETE /), user-service (GET /me/addresses/{id}) and restaurant-service (GET /{id}, /{id}/delivery-quote). */
-function fakeServices(): Server {
-  return createServer((req, res) => {
-    const send = (status: number, body?: unknown) =>
-      res.writeHead(status, { 'content-type': 'application/json' }).end(body === undefined ? '' : JSON.stringify(body));
-    const userId = req.headers['x-user-id'] as string | undefined;
-    const url = new URL(req.url!, 'http://fake');
-    const [service, ...rest] = url.pathname.split('/').filter(Boolean);
-
-    if (service === 'cart') {
-      if (!userId) return send(401);
-      if (req.method === 'DELETE') {
-        carts.delete(userId);
-        cleared.push(userId);
-        return send(204);
-      }
-      return send(
-        200,
-        carts.get(userId) ?? { restaurantId: null, lines: [], subtotalPaisa: 0, problems: [], updatedAt: null },
-      );
-    }
-    if (service === 'user') {
-      const address = addresses.get(rest[2]);
-      if (!userId || !address || address.ownerId !== userId) return send(404, { statusCode: 404 });
-      return send(200, {
-        id: rest[2],
-        label: 'home',
-        labelText: null,
-        line1: 'House 7',
-        landmark: null,
-        instructions: null,
-        isDefault: true,
-        ...address,
-      });
-    }
-    if (service === 'restaurant') {
-      if (restaurantDown) return send(503);
-      const r = restaurants.get(rest[0]);
-      if (!r) return send(404, { statusCode: 404 });
-      if (rest[1] === 'delivery-quote') {
-        return send(200, {
-          deliverable: r.deliverable,
-          acceptingOrders: r.acceptingOrders,
-          distanceMeters: 1800,
-          delivery: r.deliverable
-            ? { zoneId: randomUUID(), deliveryFeePaisa: 9900, minimumOrderPaisa: 50000, deliveryTimeMinutes: 35 }
-            : null,
-        });
-      }
-      const owner = userId === r.ownerId || String(req.headers['x-user-roles']).split(',').includes('admin');
-      return send(200, {
-        id: rest[0],
-        name: r.name,
-        location: { lat: 24.93, lng: 67.1 },
-        ...(owner ? { ownerId: r.ownerId } : {}),
-      });
-    }
-    send(404);
-  });
-}
-
-/** Puts `quantity` broasts at Rs 450 in the customer's cart. */
-function fillCart(customer: Headers, restaurantId: string, quantity = 2) {
-  carts.set(customer['X-User-Id'], {
-    restaurantId,
-    lines: [
-      {
-        id: randomUUID(),
-        itemId: randomUUID(),
-        name: 'Chicken Broast',
-        quantity,
-        options: [],
-        note: 'Extra garlic sauce',
-        unitPricePaisa: 45000,
-        lineTotalPaisa: 45000 * quantity,
-      },
-    ],
-    subtotalPaisa: 45000 * quantity,
-    problems: [],
-  });
-}
-
-/** A customer with a priced cart and a saved address, and the restaurant's owner. */
-function scenario(over: { quantity?: number; acceptingOrders?: boolean; deliverable?: boolean } = {}) {
-  const customer = newUser();
-  const owner = newUser('customer,vendor');
-  const restaurantId = randomUUID();
-  const addressId = randomUUID();
-  restaurants.set(restaurantId, {
-    name: 'Karachi Broast',
-    ownerId: owner['X-User-Id'],
-    acceptingOrders: true,
-    deliverable: true,
-    ...over,
-  });
-  addresses.set(addressId, {
-    ownerId: customer['X-User-Id'],
-    area: 'Gulshan-e-Iqbal',
-    city: 'Karachi',
-    location: { lat: 24.92, lng: 67.09 },
-  });
-  fillCart(customer, restaurantId, over.quantity ?? 2);
-  return { customer, owner, restaurantId, addressId };
-}
+import { carts, cleared, fillCart, type Headers, newUser, outage, scenario, startApp } from './testing/e2e';
 
 describe('order-service (e2e)', () => {
+  let t: Awaited<ReturnType<typeof startApp>>;
   let app: INestApplication;
   let http: ReturnType<typeof request>;
   let db: Database;
-  let services: Server;
+  let placed: string[];
+  let checkout: typeof t.checkout;
+  let place: typeof t.place;
   const admin = newUser('customer,admin');
-  const placed: string[] = [];
-
-  const checkout = (who: Headers, addressId: string, key = randomUUID()) =>
-    http.post('/').set(who).set('Idempotency-Key', key).send({ addressId, paymentMethod: 'cod', note: 'No cutlery' });
-
-  const place = async (s: ReturnType<typeof scenario>) => {
-    const res = await checkout(s.customer, s.addressId).expect(201);
-    placed.push(res.body.id);
-    return res.body as { id: string };
-  };
 
   beforeAll(async () => {
-    services = fakeServices();
-    await new Promise<void>((resolve) => services.listen(0, '127.0.0.1', resolve));
-    const base = `http://127.0.0.1:${(services.address() as AddressInfo).port}`;
-    process.env.CART_SERVICE_URL = `${base}/cart`;
-    process.env.USER_SERVICE_URL = `${base}/user`;
-    process.env.RESTAURANT_SERVICE_URL = `${base}/restaurant`;
-
-    const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
-    app = setupApp(moduleRef.createNestApplication({ logger: false }));
-    await app.init();
-    http = request(app.getHttpServer());
-    db = app.get<Database>(getDrizzleToken());
+    t = await startApp();
+    ({ app, http, db, placed, checkout, place } = t);
   });
 
-  afterAll(async () => {
-    if (placed.length) {
-      await db.delete(outbox).where(inArray(outbox.key, placed));
-      await db.delete(orders).where(inArray(orders.id, placed));
-    }
-    await app.close();
-    await new Promise<void>((resolve) => services.close(() => resolve()));
-  });
+  afterAll(() => t.close());
 
   afterEach(() => {
-    restaurantDown = false;
+    outage.restaurant = false;
   });
 
   it('needs a signed-in user and an Idempotency-Key', async () => {
@@ -212,6 +57,8 @@ describe('order-service (e2e)', () => {
       ],
       subtotalPaisa: 90000,
       deliveryFeePaisa: 9900,
+      discountPaisa: 0,
+      voucherCode: null,
       totalPaisa: 99900,
       paymentMethod: 'cod',
       note: 'No cutlery',
@@ -236,13 +83,16 @@ describe('order-service (e2e)', () => {
   it('returns the first order when a checkout is retried with the same key, even concurrently', async () => {
     const s = scenario();
     const key = randomUUID();
-    const [a, b] = await Promise.all([checkout(s.customer, s.addressId, key), checkout(s.customer, s.addressId, key)]);
+    const [a, b] = await Promise.all([
+      checkout(s.customer, s.addressId, { key }),
+      checkout(s.customer, s.addressId, { key }),
+    ]);
     placed.push(a.body.id);
     expect([a.status, b.status].sort()).toEqual([200, 201]);
     expect(b.body.id).toBe(a.body.id);
 
     // The cart is empty by now, yet the retry still answers with the order.
-    const later = await checkout(s.customer, s.addressId, key).expect(200);
+    const later = await checkout(s.customer, s.addressId, { key }).expect(200);
     expect(later.body.id).toBe(a.body.id);
     expect(await db.select().from(orders).where(eq(orders.customerId, s.customer['X-User-Id']))).toHaveLength(1);
   });
@@ -283,7 +133,7 @@ describe('order-service (e2e)', () => {
 
   it('fails closed when restaurant-service is down', async () => {
     const s = scenario();
-    restaurantDown = true;
+    outage.restaurant = true;
     await checkout(s.customer, s.addressId).expect(503);
     expect(carts.has(s.customer['X-User-Id'])).toBe(true);
   });

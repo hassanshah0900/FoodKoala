@@ -27,6 +27,8 @@ export interface Order {
   }[];
   subtotalPaisa: number;
   deliveryFeePaisa: number;
+  discountPaisa: number;
+  voucherCode: string | null;
   totalPaisa: number;
   paymentMethod: PaymentMethod;
   deliveryAddress: DeliveryAddress;
@@ -45,8 +47,16 @@ export interface Page<T> {
   hasMore: boolean;
 }
 
-/** `lines` and `history` may hold other orders' rows too; only this order's are used, in order. */
-export function toOrder(row: OrderRow, lines: OrderLineRow[], history: StatusHistoryRow[]): Order {
+/**
+ * `lines` and `history` may hold other orders' rows too; only this order's are
+ * used, in order. `voucherCodes` maps voucher id to code.
+ */
+export function toOrder(
+  row: OrderRow,
+  lines: OrderLineRow[],
+  history: StatusHistoryRow[],
+  voucherCodes: ReadonlyMap<string, string>,
+): Order {
   return {
     id: row.id,
     status: row.status,
@@ -67,6 +77,8 @@ export function toOrder(row: OrderRow, lines: OrderLineRow[], history: StatusHis
       })),
     subtotalPaisa: row.subtotalPaisa,
     deliveryFeePaisa: row.deliveryFeePaisa,
+    discountPaisa: row.discountPaisa,
+    voucherCode: row.voucherId ? (voucherCodes.get(row.voucherId) ?? null) : null,
     totalPaisa: row.totalPaisa,
     paymentMethod: row.paymentMethod,
     deliveryAddress: row.deliveryAddress,

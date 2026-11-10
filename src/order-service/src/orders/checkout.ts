@@ -1,12 +1,10 @@
 import { ConflictException, UnprocessableEntityException } from '@nestjs/common';
 import type { Address, Cart, DeliveryQuote, Restaurant } from '../clients/clients';
 import type { DeliveryAddress, LineOption, PaymentMethod } from '../db/schema';
+import { rupees } from '../money';
 
 /** Until payment-service takes online payments, only cash on delivery is offered. */
 export const ACCEPTED_PAYMENT_METHODS: readonly PaymentMethod[] = ['cod'];
-
-/** Rs 500, or Rs 499.50: how money reads in messages. */
-export const rupees = (paisa: number) => `Rs ${paisa % 100 === 0 ? paisa / 100 : (paisa / 100).toFixed(2)}`;
 
 /** Everything needed to save the order, decided before anything is written. */
 export interface OrderDraft {
@@ -26,13 +24,20 @@ export interface OrderDraft {
   }[];
   subtotalPaisa: number;
   deliveryFeePaisa: number;
+  voucherId: string | null;
+  discountPaisa: number;
   totalPaisa: number;
   estimatedDeliveryAt: Date;
 }
 
+/** 409 for a cart with nothing to order. */
+export function assertCartNotEmpty(cart: Cart): asserts cart is Cart & { restaurantId: string } {
+  if (cart.restaurantId === null || cart.lines.length === 0) throw new ConflictException('Your cart is empty');
+}
+
 /** Fails before any other service is asked: an empty cart or a payment method we can't take yet. */
 export function checkCart(cart: Cart, paymentMethod: PaymentMethod): asserts cart is Cart & { restaurantId: string } {
-  if (cart.restaurantId === null || cart.lines.length === 0) throw new ConflictException('Your cart is empty');
+  assertCartNotEmpty(cart);
   const problems = cart.problems.map((p) => p.message);
   if (!ACCEPTED_PAYMENT_METHODS.includes(paymentMethod)) {
     problems.push('Only cash on delivery is available for now');
@@ -94,7 +99,19 @@ export function draftOrder(input: {
     lines,
     subtotalPaisa,
     deliveryFeePaisa: delivery.deliveryFeePaisa,
+    voucherId: null,
+    discountPaisa: 0,
     totalPaisa: subtotalPaisa + delivery.deliveryFeePaisa,
     estimatedDeliveryAt: new Date(now.getTime() + delivery.deliveryTimeMinutes * 60_000),
+  };
+}
+
+/** The draft with a voucher's discount taken off its total. */
+export function withDiscount(draft: OrderDraft, voucher: { voucherId: string; discountPaisa: number }): OrderDraft {
+  return {
+    ...draft,
+    voucherId: voucher.voucherId,
+    discountPaisa: voucher.discountPaisa,
+    totalPaisa: draft.subtotalPaisa + draft.deliveryFeePaisa - voucher.discountPaisa,
   };
 }
