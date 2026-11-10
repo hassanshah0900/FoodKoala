@@ -55,6 +55,55 @@ function fakeMenuService(): Server {
   });
 }
 
+/** Past orders in the stand-in order-service: order id -> owner and body. */
+const pastOrders = new Map<string, { customerId: string; body: object }>();
+let ordersDown = false;
+let orderHeaders: Record<string, string | string[] | undefined> = {};
+
+/** A stand-in order-service: GET /{id} shows an order to its customer only. */
+function fakeOrderService(): Server {
+  return createServer((req, res) => {
+    orderHeaders = req.headers;
+    if (ordersDown) return void res.writeHead(503).end();
+    const order = pastOrders.get(req.url!.slice(1));
+    if (!order || order.customerId !== req.headers['x-user-id']) {
+      return void res.writeHead(404, { 'content-type': 'application/json' }).end('{"statusCode":404}');
+    }
+    res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(order.body));
+  });
+}
+
+interface PastLine {
+  itemId: string;
+  name: string;
+  quantity: number;
+  optionIds?: string[];
+  note?: string | null;
+}
+
+/** An order of `customerId` in the stand-in order-service, shaped like Order in the contract. */
+function pastOrder(customerId: string, restaurantId: string, lines: PastLine[]) {
+  const id = randomUUID();
+  pastOrders.set(id, {
+    customerId,
+    body: {
+      id,
+      status: 'delivered',
+      restaurant: { id: restaurantId, name: 'Somewhere', location: null },
+      lines: lines.map((l) => ({
+        itemId: l.itemId,
+        name: l.name,
+        quantity: l.quantity,
+        options: (l.optionIds ?? []).map((o) => ({ id: o, group: 'Choose size', name: 'Full', pricePaisa: 1 })),
+        note: l.note ?? null,
+        unitPricePaisa: 1,
+        lineTotalPaisa: l.quantity,
+      })),
+    },
+  });
+  return id;
+}
+
 function newUser() {
   const phone = `+923${String(Math.floor(Math.random() * 1e9)).padStart(9, '0')}`;
   return { 'X-User-Id': randomUUID(), 'X-User-Phone': phone, 'X-User-Roles': 'customer' };
@@ -73,6 +122,7 @@ describe('cart-service (e2e)', () => {
   let http: ReturnType<typeof request>;
   let redis: Redis;
   let menuService: Server;
+  let orderService: Server;
   const users: string[] = [];
 
   const user = () => {
@@ -85,6 +135,9 @@ describe('cart-service (e2e)', () => {
     menuService = fakeMenuService();
     await new Promise<void>((resolve) => menuService.listen(0, '127.0.0.1', resolve));
     process.env.MENU_SERVICE_URL = `http://127.0.0.1:${(menuService.address() as AddressInfo).port}`;
+    orderService = fakeOrderService();
+    await new Promise<void>((resolve) => orderService.listen(0, '127.0.0.1', resolve));
+    process.env.ORDER_SERVICE_URL = `http://127.0.0.1:${(orderService.address() as AddressInfo).port}`;
 
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
     app = setupApp(moduleRef.createNestApplication({ logger: false }));
@@ -97,10 +150,12 @@ describe('cart-service (e2e)', () => {
     if (users.length) await redis.del(...users.map((u) => `cart:${u}`));
     await app.close();
     await new Promise<void>((resolve) => menuService.close(() => resolve()));
+    await new Promise<void>((resolve) => orderService.close(() => resolve()));
   });
 
   afterEach(() => {
     menuDown = false;
+    ordersDown = false;
   });
 
   it('needs a signed-in user', async () => {
@@ -222,5 +277,99 @@ describe('cart-service (e2e)', () => {
     await http.delete('/').set(me).expect(204);
     menuDown = false;
     expect((await http.get('/').set(me).expect(200)).body.lines).toEqual([]);
+  });
+
+  describe('reorder', () => {
+    it('puts the lines of a past order back, at today\'s prices', async () => {
+      const me = user();
+      const restaurantId = randomUUID();
+      const biryani = newItem(restaurantId, 'Chicken Biryani', 45000);
+      const raita = newItem(restaurantId, 'Raita', 8000);
+      const orderId = pastOrder(me['X-User-Id'], restaurantId, [
+        { itemId: biryani.id, name: 'Chicken Biryani', quantity: 2, optionIds: [biryani.full], note: 'Extra spicy' },
+        { itemId: raita.id, name: 'Raita', quantity: 1 },
+      ]);
+
+      const res = await http.post('/reorder').set(me).send({ orderId }).expect(201);
+      expect(res.body.skipped).toEqual([]);
+      expect(res.body.cart).toMatchObject({
+        restaurantId,
+        lines: [
+          { itemId: biryani.id, quantity: 2, optionIds: [biryani.full], note: 'Extra spicy', unitPricePaisa: 80000 },
+          { itemId: raita.id, quantity: 1, optionIds: [], note: null, unitPricePaisa: 8000 },
+        ],
+        subtotalPaisa: 168000,
+        problems: [],
+      });
+      expect(orderHeaders['x-user-id']).toBe(me['X-User-Id']);
+
+      // Again: equal lines merge, like adding them one by one.
+      const again = await http.post('/reorder').set(me).send({ orderId }).expect(201);
+      expect(again.body.cart.lines.map((l: { quantity: number }) => l.quantity)).toEqual([4, 2]);
+    });
+
+    it('leaves out what the menu can no longer serve, and says why', async () => {
+      const me = user();
+      const restaurantId = randomUUID();
+      const biryani = newItem(restaurantId);
+      const kheer = newItem(restaurantId, 'Kheer', 15000);
+      const removedOption = randomUUID();
+      menu.get(kheer.id)!.available = false;
+      const orderId = pastOrder(me['X-User-Id'], restaurantId, [
+        { itemId: biryani.id, name: 'Chicken Biryani', quantity: 1 },
+        { itemId: kheer.id, name: 'Kheer', quantity: 2 },
+        { itemId: randomUUID(), name: 'Old Special', quantity: 1 },
+        { itemId: biryani.id, name: 'Chicken Biryani', quantity: 1, optionIds: [removedOption] },
+      ]);
+
+      const res = await http.post('/reorder').set(me).send({ orderId }).expect(201);
+      expect(res.body.cart.lines).toMatchObject([{ itemId: biryani.id, quantity: 1, optionIds: [] }]);
+      expect(res.body.skipped).toEqual([
+        { itemId: kheer.id, name: 'Kheer', reason: 'Kheer is sold out' },
+        { itemId: expect.any(String), name: 'Old Special', reason: expect.stringMatching(/is not on this menu/) },
+        { itemId: biryani.id, name: 'Chicken Biryani', reason: `option ${removedOption} is not a choice of Chicken Biryani` },
+      ]);
+    });
+
+    it('answers 422 when nothing can be added, and leaves the cart alone', async () => {
+      const me = user();
+      const restaurantId = randomUUID();
+      const kheer = newItem(restaurantId, 'Kheer', 15000);
+      menu.get(kheer.id)!.available = false;
+      const orderId = pastOrder(me['X-User-Id'], restaurantId, [{ itemId: kheer.id, name: 'Kheer', quantity: 1 }]);
+      const res = await http.post('/reorder').set(me).send({ orderId }).expect(422);
+      expect(res.body.message).toEqual(['Kheer: Kheer is sold out']);
+      expect((await http.get('/').set(me).expect(200)).body.lines).toEqual([]);
+    });
+
+    it('needs replace to swap a cart from another restaurant', async () => {
+      const me = user();
+      const other = randomUUID();
+      const tea = newItem(other, 'Doodh Patti', 9000);
+      await http.post('/items').set(me).send({ restaurantId: other, itemId: tea.id, quantity: 1 }).expect(201);
+      const restaurantId = randomUUID();
+      const biryani = newItem(restaurantId);
+      const orderId = pastOrder(me['X-User-Id'], restaurantId, [{ itemId: biryani.id, name: 'Chicken Biryani', quantity: 1 }]);
+
+      await http.post('/reorder').set(me).send({ orderId }).expect(409);
+      expect((await http.get('/').set(me).expect(200)).body.restaurantId).toBe(other);
+      const res = await http.post('/reorder').set(me).send({ orderId, replace: true }).expect(201);
+      expect(res.body.cart).toMatchObject({ restaurantId, lines: [{ itemId: biryani.id }] });
+    });
+
+    it('only reorders my own orders', async () => {
+      const someoneElse = randomUUID();
+      const restaurantId = randomUUID();
+      const biryani = newItem(restaurantId);
+      const orderId = pastOrder(someoneElse, restaurantId, [{ itemId: biryani.id, name: 'Chicken Biryani', quantity: 1 }]);
+      await http.post('/reorder').set(user()).send({ orderId }).expect(404);
+      await http.post('/reorder').set(user()).send({ orderId: 'nope' }).expect(400);
+      await http.post('/reorder').send({ orderId }).expect(401);
+    });
+
+    it('answers 503 when order-service fails', async () => {
+      ordersDown = true;
+      await http.post('/reorder').set(user()).send({ orderId: randomUUID() }).expect(503);
+    });
   });
 });

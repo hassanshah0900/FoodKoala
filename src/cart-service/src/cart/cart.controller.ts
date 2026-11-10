@@ -1,6 +1,14 @@
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { CurrentUser, IdentityGuard, type Identity } from '../identity/identity';
-import { addLineSchema, lineIdSchema, updateLineSchema, type AddLineDto, type UpdateLineDto } from './cart.dto';
+import {
+  addLineSchema,
+  lineIdSchema,
+  reorderSchema,
+  updateLineSchema,
+  type AddLineDto,
+  type ReorderDto,
+  type UpdateLineDto,
+} from './cart.dto';
 import { CartService } from './cart.service';
 
 @Controller()
@@ -36,5 +44,10 @@ export class CartController {
   @Delete('items/:lineId')
   remove(@CurrentUser() me: Identity, @Param('lineId', { schema: lineIdSchema }) lineId: string) {
     return this.cart.remove(me, lineId);
+  }
+
+  @Post('reorder')
+  reorder(@CurrentUser() me: Identity, @Body({ schema: reorderSchema }) body: ReorderDto) {
+    return this.cart.reorder(me, body);
   }
 }

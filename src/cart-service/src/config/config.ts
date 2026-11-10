@@ -9,6 +9,9 @@ const configSchema = z.object({
   /** menu-service prices every cart line (POST /restaurants/{id}/price). */
   MENU_SERVICE_URL: z.url().default('http://localhost:3004'),
   MENU_SERVICE_TIMEOUT_MS: z.coerce.number().int().positive().default(3000),
+  /** order-service, asked for the caller's past order when they reorder it. */
+  ORDER_SERVICE_URL: z.url().default('http://localhost:3006'),
+  ORDER_SERVICE_TIMEOUT_MS: z.coerce.number().int().positive().default(3000),
   CART_TTL_DAYS: z.coerce.number().int().positive().default(7),
   MAX_CART_LINES: z.coerce.number().int().positive().default(50),
 });

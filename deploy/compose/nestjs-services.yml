@@ -114,6 +114,8 @@ services:
       REDIS_URL: redis://redis:6379
       # Prices every cart line
       MENU_SERVICE_URL: http://menu-service:3004
+      # Reads past orders for reorder. No depends_on: order-service already depends on cart-service.
+      ORDER_SERVICE_URL: http://order-service:3006
     depends_on:
       redis: { condition: service_healthy }
       menu-service: { condition: service_started }

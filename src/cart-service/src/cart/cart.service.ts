@@ -3,15 +3,26 @@ import { randomUUID } from 'node:crypto';
 import { APP_CONFIG, type AppConfig } from '../config/config';
 import type { Identity } from '../identity/identity';
 import { MenuClient, type LineToPrice } from '../menu/menu-client';
-import type { AddLineDto, UpdateLineDto } from './cart.dto';
+import { OrderClient } from '../orders/order-client';
+import type { AddLineDto, ReorderDto, UpdateLineDto } from './cart.dto';
 import { addLine, findLine, removeLine, replaceLine, sortedIds, toView, type CartView } from './cart.rules';
 import { CartStore, type StoredCart, type StoredLine } from './cart.store';
+
+/** A line of a reordered order that could not be added. */
+export interface Skipped {
+  itemId: string;
+  name: string;
+  reason: string;
+}
+
+const toPrice = (l: LineToPrice): LineToPrice => ({ itemId: l.itemId, quantity: l.quantity, optionIds: l.optionIds });
 
 @Injectable()
 export class CartService {
   constructor(
     private readonly store: CartStore,
     private readonly menu: MenuClient,
+    private readonly orders: OrderClient,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 
@@ -45,6 +56,51 @@ export class CartService {
 
   async remove(me: Identity, lineId: string): Promise<CartView> {
     return this.view(await this.store.update(me.userId, (current) => removeLine(current, lineId, new Date())));
+  }
+
+  /**
+   * Adds the lines of one of the caller's orders, at today's prices. Lines
+   * the menu can no longer serve are left out and reported in `skipped`.
+   */
+  async reorder(me: Identity, { orderId, replace }: ReorderDto): Promise<{ cart: CartView; skipped: Skipped[] }> {
+    const order = await this.orders.get(me, orderId);
+    let lines = order.lines.map((l) => ({ ...l, optionIds: sortedIds(l.optionIds) }));
+    const skipped: Skipped[] = [];
+
+    let pricing = await this.menu.price(order.restaurantId, lines.map(toPrice));
+    if (!pricing.ok) {
+      const unplaced = pricing.problems.filter((p) => p.line === null);
+      // A problem with no line (e.g. the restaurant has no menu) leaves nothing to add.
+      if (unplaced.length) throw new UnprocessableEntityException(unplaced.map((p) => p.message));
+      const reasons = new Map<number, string[]>();
+      for (const p of pricing.problems) reasons.set(p.line!, [...(reasons.get(p.line!) ?? []), p.message]);
+      lines.forEach((l, i) => {
+        if (reasons.has(i)) skipped.push({ itemId: l.itemId, name: l.name, reason: reasons.get(i)!.join('; ') });
+      });
+      lines = lines.filter((_, i) => !reasons.has(i));
+      if (!lines.length) {
+        throw new UnprocessableEntityException(skipped.map((s) => `${s.name}: ${s.reason}`));
+      }
+      pricing = await this.menu.price(order.restaurantId, lines.map(toPrice));
+      if (!pricing.ok) throw new UnprocessableEntityException(pricing.problems.map((p) => p.message));
+    }
+
+    const priced = pricing.lines;
+    const ids = lines.map(() => randomUUID());
+    const now = new Date();
+    const cart = await this.store.update(me.userId, (current) =>
+      lines.reduce<StoredCart | null>(
+        (next, l, i) =>
+          addLine(
+            next,
+            { restaurantId: order.restaurantId, ...l, replace: i === 0 && replace },
+            { name: priced[i].name, options: priced[i].options, unitPricePaisa: priced[i].unitPricePaisa },
+            { id: ids[i], now, maxLines: this.config.MAX_CART_LINES },
+          ),
+        current,
+      ),
+    );
+    return { cart: await this.view(cart), skipped };
   }
 
   async clear(me: Identity): Promise<void> {

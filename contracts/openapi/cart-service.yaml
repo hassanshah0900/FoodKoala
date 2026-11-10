@@ -131,6 +131,54 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '503': { $ref: '#/components/responses/Unavailable' }
 
+  /reorder:
+    post:
+      tags: [cart]
+      operationId: reorder
+      summary: Put the items of one of my past orders back in the cart
+      description: |
+        Adds every line of the order (item, quantity, choices, note) as if
+        added one by one, at today's prices. Lines the menu can no longer
+        serve as they were (sold out, removed, a choice gone) are left out
+        and listed in `skipped`. order-service is asked for the order with
+        the caller's identity, so only their own orders can be reordered.
+        Merging into the same restaurant's cart follows `POST /items`, so a
+        line going over 50 of the same item gets 400.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Reorder' }
+            example: { orderId: 9a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d }
+      responses:
+        '201':
+          description: Cart with the order's lines added
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReorderResult' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404':
+          description: No such order of mine
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: The cart holds items from another restaurant (send `replace`), or would go over 50 lines
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '422':
+          description: None of the order's lines can be served any more; `message` lists why
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '503':
+          description: order-service, menu-service or Redis could not be reached
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
   /healthz:
     get:
       tags: [health]
@@ -160,6 +208,33 @@ components:
       description: Access token from auth-service, verified by api-gateway.
 
   schemas:
+    Reorder:
+      type: object
+      required: [orderId]
+      additionalProperties: false
+      properties:
+        orderId: { type: string, format: uuid }
+        replace:
+          type: boolean
+          default: false
+          description: Empty a cart holding another restaurant's items first
+
+    ReorderResult:
+      type: object
+      required: [cart, skipped]
+      properties:
+        cart: { $ref: '#/components/schemas/Cart' }
+        skipped:
+          type: array
+          description: The order's lines that were left out, in order
+          items:
+            type: object
+            required: [itemId, name, reason]
+            properties:
+              itemId: { type: string, format: uuid }
+              name: { type: string, description: As it was ordered }
+              reason: { type: string, description: What menu-service said }
+
     AddLine:
       type: object
       required: [restaurantId, itemId, quantity]
