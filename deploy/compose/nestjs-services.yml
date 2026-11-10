@@ -55,6 +55,8 @@ services:
     ports: ["3002:3002"]
     environment:
       DATABASE_URL: *postgres-url
+      # Checks restaurants are listed before they become favourites, and shows them
+      RESTAURANT_SERVICE_URL: http://restaurant-service:3003
     depends_on:
       user-migrate: { condition: service_completed_successfully }
     healthcheck:
