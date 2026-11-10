@@ -26,3 +26,9 @@ export const updateLineSchema = z
 export type UpdateLineDto = z.output<typeof updateLineSchema>;
 
 export const lineIdSchema = z.uuid();
+
+export const reorderSchema = z.strictObject({
+  orderId: z.uuid(),
+  replace: z.boolean().default(false),
+});
+export type ReorderDto = z.output<typeof reorderSchema>;
