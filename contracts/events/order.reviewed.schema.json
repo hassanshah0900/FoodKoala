@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "order.reviewed",
+  "title": "OrderReviewed",
+  "description": "`data` of the order.reviewed event, published by order-service when a customer rates a delivered order. Each order is reviewed at most once and a review never changes, so consumers can apply it once per orderId. Keyed by orderId.",
+  "type": "object",
+  "required": ["orderId", "customerId", "restaurantId", "riderId", "restaurantRating", "riderRating", "comment", "reviewedAt"],
+  "properties": {
+    "orderId": { "type": "string", "format": "uuid" },
+    "customerId": { "type": "string", "format": "uuid" },
+    "restaurantId": { "type": "string", "format": "uuid" },
+    "riderId": { "type": ["string", "null"], "format": "uuid", "description": "Who delivered the order; null when an admin recorded the delivery" },
+    "restaurantRating": { "type": "integer", "minimum": 1, "maximum": 5 },
+    "riderRating": { "type": ["integer", "null"], "minimum": 1, "maximum": 5, "description": "Null when there was no rider or the customer didn't rate them" },
+    "comment": { "type": ["string", "null"], "description": "About the restaurant's food; shown publicly without the customer's identity" },
+    "reviewedAt": { "type": "string", "format": "date-time" }
+  }
+}

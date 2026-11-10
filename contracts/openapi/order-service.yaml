@@ -40,10 +40,16 @@ info:
     see the orders of their restaurants. Admins see every order. Anyone else
     gets 404.
 
-    **Events.** Every order placed and every status change is written to an
-    outbox in the same transaction as the change, for publishing to Kafka as
-    `order.placed` and `order.status_changed` (`contracts/events`). It reads
-    `delivery.picked_up` and `delivery.delivered`.
+    **Reviews.** Within 7 days of delivery (`REVIEW_WINDOW_DAYS`) the
+    customer can rate the order once: the restaurant from 1 to 5, the rider
+    from 1 to 5 when a rider delivered it, and an optional comment. A review
+    can't be changed afterwards.
+
+    **Events.** Every order placed, every status change and every review is
+    written to an outbox in the same transaction as the change, for
+    publishing to Kafka as `order.placed`, `order.status_changed` and
+    `order.reviewed` (`contracts/events`). It reads `delivery.picked_up` and
+    `delivery.delivered`.
 
     **Money** is in paisa (integer, 1 PKR = 100 paisa). Menu prices include
     sales tax.
@@ -63,6 +69,8 @@ tags:
     description: Reading orders and moving them along
   - name: restaurant
     description: A restaurant's incoming orders
+  - name: reviews
+    description: The customer's rating of a delivered order
   - name: health
     description: Liveness and readiness probes
 
@@ -204,6 +212,54 @@ paths:
               schema: { $ref: '#/components/schemas/Error' }
         '503': { $ref: '#/components/responses/Unavailable' }
 
+  /{id}/review:
+    parameters:
+      - $ref: '#/components/parameters/OrderId'
+    get:
+      tags: [reviews]
+      operationId: getOrderReview
+      summary: The review of an order
+      description: Visible to whoever can see the order. 404 until it is reviewed.
+      responses:
+        '200':
+          description: Review
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Review' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+    post:
+      tags: [reviews]
+      operationId: reviewOrder
+      summary: Rate a delivered order (its customer only, once)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReviewCreate' }
+            example: { restaurantRating: 5, riderRating: 4, comment: Biryani was hot and on time }
+      responses:
+        '201':
+          description: Review
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Review' }
+        '400':
+          description: Invalid body, or `riderRating` for an order no rider delivered
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Not delivered, already reviewed, or the review window has closed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
   /healthz:
     get:
       tags: [health]
@@ -286,6 +342,31 @@ components:
           schema: { $ref: '#/components/schemas/Error' }
 
   schemas:
+    ReviewCreate:
+      type: object
+      required: [restaurantRating]
+      additionalProperties: false
+      properties:
+        restaurantRating: { type: integer, minimum: 1, maximum: 5 }
+        riderRating:
+          type: [integer, 'null']
+          minimum: 1
+          maximum: 5
+          description: Only for orders a rider delivered
+        comment: { type: [string, 'null'], minLength: 1, maxLength: 500 }
+
+    Review:
+      type: object
+      required: [orderId, restaurantId, riderId, restaurantRating, riderRating, comment, createdAt]
+      properties:
+        orderId: { type: string, format: uuid }
+        restaurantId: { type: string, format: uuid }
+        riderId: { type: [string, 'null'], format: uuid, description: Who delivered it; null when an admin recorded the delivery }
+        restaurantRating: { type: integer, minimum: 1, maximum: 5 }
+        riderRating: { type: [integer, 'null'], minimum: 1, maximum: 5 }
+        comment: { type: [string, 'null'] }
+        createdAt: { type: string, format: date-time }
+
     Status:
       type: string
       enum: [placed, accepted, ready, picked_up, delivered, rejected, cancelled]

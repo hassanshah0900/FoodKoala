@@ -2,9 +2,9 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "restaurant.updated",
   "title": "RestaurantUpdated",
-  "description": "`data` of the restaurant.updated event, published by restaurant-service after every change to a restaurant, its opening hours or its delivery zones, whatever its status. It is the restaurant's whole public state, not a diff: a consumer replaces what it has. Keyed by restaurantId. `revision` grows by one with every change, so a consumer can drop an event older than what it already holds (redelivery, or a backfill racing a live change).",
+  "description": "`data` of the restaurant.updated event, published by restaurant-service after every change to a restaurant, its opening hours, its delivery zones or its rating, whatever its status. It is the restaurant's whole public state, not a diff: a consumer replaces what it has. Keyed by restaurantId. `revision` grows by one with every change, so a consumer can drop an event older than what it already holds (redelivery, or a backfill racing a live change).",
   "type": "object",
-  "required": ["restaurantId", "revision", "name", "description", "cuisines", "status", "address", "location", "logoUrl", "coverUrl", "hours", "pausedUntil", "zones", "updatedAt"],
+  "required": ["restaurantId", "revision", "name", "description", "cuisines", "status", "address", "location", "logoUrl", "coverUrl", "hours", "pausedUntil", "rating", "zones", "updatedAt"],
   "properties": {
     "restaurantId": { "type": "string", "format": "uuid" },
     "revision": { "type": "integer", "minimum": 1 },
@@ -38,6 +38,14 @@
       }
     },
     "pausedUntil": { "type": ["string", "null"], "format": "date-time", "description": "Not taking orders until then; may already be in the past" },
+    "rating": {
+      "type": "object",
+      "required": ["average", "count"],
+      "properties": {
+        "average": { "type": ["number", "null"], "description": "Mean restaurant rating, one decimal; null until the first review" },
+        "count": { "type": "integer" }
+      }
+    },
     "zones": {
       "type": "array",
       "items": {
