@@ -15,7 +15,10 @@ const configSchema = z
       .string()
       .optional()
       .transform((s) => {
-        const brokers = s?.split(',').map((b) => b.trim()).filter(Boolean);
+        const brokers = s
+          ?.split(',')
+          .map((b) => b.trim())
+          .filter(Boolean);
         return brokers?.length ? brokers : undefined;
       })
       .pipe(z.array(z.string().regex(/^[\w.-]+:\d+$/, 'expected host:port')).optional()),
@@ -36,7 +39,11 @@ const configSchema = z
   })
   .superRefine((c, ctx) => {
     if (c.SMS_PROVIDER === 'log' && c.NODE_ENV === 'production') {
-      ctx.addIssue({ code: 'custom', path: ['SMS_PROVIDER'], message: 'log is for development; use twilio in production' });
+      ctx.addIssue({
+        code: 'custom',
+        path: ['SMS_PROVIDER'],
+        message: 'log is for development; use twilio in production',
+      });
     }
     if (c.SMS_PROVIDER === 'twilio') {
       for (const key of ['TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_FROM'] as const) {

@@ -25,7 +25,8 @@ describe('TwilioSmsSender', () => {
   afterAll(() => new Promise((r) => server.close(r)));
 
   const sid = `AC${'1'.repeat(32)}`;
-  const sender = (from = '+15005550006') => new TwilioSmsSender({ accountSid: sid, authToken: 'tok', from, apiUrl, timeoutMs: 1000 });
+  const sender = (from = '+15005550006') =>
+    new TwilioSmsSender({ accountSid: sid, authToken: 'tok', from, apiUrl, timeoutMs: 1000 });
 
   it('posts the message with basic auth and returns the message sid', async () => {
     reply = { status: 201, body: { sid: 'SM123' } };
@@ -45,7 +46,10 @@ describe('TwilioSmsSender', () => {
 
   it('gives up on a bad number and retries an outage or rate limit', async () => {
     reply = { status: 400, body: { code: 21211, message: "The 'To' number is not valid." } };
-    await expect(sender().send('+920', 'x')).rejects.toMatchObject({ retryable: false, message: expect.stringContaining('21211') });
+    await expect(sender().send('+920', 'x')).rejects.toMatchObject({
+      retryable: false,
+      message: expect.stringContaining('21211'),
+    });
     for (const status of [429, 503]) {
       reply = { status, body: {} };
       await expect(sender().send('+923001234567', 'x')).rejects.toMatchObject({ retryable: true });
@@ -53,7 +57,13 @@ describe('TwilioSmsSender', () => {
   });
 
   it('retries when Twilio is unreachable', async () => {
-    const down = new TwilioSmsSender({ accountSid: sid, authToken: 't', from: '+15005550006', apiUrl: 'http://127.0.0.1:1', timeoutMs: 500 });
+    const down = new TwilioSmsSender({
+      accountSid: sid,
+      authToken: 't',
+      from: '+15005550006',
+      apiUrl: 'http://127.0.0.1:1',
+      timeoutMs: 500,
+    });
     await expect(down.send('+923001234567', 'x')).rejects.toEqual(expect.any(SmsError));
     await expect(down.send('+923001234567', 'x')).rejects.toMatchObject({ retryable: true });
   });

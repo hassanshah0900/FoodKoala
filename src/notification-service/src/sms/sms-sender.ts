@@ -55,6 +55,9 @@ export class TwilioSmsSender implements SmsSender {
     if (res.ok && reply.sid) return reply.sid;
     // 429 and 5xx are worth another try; other 4xx (bad number, blocked) are not.
     const retryable = res.status === 429 || res.status >= 500;
-    throw new SmsError(`Twilio answered ${res.status}${reply.code ? ` (${reply.code})` : ''}: ${reply.message ?? 'no message'}`, retryable);
+    throw new SmsError(
+      `Twilio answered ${res.status}${reply.code ? ` (${reply.code})` : ''}: ${reply.message ?? 'no message'}`,
+      retryable,
+    );
   }
 }

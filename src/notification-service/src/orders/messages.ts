@@ -12,13 +12,20 @@ export interface Message {
   sms: { phone: string; body: string } | null;
 }
 
-const KARACHI_TIME = new Intl.DateTimeFormat('en-PK', { timeZone: 'Asia/Karachi', hour: 'numeric', minute: '2-digit', hour12: true });
+const KARACHI_TIME = new Intl.DateTimeFormat('en-PK', {
+  timeZone: 'Asia/Karachi',
+  hour: 'numeric',
+  minute: '2-digit',
+  hour12: true,
+});
 
 /** 7:45 pm, in Pakistan time. */
-export const clock = (iso: string) => KARACHI_TIME.format(new Date(iso)).replace(/\s?([AP]M)$/i, (_, m: string) => ` ${m.toLowerCase()}`);
+export const clock = (iso: string) =>
+  KARACHI_TIME.format(new Date(iso)).replace(/\s?([AP]M)$/i, (_, m: string) => ` ${m.toLowerCase()}`);
 
 /** Rs 999, or Rs 999.50. */
-export const rupees = (paisa: number) => `Rs ${paisa % 100 === 0 ? (paisa / 100).toLocaleString('en-PK') : (paisa / 100).toFixed(2)}`;
+export const rupees = (paisa: number) =>
+  `Rs ${paisa % 100 === 0 ? (paisa / 100).toLocaleString('en-PK') : (paisa / 100).toFixed(2)}`;
 
 /** A short order reference people can read out on the phone: the first 8 characters of the id. */
 export const ref = (orderId: string) => `#${orderId.slice(0, 8).toUpperCase()}`;
@@ -70,7 +77,10 @@ function customerMessage(event: Exclude<OrderEvent, { type: 'delivery.assigned' 
 
   if (event.type === 'order.placed') {
     const { totals, paymentMethod, estimatedDeliveryAt } = event.data;
-    const paying = paymentMethod === 'cod' ? `Pay ${rupees(totals.totalPaisa)} in cash on delivery.` : `Total ${rupees(totals.totalPaisa)}.`;
+    const paying =
+      paymentMethod === 'cod'
+        ? `Pay ${rupees(totals.totalPaisa)} in cash on delivery.`
+        : `Total ${rupees(totals.totalPaisa)}.`;
     return {
       ...base,
       kind: 'order_placed',
@@ -88,13 +98,25 @@ function customerMessage(event: Exclude<OrderEvent, { type: 'delivery.assigned' 
       return { ...base, kind: 'order_accepted', title: 'Order accepted', body, sms: sms(body) };
     }
     case 'ready':
-      return { ...base, kind: 'order_ready', title: 'Food is ready', body: `Your order ${order} is packed and waiting for the rider.`, sms: null };
+      return {
+        ...base,
+        kind: 'order_ready',
+        title: 'Food is ready',
+        body: `Your order ${order} is packed and waiting for the rider.`,
+        sms: null,
+      };
     case 'picked_up': {
       const body = `Your order ${order} from ${c.restaurantName} is on its way.`;
       return { ...base, kind: 'order_picked_up', title: 'On its way', body, sms: sms(body) };
     }
     case 'delivered':
-      return { ...base, kind: 'order_delivered', title: 'Delivered', body: `Your order ${order} has been delivered. Enjoy your meal!`, sms: null };
+      return {
+        ...base,
+        kind: 'order_delivered',
+        title: 'Delivered',
+        body: `Your order ${order} has been delivered. Enjoy your meal!`,
+        sms: null,
+      };
     case 'rejected': {
       const body = `${c.restaurantName} couldn't take your order ${order}${because(c.reason)}. You have not been charged.`;
       return { ...base, kind: 'order_rejected', title: 'Order not accepted', body, sms: sms(body) };

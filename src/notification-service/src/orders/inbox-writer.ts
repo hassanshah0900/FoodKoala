@@ -21,12 +21,21 @@ export class InboxWriter {
       for (const m of messages) {
         const [row] = await tx
           .insert(notifications)
-          .values({ eventId, userId: m.userId, kind: m.kind, title: m.title, body: m.body, data: m.data, createdAt: occurredAt })
+          .values({
+            eventId,
+            userId: m.userId,
+            kind: m.kind,
+            title: m.title,
+            body: m.body,
+            data: m.data,
+            createdAt: occurredAt,
+          })
           .onConflictDoNothing({ target: [notifications.eventId, notifications.userId] })
           .returning({ id: notifications.id });
         if (!row) continue;
         added++;
-        if (m.sms) await tx.insert(smsMessages).values({ notificationId: row.id, phone: m.sms.phone, body: m.sms.body });
+        if (m.sms)
+          await tx.insert(smsMessages).values({ notificationId: row.id, phone: m.sms.phone, body: m.sms.body });
       }
       return added;
     });
