@@ -1,10 +1,11 @@
 import { ConflictException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { InjectDrizzle } from '@nestjs/drizzle';
-import { and, desc, eq, inArray, notInArray, or, type SQL, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, notInArray, or, sql } from 'drizzle-orm';
 import { CartClient } from '../clients/clients';
 import type { Database, Tx } from '../db/database';
 import { isUniqueViolation } from '../db/errors';
 import { orders, type VoucherRow, vouchers } from '../db/schema';
+import { countWhere } from '../db/sql';
 import type { Identity } from '../identity/identity';
 import { assertCartNotEmpty } from '../orders/checkout';
 import type { Page } from '../orders/order.view';
@@ -98,12 +99,11 @@ export class VouchersService {
   private async useOf(db: Database | Tx, voucherId: string, customerId: string): Promise<VoucherUse> {
     const isVoucher = eq(orders.voucherId, voucherId);
     const isCustomer = eq(orders.customerId, customerId);
-    const count = (where: SQL) => sql<number>`count(*) filter (where ${where})`.mapWith(Number);
     const [use] = await db
       .select({
-        total: count(isVoucher),
-        byCustomer: count(and(isVoucher, isCustomer)!),
-        customerOrders: count(isCustomer),
+        total: countWhere(isVoucher),
+        byCustomer: countWhere(and(isVoucher, isCustomer)!),
+        customerOrders: countWhere(isCustomer),
       })
       .from(orders)
       .where(and(standing, or(isVoucher, isCustomer)));

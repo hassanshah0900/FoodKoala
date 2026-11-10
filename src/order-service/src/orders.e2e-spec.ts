@@ -6,7 +6,6 @@ import type { Database } from './db/database';
 import { orders, outbox } from './db/schema';
 import { DeliveryEventConsumer } from './delivery/delivery-event-consumer';
 import { AcceptTimeouts } from './orders/accept-timeouts';
-import { OrdersService } from './orders/orders.service';
 import { carts, cleared, fillCart, type Headers, newUser, outage, scenario, startApp } from './testing/e2e';
 
 describe('order-service (e2e)', () => {
@@ -388,9 +387,7 @@ describe('order-service (e2e)', () => {
     /** An order the rider delivered `daysAgo` days ago. */
     const delivered = async (s: ReturnType<typeof scenario>, daysAgo = 0) => {
       const order = await place(s);
-      await http.post(`/${order.id}/status`).set(s.owner).send({ status: 'accepted', prepTimeMinutes: 15 }).expect(200);
-      const at = new Date(Date.now() - daysAgo * 24 * 3600_000);
-      await app.get(OrdersService).applyRiderEvent(order.id, 'delivered', rider, at);
+      await t.deliver(s, order.id, rider, new Date(Date.now() - daysAgo * 24 * 3600_000));
       return order;
     };
     const review = (who: Headers, orderId: string, body: object) => http.post(`/${orderId}/review`).set(who).send(body);

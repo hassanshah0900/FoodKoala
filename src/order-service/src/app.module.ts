@@ -11,6 +11,9 @@ import { OrdersController } from './orders/orders.controller';
 import { OrdersService } from './orders/orders.service';
 import { OutboxRelay } from './outbox/outbox-relay';
 import { EVENT_PUBLISHER, KafkaPublisher } from './outbox/publisher';
+import { ReportsController } from './reports/reports.controller';
+import { ReportsService } from './reports/reports.service';
+import { RestaurantAccess } from './restaurants/restaurant-access';
 import { ReviewsController } from './reviews/reviews.controller';
 import { ReviewsService } from './reviews/reviews.service';
 import { VouchersController } from './vouchers/vouchers.controller';
@@ -25,11 +28,13 @@ import { VouchersService } from './vouchers/vouchers.service';
     }),
   ],
   // VouchersController comes before OrdersController, whose GET /:id would otherwise take GET /vouchers.
-  controllers: [HealthController, VouchersController, OrdersController, ReviewsController],
+  controllers: [HealthController, VouchersController, OrdersController, ReviewsController, ReportsController],
   providers: [
     OrdersService,
     ReviewsService,
     VouchersService,
+    ReportsService,
+    RestaurantAccess,
     AcceptTimeouts,
     CartClient,
     UserClient,

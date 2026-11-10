@@ -1,4 +1,4 @@
-import { ConflictException, ForbiddenException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ConflictException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectDrizzle } from '@nestjs/drizzle';
 import { and, asc, desc, eq, inArray, lt, type SQL } from 'drizzle-orm';
 import { CartClient, RestaurantClient, UserClient } from '../clients/clients';
@@ -16,6 +16,7 @@ import {
   vouchers,
 } from '../db/schema';
 import { type Identity, isAdmin } from '../identity/identity';
+import { RestaurantAccess } from '../restaurants/restaurant-access';
 import { VouchersService } from '../vouchers/vouchers.service';
 import { checkCart, draftOrder, withDiscount } from './checkout';
 import { orderPlaced, orderStatusChanged } from './events';
@@ -38,6 +39,7 @@ export class OrdersService {
     private readonly users: UserClient,
     private readonly restaurants: RestaurantClient,
     private readonly vouchers: VouchersService,
+    private readonly access: RestaurantAccess,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 
@@ -120,11 +122,7 @@ export class OrdersService {
 
   /** A restaurant's orders, for its owner or an admin. */
   async listForRestaurant(me: Identity, restaurantId: string, query: RestaurantOrdersQuery): Promise<Page<Order>> {
-    if (!isAdmin(me)) {
-      const owner = await this.restaurants.isOwner(me, restaurantId);
-      if (owner === null) throw new NotFoundException('Restaurant not found');
-      if (!owner) throw new ForbiddenException('Not your restaurant');
-    }
+    await this.access.assertManages(me, restaurantId);
     const where = and(
       eq(orders.restaurantId, restaurantId),
       query.status ? inArray(orders.status, query.status) : undefined,
