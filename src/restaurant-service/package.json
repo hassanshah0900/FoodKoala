@@ -11,9 +11,11 @@
     "typecheck": "tsc --noEmit",
     "test:e2e": "vitest run --config vitest.e2e.config.mts",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "node --env-file-if-exists=.env dist/db/migrate.js"
+    "db:migrate": "node --env-file-if-exists=.env dist/db/migrate.js",
+    "events:backfill": "node --env-file-if-exists=.env dist/events/backfill.js"
   },
   "dependencies": {
+    "@confluentinc/kafka-javascript": "^1.11.0",
     "@nestjs/common": "^12.4.0",
     "@nestjs/core": "^12.4.0",
     "@nestjs/drizzle": "^0.0.2",

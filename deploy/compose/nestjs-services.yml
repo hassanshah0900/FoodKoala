@@ -71,8 +71,11 @@ services:
     environment:
       # Needs PostGIS, which the postgis/postgis image in infra.yml has.
       DATABASE_URL: *postgres-url
+      # Publishes restaurants.outbox (restaurant.updated); retries on its own until Kafka is up
+      KAFKA_BROKERS: kafka:29092
     depends_on:
       restaurant-migrate: { condition: service_completed_successfully }
+      kafka: { condition: service_started }
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3003/readyz"]
       <<: *healthcheck
@@ -88,8 +91,11 @@ services:
       DATABASE_URL: *postgres-url
       # Asked who owns a restaurant before menu changes (ADR 0006)
       RESTAURANT_SERVICE_URL: http://restaurant-service:3003
+      # Publishes menu.outbox (menu.updated); retries on its own until Kafka is up
+      KAFKA_BROKERS: kafka:29092
     depends_on:
       menu-migrate: { condition: service_completed_successfully }
+      kafka: { condition: service_started }
       restaurant-service: { condition: service_started }
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3004/readyz"]

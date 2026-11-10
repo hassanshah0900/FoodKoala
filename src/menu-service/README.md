@@ -14,7 +14,9 @@ Restaurant menus (categories, items, sizes and add-ons, sold-out flags) and the 
 - **Choices** are option groups on an item: a size is `minSelect: 1, maxSelect: 1`, extras are e.g. `0` to `2`. Saved options get ids; sending an id back keeps it, so carts referencing it stay valid.
 - **Pricing.** `POST /restaurants/{id}/price` checks order lines against the menu (item on this menu and available, choices valid and available, group limits) and returns unit prices, line totals and the subtotal. It is the only place prices are computed; cart and order services call it and never trust client prices. Problems come back as 422 with one message per problem.
 
-Money is in paisa. Data lives in the `menu` Postgres schema (`categories`, `items`); migrations are tracked in `drizzle.menu_migrations`.
+- **Events.** Every menu change writes [`menu.updated`](../../contracts/events/menu.updated.schema.json) to `menu.outbox` in the same transaction: the whole menu (without option groups) and a `revision` that grows per change ([state events](../../contracts/README.md#event-envelope)). A relay publishes the outbox to Kafka when `KAFKA_BROKERS` is set. search-service indexes dishes from these; `npm run events:backfill` republishes every menu for a new consumer.
+
+Money is in paisa. Data lives in the `menu` Postgres schema (`categories`, `items`, `menus` for revisions, `outbox`); migrations are tracked in `drizzle.menu_migrations`.
 
 ## Run
 

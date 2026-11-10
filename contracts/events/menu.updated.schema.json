@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "menu.updated",
+  "title": "MenuUpdated",
+  "description": "`data` of the menu.updated event, published by menu-service after every change to a restaurant's menu (categories, items, their order or availability). It is the whole menu, not a diff: a consumer replaces what it has. Keyed by restaurantId. `revision` grows by one with every change, so a consumer can drop an event older than what it already holds. Option groups are left out; read them from menu-service.",
+  "type": "object",
+  "required": ["restaurantId", "revision", "categories", "updatedAt"],
+  "properties": {
+    "restaurantId": { "type": "string", "format": "uuid" },
+    "revision": { "type": "integer", "minimum": 1 },
+    "categories": {
+      "type": "array",
+      "description": "In menu order",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "description", "items"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "description": { "type": ["string", "null"] },
+          "items": {
+            "type": "array",
+            "description": "In menu order",
+            "items": {
+              "type": "object",
+              "required": ["id", "name", "description", "imageUrl", "pricePaisa", "isAvailable"],
+              "properties": {
+                "id": { "type": "string", "format": "uuid" },
+                "name": { "type": "string" },
+                "description": { "type": ["string", "null"] },
+                "imageUrl": { "type": ["string", "null"] },
+                "pricePaisa": { "type": "integer", "description": "Base price, before options" },
+                "isAvailable": { "type": "boolean" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "updatedAt": { "type": "string", "format": "date-time" }
+  }
+}

@@ -6,7 +6,7 @@ import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { AppModule } from './app.module';
 import type { Database } from './db/database';
-import { deliveryZones, restaurants } from './db/schema';
+import { deliveryZones, outbox, restaurants } from './db/schema';
 import { setupApp } from './setup-app';
 
 const createdUsers: string[] = [];
@@ -85,6 +85,8 @@ describe('restaurant-service (e2e)', () => {
   });
 
   afterAll(async () => {
+    const mine = await db.select({ id: restaurants.id }).from(restaurants).where(inArray(restaurants.ownerId, createdUsers));
+    if (mine.length) await db.delete(outbox).where(inArray(outbox.key, mine.map((r) => r.id)));
     await db.delete(restaurants).where(inArray(restaurants.ownerId, createdUsers));
     await app.close();
   });

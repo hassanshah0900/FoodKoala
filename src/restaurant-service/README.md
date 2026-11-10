@@ -14,7 +14,9 @@ Restaurant onboarding and review, opening hours, delivery zones and province (us
 - **Delivery zones** are GeoJSON polygons drawn on the map, each with its own delivery fee, minimum order and delivery time (up to 10 per restaurant). PostGIS rejects outlines that cross themselves.
 - **Browsing.** `GET /?lat=&lng=` lists approved restaurants with a zone containing the point, nearest first; when zones overlap, the cheapest fee applies. `GET /{id}/delivery-quote?lat=&lng=` answers "do you deliver here, and for how much" for checkout and order-service.
 
-Money is in paisa (`deliveryFeePaisa: 9900` is Rs 99). Data lives in the `restaurants` Postgres schema (`restaurants`, `delivery_zones` with a GiST index); migrations are tracked in `drizzle.restaurants_migrations`.
+- **Events.** Every change to a restaurant, its hours or its zones writes [`restaurant.updated`](../../contracts/events/restaurant.updated.schema.json) to `restaurants.outbox` in the same transaction: the whole public restaurant with its zones and a `revision` that grows per change ([state events](../../contracts/README.md#event-envelope)). A relay publishes the outbox to Kafka when `KAFKA_BROKERS` is set. search-service builds its index from these; `npm run events:backfill` republishes every restaurant for a new consumer.
+
+Money is in paisa (`deliveryFeePaisa: 9900` is Rs 99). Data lives in the `restaurants` Postgres schema (`restaurants`, `delivery_zones` with a GiST index, `outbox`); migrations are tracked in `drizzle.restaurants_migrations`.
 
 ## Run
 

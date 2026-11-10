@@ -23,6 +23,12 @@ Every event on Kafka uses this envelope; `data` follows the event's schema.
 
 Topic naming: `<domain>.<event>`, e.g. `order.placed`, `payment.completed`.
 
+**State events** (`restaurant.updated`, `menu.updated`) carry the whole
+current state of one thing, not what changed, plus a `revision` that grows
+by one per change. Consumers keep the highest revision they have seen and
+ignore anything older, so redeliveries and replays are harmless. A service
+can republish everything it owns (a backfill) to fill a new consumer.
+
 ## Identity headers
 
 Requests that `api-gateway` has authenticated reach services with these

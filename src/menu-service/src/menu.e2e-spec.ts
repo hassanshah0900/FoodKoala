@@ -1,14 +1,14 @@
 import { INestApplication } from '@nestjs/common';
 import { getDrizzleToken } from '@nestjs/drizzle';
 import { Test } from '@nestjs/testing';
-import { inArray } from 'drizzle-orm';
+import { asc, eq, inArray } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import request from 'supertest';
 import { AppModule } from './app.module';
 import type { Database } from './db/database';
-import { categories, items } from './db/schema';
+import { categories, items, menus, outbox } from './db/schema';
 import { setupApp } from './setup-app';
 
 /** Restaurant id -> owner id, as the stand-in restaurant-service knows them. */
@@ -81,6 +81,8 @@ describe('menu-service (e2e)', () => {
   afterAll(async () => {
     await db.delete(items).where(inArray(items.restaurantId, restaurantIds));
     await db.delete(categories).where(inArray(categories.restaurantId, restaurantIds));
+    await db.delete(menus).where(inArray(menus.restaurantId, restaurantIds));
+    await db.delete(outbox).where(inArray(outbox.key, restaurantIds));
     await app.close();
     await new Promise<void>((resolve) => restaurantService.close(() => resolve()));
   });
@@ -257,6 +259,71 @@ describe('menu-service (e2e)', () => {
         .send({ lines: [{ itemId: item.id, quantity: 1, optionIds: [single.id] }] })
         .expect(422);
       expect(res2.body.message).toEqual([`lines[0]: item ${item.id} is not on this menu`]);
+    });
+  });
+
+  describe('menu.updated', () => {
+    const events = async (restaurantId: string) => {
+      const rows = await db.select().from(outbox).where(eq(outbox.key, restaurantId)).orderBy(asc(outbox.id));
+      return rows.map((r) => {
+        expect(r.topic).toBe('menu.updated');
+        const env = r.payload as { id: string; type: string; source: string; data: any };
+        expect(env).toMatchObject({ id: r.eventId, type: 'menu.updated', source: 'menu-service' });
+        return env.data;
+      });
+    };
+
+    it('publishes the whole menu after every change, with a growing revision', async () => {
+      const r = newRestaurant();
+      const mains = await category(r, 'Biryani');
+      const drinks = await category(r, 'Drinks');
+      const item = await http.post(`/categories/${mains}/items`).set(r.owner).send(biryani).expect(201);
+      const cola = await http
+        .post(`/categories/${drinks}/items`)
+        .set(r.owner)
+        .send({ name: 'Cola', pricePaisa: 12000 })
+        .expect(201);
+      await http.patch(`/items/${item.body.id}`).set(r.owner).send({ isAvailable: false }).expect(200);
+      await http.patch(`/categories/${drinks}`).set(r.owner).send({ name: 'Cold drinks' }).expect(200);
+      await http.put(`/restaurants/${r.id}/categories/order`).set(r.owner).send({ ids: [drinks, mains] }).expect(204);
+      await http.delete(`/items/${cola.body.id}`).set(r.owner).expect(204);
+
+      const sent = await events(r.id);
+      expect(sent.map((e) => e.revision)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+      expect(sent[2].categories[0]).toEqual({
+        id: mains,
+        name: 'Biryani',
+        description: null,
+        items: [
+          {
+            id: item.body.id,
+            name: 'Chicken Biryani',
+            description: biryani.description,
+            imageUrl: null,
+            pricePaisa: 45000,
+            isAvailable: true,
+          },
+        ],
+      });
+      expect(sent[4].categories[0].items[0].isAvailable).toBe(false);
+      expect(sent[5].categories[1].name).toBe('Cold drinks');
+      expect(sent[6].categories.map((c: { id: string }) => c.id)).toEqual([drinks, mains]);
+      expect(sent[7]).toMatchObject({
+        restaurantId: r.id,
+        categories: [
+          { id: drinks, name: 'Cold drinks', items: [] },
+          { id: mains, items: [{ id: item.body.id }] },
+        ],
+      });
+    });
+
+    it('publishes nothing when a change is refused', async () => {
+      const r = newRestaurant();
+      const mains = await category(r);
+      await http.post(`/categories/${mains}/items`).set(r.owner).send(biryani).expect(201);
+      await http.delete(`/categories/${mains}`).set(r.owner).expect(409);
+      await http.patch(`/categories/${mains}`).set(newUser()).send({ name: 'Mine now' }).expect(403);
+      expect(await events(r.id)).toHaveLength(2);
     });
   });
 });
