@@ -9,15 +9,14 @@ import { getMenu } from '@/lib/api/menus';
 import { deliveryQuote, getRestaurant } from '@/lib/api/restaurants';
 import { currentCart } from '@/lib/cart';
 import { currentLocation } from '@/lib/current-location';
+import { isUuid } from '@/lib/params';
 import { currentUser } from '@/lib/session';
 
 type Props = { params: Promise<{ id: string }> };
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 /** The restaurant, or 404 for an id that can't be one (the API would answer 400). */
 async function load(id: string) {
-  if (!UUID.test(id)) notFound();
+  if (!isUuid(id)) notFound();
   const restaurant = await getRestaurant(id);
   if (!restaurant) notFound();
   return restaurant;

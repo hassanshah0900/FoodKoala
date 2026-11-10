@@ -1,7 +1,7 @@
 'use client';
 
 import { useActionState, useEffect, useState } from 'react';
-import { type LoginState, submitLogin } from '@/app/login/actions';
+import { type LoginState, submitLogin } from '@/app/(shop)/login/actions';
 import { formatPhone } from '@/lib/phone';
 
 const field =

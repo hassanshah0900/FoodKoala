@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { changeQuantity } from '@/app/cart/actions';
+import { changeQuantity } from '@/app/(shop)/cart/actions';
 import { MoneyRows } from '@/components/checkout/OrderSummary';
 import { BagIcon } from '@/components/icons';
 import type { Cart, Delivery } from '@/lib/api/types';

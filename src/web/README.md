@@ -28,22 +28,32 @@ their menus. Signing in, the cart, checkout and order tracking come next, then t
   it is delivered, rejected or cancelled; then what was ordered, the money and the address.
 - **`/login`**: sign in or sign up with a mobile number and the 6-digit code texted to it (auth-service).
 
+### Admin console (`/admin`)
+
+Only for users with the `admin` role (see `ADMIN_PHONES` in auth-service); guests are sent to log in and anyone
+else gets a 404. It has its own frame, with the sections down the side.
+
+- **`/admin`**: what is waiting: the oldest restaurant applications.
+- **`/admin/restaurants`**: restaurants by status (waiting for review, live, suspended, rejected).
+- **`/admin/restaurants/{id}`**: the details, opening hours and delivery zones an admin checks, what still stops
+  an approval, and the decision: approve, reject or suspend (with a reason the owner sees), reinstate.
+
 ## Sessions
 
 The access token (15 minutes) and the single-use refresh token are kept in httpOnly cookies, so scripts in the
 page never see them. `src/proxy.ts` runs before each page and server action: when the access token is missing
 or about to expire it trades the refresh token for a new pair, setting the cookies on both the request (so that
 render already uses them) and the response. A refresh token that auth-service refuses signs the user out.
-`lib/session.ts` gives pages `currentUser()`, `accessToken()` and `requireUser()`.
+`lib/session.ts` gives pages `currentUser()`, `accessToken()`, `requireUser()` and `requireAdmin()`.
 
 ## Layout
 
-| Folder            | What it holds                                                                                            |
-| ----------------- | -------------------------------------------------------------------------------------------------------- |
-| `src/app/`        | Routes. Each page loads its data on the server and arranges components. `actions.ts` saves the location. |
-| `src/components/` | Presentation only: they receive data as props and fetch nothing.                                         |
-| `src/lib/api/`    | One file per service the app calls through api-gateway, typed after `contracts/openapi`. Server only.    |
-| `src/lib/`        | Pure helpers (money, the location cookie, listing filters, menu prices), each with a `.spec.ts`.         |
+| Folder            | What it holds                                                                                                     |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `src/app/`        | Routes: each page loads its data and arranges components. `(shop)/` is the customer's side, `admin/` the console. |
+| `src/components/` | Presentation only: they receive data as props and fetch nothing.                                                  |
+| `src/lib/api/`    | One file per service the app calls through api-gateway, typed after `contracts/openapi`. Server only.             |
+| `src/lib/`        | Pure helpers (money, the location cookie, listing filters, menu prices), each with a `.spec.ts`.                  |
 
 **Design.** The palette is in `src/app/globals.css` as Tailwind theme tokens: `brand-600` (`#7a1fb3`) is the
 FoodKoala purple of buttons, links and the logo; lighter shades tint backgrounds, darker ones are hover states.

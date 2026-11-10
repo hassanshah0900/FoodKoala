@@ -1,4 +1,4 @@
-import { clockTime, deliveryWindow, distance, ratingCount, rupees } from './format';
+import { clockTime, dateTime, deliveryWindow, distance, ratingCount, rupees, shortDate } from './format';
 
 describe('format', () => {
   it.each([
@@ -23,4 +23,9 @@ describe('format', () => {
   ])('%i ratings read as %s', (n, text) => expect(ratingCount(n)).toBe(text));
 
   it('shows times in Pakistan', () => expect(clockTime('2026-11-10T08:30:00Z')).toBe('13:30'));
+
+  it('gives dates in Pakistan time', () => {
+    expect(shortDate('2026-11-09T20:30:00Z')).toBe('10 Nov 2026');
+    expect(dateTime('2026-11-09T20:30:00Z')).toBe('10 Nov, 01:30');
+  });
 });

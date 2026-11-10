@@ -8,16 +8,15 @@ import { addressTitle } from '@/lib/addresses';
 import { getOrder } from '@/lib/api/orders';
 import { rupees } from '@/lib/format';
 import { isFinal } from '@/lib/order-status';
+import { isUuid } from '@/lib/params';
 import { accessToken, requireUser } from '@/lib/session';
 
 export const metadata: Metadata = { title: 'Your order' };
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 export default async function OrderPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   await requireUser(`/orders/${id}`);
-  if (!UUID.test(id)) notFound();
+  if (!isUuid(id)) notFound();
   const order = await getOrder((await accessToken())!, id);
   if (!order) notFound();
   const a = order.deliveryAddress;

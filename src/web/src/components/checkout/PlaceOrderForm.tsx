@@ -1,7 +1,7 @@
 'use client';
 
 import { useActionState } from 'react';
-import { type PlaceOrderState, submitOrder } from '@/app/checkout/actions';
+import { type PlaceOrderState, submitOrder } from '@/app/(shop)/checkout/actions';
 import { CashIcon } from '@/components/icons';
 import { rupees } from '@/lib/format';
 

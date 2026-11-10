@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { chooseArea, chooseCoordinates } from '@/app/actions';
+import { chooseArea, chooseCoordinates } from '@/app/(shop)/actions';
 import { CrosshairIcon, PinIcon } from '@/components/icons';
 import { AREAS } from '@/lib/location';
 

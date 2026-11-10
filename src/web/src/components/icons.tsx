@@ -95,3 +95,20 @@ export function StarIcon({ className = 'size-4' }: IconProps) {
     </svg>
   );
 }
+
+export const GridIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="3" y="3" width="7" height="7" rx="1.5" />
+    <rect x="14" y="3" width="7" height="7" rx="1.5" />
+    <rect x="3" y="14" width="7" height="7" rx="1.5" />
+    <rect x="14" y="14" width="7" height="7" rx="1.5" />
+  </Svg>
+);
+
+export const StoreIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M4 10v10h16V10" />
+    <path d="M3 4h18l-1 6a3 3 0 0 1-5.5 1A3 3 0 0 1 12 12a3 3 0 0 1-2.5-1A3 3 0 0 1 4 10Z" />
+    <path d="M10 20v-5h4v5" />
+  </Svg>
+);

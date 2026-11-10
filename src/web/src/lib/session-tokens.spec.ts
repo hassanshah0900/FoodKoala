@@ -1,4 +1,4 @@
-import { claimsOf, isFresh, sessionCookies } from './session-tokens';
+import { claimsOf, isAdmin, isFresh, sessionCookies } from './session-tokens';
 
 const jwt = (payload: object) =>
   ['e30', Buffer.from(JSON.stringify(payload)).toString('base64url'), 'signature'].join('.');
@@ -32,5 +32,11 @@ describe('session tokens', () => {
       ['fk_refresh', 'r', 2_592_000, true, true],
     ]);
     expect(sessionCookies(null, false).every((c) => c.value === '' && c.options.maxAge === 0)).toBe(true);
+  });
+
+  it('knows an admin by the role', () => {
+    expect(isAdmin(claimsOf(jwt({ ...claims, roles: ['customer', 'admin'] })))).toBe(true);
+    expect(isAdmin(claimsOf(jwt(claims)))).toBe(false);
+    expect(isAdmin(null)).toBe(false);
   });
 });
