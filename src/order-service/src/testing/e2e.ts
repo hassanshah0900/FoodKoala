@@ -10,6 +10,7 @@ import { AppModule } from '../app.module';
 import type { Cart } from '../clients/clients';
 import type { Database } from '../db/database';
 import { orders, outbox } from '../db/schema';
+import { OrdersService } from '../orders/orders.service';
 import { setupApp } from '../setup-app';
 
 /** Helpers shared by the e2e specs: stand-ins for the services order-service calls, and the app. */
@@ -98,13 +99,13 @@ function fakeServices(): Server {
 }
 
 /** Puts `quantity` broasts at Rs 450 in the customer's cart. */
-export function fillCart(customer: Headers, restaurantId: string, quantity = 2) {
+export function fillCart(customer: Headers, restaurantId: string, quantity = 2, itemId: string = randomUUID()) {
   carts.set(customer['X-User-Id'], {
     restaurantId,
     lines: [
       {
         id: randomUUID(),
-        itemId: randomUUID(),
+        itemId,
         name: 'Chicken Broast',
         quantity,
         options: [],
@@ -142,6 +143,15 @@ export function scenario(over: { quantity?: number; acceptingOrders?: boolean; d
 }
 
 export type Scenario = ReturnType<typeof scenario>;
+
+/** A new customer, with an address and a cart, at the same restaurant as `s`. */
+export function anotherCustomer(s: Scenario, quantity = 2): Scenario {
+  const customer = newUser();
+  const addressId = randomUUID();
+  addresses.set(addressId, { ...addresses.get(s.addressId)!, ownerId: customer['X-User-Id'] });
+  fillCart(customer, s.restaurantId, quantity);
+  return { ...s, customer, addressId };
+}
 
 /**
  * The app wired to the stand-in services. `place` checks out and remembers
@@ -190,6 +200,11 @@ export async function startApp() {
     /** Runs `fn` on close, once the orders placed are gone (e.g. to delete what they refer to). */
     onClose(fn: () => Promise<unknown>) {
       cleanups.push(fn);
+    },
+    /** Has the restaurant accept the order and a rider deliver it at `at`. */
+    async deliver(s: Scenario, orderId: string, riderId: string = randomUUID(), at = new Date()) {
+      await http.post(`/${orderId}/status`).set(s.owner).send({ status: 'accepted', prepTimeMinutes: 15 }).expect(200);
+      await app.get(OrdersService).applyRiderEvent(orderId, 'delivered', riderId, at);
     },
     async close() {
       if (placed.length) {
