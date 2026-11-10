@@ -39,7 +39,7 @@ jobs:
 
       # uv installs Python (the version from pyproject's requires-python) and
       # the dependencies; its cache is keyed on uv.lock.
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.3.3 # this action publishes exact versions only, no moving v10 tag
         with:
           working-directory: src/${{ inputs.service }}
           enable-cache: true
@@ -97,7 +97,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.3.3 # this action publishes exact versions only, no moving v10 tag
         with:
           working-directory: src/${{ inputs.service }}
           enable-cache: true
