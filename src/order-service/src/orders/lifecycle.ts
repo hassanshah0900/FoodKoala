@@ -11,7 +11,8 @@ interface Rule {
 /** The life cycle table of contracts/openapi/order-service.yaml. */
 export const TRANSITIONS: Readonly<Partial<Record<`${Status}>${Status}`, Rule>>> = {
   'placed>accepted': { by: ['restaurant'] },
-  'placed>rejected': { by: ['restaurant', 'admin'], reasonFrom: ['restaurant', 'admin'] },
+  // `system`: nobody at the restaurant answered in time (AcceptTimeouts).
+  'placed>rejected': { by: ['restaurant', 'admin', 'system'], reasonFrom: ['restaurant', 'admin'] },
   'placed>cancelled': { by: ['customer', 'admin'], reasonFrom: ['admin'] },
   'accepted>ready': { by: ['restaurant'] },
   'accepted>cancelled': { by: ['admin'], reasonFrom: ['admin'] },
@@ -76,7 +77,8 @@ export function decide(from: Status, change: Change, roles: ReadonlySet<Actor>):
   }
   const actor = rule.by.find((a) => roles.has(a));
   if (!actor) {
-    const who = rule.by.map((a) => ({ customer: 'the customer', admin: 'an admin', restaurant: 'the restaurant', rider: 'the rider' })[a]);
+    const names: Partial<Record<Actor, string>> = { customer: 'the customer', admin: 'an admin', restaurant: 'the restaurant', rider: 'the rider' };
+    const who = rule.by.flatMap((a) => names[a] ?? []); // nobody calls the API as `system`
     throw new ForbiddenException(`Only ${who.join(' or ')} can ${VERB[change.to]} this order`);
   }
   if (rule.reasonFrom?.includes(actor) && !change.reason) {

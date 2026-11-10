@@ -24,8 +24,11 @@ export const PAYMENT_METHODS = ['cod', 'card', 'jazzcash', 'easypaisa'] as const
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
 export const paymentMethodEnum = ordersSchema.enum('payment_method', PAYMENT_METHODS);
 
-/** `rider` comes from delivery-service's events, never from this API. */
-export const ACTORS = ['customer', 'restaurant', 'admin', 'rider'] as const;
+/**
+ * `rider` comes from delivery-service's events, never from this API. `system` is
+ * order-service itself, e.g. rejecting an order the restaurant never answered.
+ */
+export const ACTORS = ['customer', 'restaurant', 'admin', 'rider', 'system'] as const;
 export type Actor = (typeof ACTORS)[number];
 export const actorEnum = ordersSchema.enum('actor', ACTORS);
 
@@ -117,7 +120,8 @@ export const orderStatusHistory = ordersSchema.table(
       .references(() => orders.id, { onDelete: 'cascade' }),
     status: statusEnum('status').notNull(),
     actor: actorEnum('actor').notNull(),
-    actorId: uuid('actor_id').notNull(),
+    /** The user who made the change; null for `system`. */
+    actorId: uuid('actor_id'),
     reason: text('reason'),
     at: timestamp('at', { withTimezone: true }).notNull().defaultNow(),
   },

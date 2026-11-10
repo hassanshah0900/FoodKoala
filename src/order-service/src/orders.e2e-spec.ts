@@ -7,10 +7,11 @@ import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import request from 'supertest';
 import { AppModule } from './app.module';
-import { DeliveryEventConsumer } from './delivery/delivery-event-consumer';
 import type { Cart } from './clients/clients';
 import type { Database } from './db/database';
 import { orders, outbox } from './db/schema';
+import { DeliveryEventConsumer } from './delivery/delivery-event-consumer';
+import { AcceptTimeouts } from './orders/accept-timeouts';
 import { setupApp } from './setup-app';
 
 type Headers = Record<'X-User-Id' | 'X-User-Phone' | 'X-User-Roles', string>;
@@ -331,6 +332,37 @@ describe('order-service (e2e)', () => {
     expect([accept.status, cancel.status].sort()).toEqual([200, 409]);
     const final = await http.get(`/${order.id}`).set(s.customer).expect(200);
     expect(final.body.timeline).toHaveLength(2);
+  });
+
+  it('rejects orders the restaurant never answered, once, and leaves the rest alone', async () => {
+    const [late, fresh, answered] = [scenario(), scenario(), scenario()];
+    const lateOrder = await place(late);
+    const freshOrder = await place(fresh);
+    const answeredOrder = await place(answered);
+    await http.post(`/${answeredOrder.id}/status`).set(answered.owner).send({ status: 'accepted', prepTimeMinutes: 15 }).expect(200);
+    const longAgo = new Date(Date.now() - 11 * 60_000);
+    await db.update(orders).set({ placedAt: longAgo }).where(inArray(orders.id, [lateOrder.id, answeredOrder.id]));
+
+    // Two replicas at once: the order is still rejected only once.
+    const timeouts = app.get(AcceptTimeouts);
+    await Promise.all([timeouts.runOnce(), timeouts.runOnce()]);
+
+    const rejected = (await http.get(`/${lateOrder.id}`).set(late.customer).expect(200)).body;
+    expect(rejected.status).toBe('rejected');
+    expect(rejected.timeline).toEqual([
+      expect.objectContaining({ status: 'placed', by: 'customer' }),
+      expect.objectContaining({ status: 'rejected', by: 'system', reason: 'Not accepted within 10 minutes' }),
+    ]);
+    const events = await db.select().from(outbox).where(eq(outbox.key, lateOrder.id)).orderBy(outbox.id);
+    expect(events.map((e) => e.payload)).toEqual([
+      expect.objectContaining({ type: 'order.placed' }),
+      expect.objectContaining({ data: expect.objectContaining({ from: 'placed', to: 'rejected', by: 'system', reason: 'Not accepted within 10 minutes' }) }),
+    ]);
+    expect((await http.get(`/${freshOrder.id}`).set(fresh.customer).expect(200)).body.status).toBe('placed');
+    expect((await http.get(`/${answeredOrder.id}`).set(answered.customer).expect(200)).body.status).toBe('accepted');
+
+    // Too late now for the restaurant.
+    await http.post(`/${lateOrder.id}/status`).set(late.owner).send({ status: 'accepted', prepTimeMinutes: 15 }).expect(409);
   });
 
   describe('rider events from delivery-service', () => {
