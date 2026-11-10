@@ -106,3 +106,25 @@ export interface MenuOption {
   pricePaisa: number;
   isAvailable: boolean;
 }
+
+/** Cart in cart-service.yaml. */
+export interface Cart {
+  restaurantId: string | null;
+  lines: CartLine[];
+  subtotalPaisa: number;
+  /** Lines that no longer match the menu; the cart can't be checked out until they're fixed. */
+  problems: { lineId: string | null; message: string }[];
+  updatedAt: string | null;
+}
+
+export interface CartLine {
+  id: string;
+  itemId: string;
+  name: string;
+  quantity: number;
+  optionIds: string[];
+  options: { id: string; group: string; name: string; pricePaisa: number }[];
+  note: string | null;
+  unitPricePaisa: number;
+  lineTotalPaisa: number;
+}

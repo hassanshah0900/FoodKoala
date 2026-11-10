@@ -1,7 +1,7 @@
 import type { MenuCategory } from '@/lib/api/types';
-import { MenuItemCard } from './MenuItemCard';
+import { AddableItem } from './AddableItem';
 
-export function MenuSections({ categories }: { categories: MenuCategory[] }) {
+export function MenuSections({ categories, restaurantId }: { categories: MenuCategory[]; restaurantId: string }) {
   return (
     <div className="space-y-10 pt-6">
       {categories.map((c) => (
@@ -10,7 +10,7 @@ export function MenuSections({ categories }: { categories: MenuCategory[] }) {
           {c.description && <p className="mt-1 text-sm text-muted">{c.description}</p>}
           <div className="mt-4 grid gap-4 md:grid-cols-2">
             {c.items.map((item) => (
-              <MenuItemCard key={item.id} item={item} />
+              <AddableItem key={item.id} item={item} restaurantId={restaurantId} />
             ))}
           </div>
         </section>

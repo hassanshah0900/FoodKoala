@@ -2,7 +2,8 @@ import type { MenuItem } from '@/lib/api/types';
 import { rupees } from '@/lib/format';
 import { fromPrice } from '@/lib/menu';
 
-export function MenuItemCard({ item }: { item: MenuItem }) {
+/** One item on the menu. `addable` shows the + that says tapping adds it. */
+export function MenuItemCard({ item, addable = false }: { item: MenuItem; addable?: boolean }) {
   const hasChoices = item.optionGroups.length > 0;
   return (
     <article
@@ -19,10 +20,22 @@ export function MenuItemCard({ item }: { item: MenuItem }) {
         {item.description && <p className="line-clamp-2 text-sm text-muted">{item.description}</p>}
         {!item.isAvailable && <p className="text-xs font-bold tracking-wide text-red-700 uppercase">Sold out</p>}
       </div>
-      {item.imageUrl && (
-        // biome-ignore lint/performance/noImgElement: menu photos come from any host restaurants upload to.
-        <img src={item.imageUrl} alt="" loading="lazy" className="size-24 shrink-0 rounded-lg object-cover" />
-      )}
+      <div className="relative shrink-0">
+        {item.imageUrl ? (
+          // biome-ignore lint/performance/noImgElement: menu photos come from any host restaurants upload to.
+          <img src={item.imageUrl} alt="" loading="lazy" className="size-24 rounded-lg object-cover" />
+        ) : (
+          <div className="size-24" />
+        )}
+        {addable && (
+          <span
+            aria-hidden="true"
+            className="absolute right-1 bottom-1 flex size-8 items-center justify-center rounded-full bg-white text-xl font-bold text-brand-600 shadow-md"
+          >
+            +
+          </span>
+        )}
+      </div>
     </article>
   );
 }
