@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/hassanshah0900/FoodKoala/src/delivery-service/internal/deliveries"
+	"github.com/hassanshah0900/FoodKoala/src/delivery-service/internal/earnings"
 	"github.com/hassanshah0900/FoodKoala/src/delivery-service/internal/httpx"
 	"github.com/hassanshah0900/FoodKoala/src/delivery-service/internal/identity"
 	"github.com/hassanshah0900/FoodKoala/src/delivery-service/internal/riders"
@@ -21,6 +22,7 @@ type Deps struct {
 	DB         *pgxpool.Pool
 	Riders     riders.Service
 	Deliveries deliveries.Service
+	Earnings   earnings.Service
 	// ConsumerAlive reports whether order events are being consumed; nil when Kafka is off.
 	ConsumerAlive func() bool
 }
@@ -48,6 +50,29 @@ func paging(r *http.Request) (page, limit int, err error) {
 		}
 	}
 	return page, limit, nil
+}
+
+// defaultPeriod is the earnings window when the query names none: the last 7 days.
+const defaultPeriod = 7 * 24 * time.Hour
+
+// period reads ?from=&to= (RFC 3339), each defaulting from the other or from now.
+func period(r *http.Request) (from, to time.Time, err error) {
+	parse := func(name string, def time.Time) (time.Time, error) {
+		v := r.URL.Query().Get(name)
+		if v == "" {
+			return def, nil
+		}
+		t, err := time.Parse(time.RFC3339, v)
+		if err != nil {
+			return time.Time{}, httpx.Errorf(http.StatusBadRequest, "%s must be an RFC 3339 time, e.g. 2026-11-01T00:00:00+05:00", name)
+		}
+		return t, nil
+	}
+	if to, err = parse("to", time.Now()); err != nil {
+		return
+	}
+	from, err = parse("from", to.Add(-defaultPeriod))
+	return
 }
 
 func reply(w http.ResponseWriter, status int, v any, err error) error {
@@ -121,6 +146,54 @@ func New(d Deps) http.Handler {
 	mux.Handle("GET /riders/me/delivery", user(func(w http.ResponseWriter, r *http.Request) error {
 		del, err := d.Deliveries.Current(r.Context(), identity.From(r))
 		return reply(w, http.StatusOK, del, err)
+	}))
+
+	// Earnings and settlements: the rider's own under /riders/me, any rider's for admins.
+	mine := func(r *http.Request) (string, error) { return identity.From(r).UserID, nil }
+	pathRider := func(r *http.Request) (string, error) { return id(r, "userId") }
+	statement := func(whose func(*http.Request) (string, error)) httpx.Handler {
+		return func(w http.ResponseWriter, r *http.Request) error {
+			riderID, err := whose(r)
+			if err != nil {
+				return err
+			}
+			from, to, err := period(r)
+			if err != nil {
+				return err
+			}
+			st, err := d.Earnings.Of(r.Context(), riderID, from, to)
+			return reply(w, http.StatusOK, st, err)
+		}
+	}
+	settlements := func(whose func(*http.Request) (string, error)) httpx.Handler {
+		return func(w http.ResponseWriter, r *http.Request) error {
+			riderID, err := whose(r)
+			if err != nil {
+				return err
+			}
+			page, limit, err := paging(r)
+			if err != nil {
+				return err
+			}
+			p, err := d.Earnings.Settlements(r.Context(), riderID, page, limit)
+			return reply(w, http.StatusOK, p, err)
+		}
+	}
+	mux.Handle("GET /riders/me/earnings", user(statement(mine)))
+	mux.Handle("GET /riders/me/settlements", user(settlements(mine)))
+	mux.Handle("GET /riders/{userId}/earnings", admin(statement(pathRider)))
+	mux.Handle("GET /riders/{userId}/settlements", admin(settlements(pathRider)))
+	mux.Handle("POST /riders/{userId}/settlements", admin(func(w http.ResponseWriter, r *http.Request) error {
+		riderID, err := id(r, "userId")
+		if err != nil {
+			return err
+		}
+		var body earnings.NewSettlement
+		if err := httpx.Decode(r, &body); err != nil {
+			return err
+		}
+		st, err := d.Earnings.Settle(r.Context(), identity.From(r), riderID, body)
+		return reply(w, http.StatusCreated, st, err)
 	}))
 
 	// Admins: review riders, watch deliveries.

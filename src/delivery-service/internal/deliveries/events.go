@@ -35,6 +35,8 @@ type orderPlaced struct {
 	Totals             struct {
 		DeliveryFeePaisa *int `json:"deliveryFeePaisa"`
 		TotalPaisa       *int `json:"totalPaisa"`
+		// Absent in orders placed before tips.
+		TipPaisa *int `json:"tipPaisa"`
 	} `json:"totals"`
 	PaymentMethod   string `json:"paymentMethod"`
 	DeliveryAddress struct {
@@ -83,18 +85,21 @@ func (s Service) placed(ctx context.Context, tx pgx.Tx, d orderPlaced) error {
 	if !d.RestaurantLocation.ok() || !d.DeliveryAddress.ok() || d.Totals.TotalPaisa == nil || d.Totals.DeliveryFeePaisa == nil {
 		return fmt.Errorf("%w: order %s lacks a location or totals", inbox.ErrMalformed, d.OrderID)
 	}
-	cash := 0
+	cash, tip := 0, 0
 	if d.PaymentMethod == "cod" {
 		cash = *d.Totals.TotalPaisa
 	}
+	if d.Totals.TipPaisa != nil {
+		tip = *d.Totals.TipPaisa
+	}
 	_, err := tx.Exec(ctx, `INSERT INTO delivery.deliveries
 		(id, order_id, customer_id, customer_phone, restaurant_id, restaurant_name, pickup_lat, pickup_lng,
-		 dropoff_lat, dropoff_lng, dropoff_text, dropoff_landmark, cash_to_collect_paisa, delivery_fee_paisa)
-		VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+		 dropoff_lat, dropoff_lng, dropoff_text, dropoff_landmark, cash_to_collect_paisa, delivery_fee_paisa, tip_paisa)
+		VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 		ON CONFLICT (order_id) DO NOTHING`,
 		d.OrderID, d.CustomerID, d.CustomerPhone, d.RestaurantID, d.RestaurantName,
 		*d.RestaurantLocation.Lat, *d.RestaurantLocation.Lng, *d.DeliveryAddress.Lat, *d.DeliveryAddress.Lng,
-		d.DeliveryAddress.Text, d.DeliveryAddress.Landmark, cash, *d.Totals.DeliveryFeePaisa)
+		d.DeliveryAddress.Text, d.DeliveryAddress.Landmark, cash, *d.Totals.DeliveryFeePaisa, tip)
 	return err
 }
 

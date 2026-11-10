@@ -23,6 +23,7 @@ import (
 	"github.com/hassanshah0900/FoodKoala/src/delivery-service/internal/consumer"
 	"github.com/hassanshah0900/FoodKoala/src/delivery-service/internal/db"
 	"github.com/hassanshah0900/FoodKoala/src/delivery-service/internal/deliveries"
+	"github.com/hassanshah0900/FoodKoala/src/delivery-service/internal/earnings"
 	"github.com/hassanshah0900/FoodKoala/src/delivery-service/internal/inbox"
 	"github.com/hassanshah0900/FoodKoala/src/delivery-service/internal/outbox"
 	"github.com/hassanshah0900/FoodKoala/src/delivery-service/internal/riders"
@@ -62,7 +63,7 @@ func run() error {
 	defer pool.Close()
 
 	dels := deliveries.Service{DB: pool, MaxPickupMeters: cfg.MaxPickupMeters, LocationFreshFor: cfg.LocationFreshFor}
-	deps := api.Deps{DB: pool, Deliveries: dels}
+	deps := api.Deps{DB: pool, Deliveries: dels, Earnings: earnings.Service{DB: pool}}
 	rs := riders.Service{DB: pool}
 	var workers sync.WaitGroup
 	start := func(f func()) { workers.Add(1); go func() { defer workers.Done(); f() }() }

@@ -52,12 +52,17 @@ func (f fixture) apply(raw []byte) {
 	}
 }
 
+// placed is an order.placed paid in cash, without a tip as orders before tips were.
 func (f fixture) placed(orderID, customerID string) []byte {
+	return f.placedWith(orderID, customerID, map[string]any{"subtotalPaisa": 90000, "deliveryFeePaisa": 9900, "totalPaisa": 99900})
+}
+
+func (f fixture) placedWith(orderID, customerID string, totals map[string]any) []byte {
 	return f.event("order.placed", map[string]any{
 		"orderId": orderID, "customerId": customerID, "customerPhone": "+923001112233",
 		"restaurantId": outbox.NewID(), "restaurantName": "Karachi Broast",
 		"restaurantLocation": map[string]any{"lat": restaurant[0], "lng": restaurant[1]},
-		"totals":             map[string]any{"subtotalPaisa": 90000, "deliveryFeePaisa": 9900, "totalPaisa": 99900},
+		"totals":             totals,
 		"paymentMethod":      "cod",
 		"deliveryAddress":    map[string]any{"lat": 24.93, "lng": 67.1, "text": "House 7, Block 10, Gulshan-e-Iqbal, Karachi", "landmark": nil},
 	})
@@ -133,13 +138,25 @@ func TestOrderEventsDriveTheDelivery(t *testing.T) {
 	f.apply(placed)
 	f.apply(placed) // a redelivered event changes nothing
 	d := f.delivery(orderID)
-	if d.Status != "waiting" || d.CashToCollectPaisa != 99900 || d.DeliveryFeePaisa != 9900 || d.Restaurant.Location.Lat != restaurant[0] {
+	if d.Status != "waiting" || d.CashToCollectPaisa != 99900 || d.DeliveryFeePaisa != 9900 || d.TipPaisa != 0 ||
+		d.Restaurant.Location.Lat != restaurant[0] {
 		t.Fatalf("unexpected delivery: %+v", d)
 	}
 	f.apply(f.status(orderID, "accepted", "restaurant", time.Now()))
 	f.apply(f.status(orderID, "ready", "restaurant", time.Now()))
 	if d := f.delivery(orderID); d.Status != "searching" || d.FoodReadyAt == nil {
 		t.Fatalf("expected searching with the food ready: %+v", d)
+	}
+}
+
+func TestTheTipGoesWithTheDelivery(t *testing.T) {
+	f := setup(t)
+	orderID := outbox.NewID()
+	f.apply(f.placedWith(orderID, outbox.NewID(), map[string]any{
+		"subtotalPaisa": 90000, "deliveryFeePaisa": 9900, "discountPaisa": 20000, "tipPaisa": 5000, "totalPaisa": 84900,
+	}))
+	if d := f.delivery(orderID); d.TipPaisa != 5000 || d.CashToCollectPaisa != 84900 {
+		t.Fatalf("unexpected delivery: %+v", d)
 	}
 }
 

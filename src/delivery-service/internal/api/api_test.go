@@ -9,8 +9,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	"github.com/hassanshah0900/FoodKoala/src/delivery-service/internal/api"
 	"github.com/hassanshah0900/FoodKoala/src/delivery-service/internal/deliveries"
+	"github.com/hassanshah0900/FoodKoala/src/delivery-service/internal/earnings"
 	"github.com/hassanshah0900/FoodKoala/src/delivery-service/internal/outbox"
 	"github.com/hassanshah0900/FoodKoala/src/delivery-service/internal/riders"
 	"github.com/hassanshah0900/FoodKoala/src/delivery-service/internal/testdb"
@@ -182,5 +185,102 @@ func TestLocationOfARiderCarryingAnOrderIsPublished(t *testing.T) {
 	if e.topic != "rider.location" || e.key != orderID || e.data["deliveryId"] != deliveryID || e.data["riderId"] != me["X-User-Id"] ||
 		e.data["location"] != (riders.Location{Lat: 24.93, Lng: 67.1}) {
 		t.Fatalf("event: %+v", e)
+	}
+}
+
+// delivered records a delivery the rider dropped off at `at`.
+func delivered(t *testing.T, pool *pgxpool.Pool, riderID string, feePaisa, tipPaisa, cashPaisa int, at time.Time) {
+	t.Helper()
+	if _, err := pool.Exec(context.Background(), `INSERT INTO delivery.deliveries
+		(id, order_id, customer_id, customer_phone, restaurant_id, restaurant_name, pickup_lat, pickup_lng,
+		 dropoff_lat, dropoff_lng, dropoff_text, cash_to_collect_paisa, delivery_fee_paisa, tip_paisa, status, rider_id,
+		 assigned_at, picked_up_at, delivered_at)
+		VALUES ($1, $2, $3, '+923000000000', $4, 'Kolachi', 24.9, 67.1, 24.95, 67.05, 'Block 5', $5, $6, $7, 'delivered', $8, $9, $9, $9)`,
+		outbox.NewID(), outbox.NewID(), outbox.NewID(), outbox.NewID(), cashPaisa, feePaisa, tipPaisa, riderID, at); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestRidersSeeTheirEarningsAndAdminsSettleThem(t *testing.T) {
+	pool := testdb.Open(t)
+	c := client{t: t, h: api.New(api.Deps{DB: pool, Riders: riders.Service{DB: pool}, Earnings: earnings.Service{DB: pool}})}
+	me := newUser("customer")
+	admin := newUser("customer,admin")
+	c.expect(404, "GET", "/riders/me/earnings", me, nil)
+	c.expect(201, "POST", "/riders", me, map[string]string{"name": "Ali", "vehicle": "motorbike", "city": "Karachi"})
+	rider := me["X-User-Id"]
+
+	now := time.Now()
+	delivered(t, pool, rider, 9900, 5000, 99900, now.Add(-time.Hour))    // cash on delivery, tipped
+	delivered(t, pool, rider, 7900, 0, 0, now.Add(-2*time.Hour))         // paid online
+	delivered(t, pool, rider, 9900, 0, 50000, now.Add(-10*24*time.Hour)) // before the last 7 days
+
+	type money = map[string]any
+	st := c.expect(200, "GET", "/riders/me/earnings", me, nil)
+	period, balance := st["period"].(money), st["balance"].(money)
+	if period["deliveries"] != 2.0 || period["deliveryFeesPaisa"] != 17800.0 || period["tipsPaisa"] != 5000.0 ||
+		period["earnedPaisa"] != 22800.0 || period["cashCollectedPaisa"] != 99900.0 {
+		t.Fatalf("period: %v", period)
+	}
+	// All time: earned 32700, collected 149900.
+	if balance["cashInHandPaisa"] != 149900.0 || balance["unpaidEarningsPaisa"] != 32700.0 || balance["netPaisa"] != -117200.0 {
+		t.Fatalf("balance: %v", balance)
+	}
+	from := now.Add(-11 * 24 * time.Hour).Format(time.RFC3339)
+	to := now.Add(-9 * 24 * time.Hour).Format(time.RFC3339)
+	old := c.expect(200, "GET", "/riders/me/earnings?from="+from+"&to="+to, me, nil)["period"].(money)
+	if old["deliveries"] != 1.0 || old["earnedPaisa"] != 9900.0 {
+		t.Fatalf("old period: %v", old)
+	}
+	c.expect(400, "GET", "/riders/me/earnings?from=yesterday", me, nil)
+	c.expect(400, "GET", "/riders/me/earnings?from="+to+"&to="+from, me, nil)
+
+	// The rider keeps what they earned out of the cash and hands in the rest.
+	settle := func(want int, kind string, amount int) map[string]any {
+		return c.expect(want, "POST", "/riders/"+rider+"/settlements", admin, map[string]any{"kind": kind, "amountPaisa": amount, "note": " Office, Shahrah-e-Faisal "})
+	}
+	c.expect(403, "POST", "/riders/"+rider+"/settlements", me, map[string]any{"kind": "payout", "amountPaisa": 100})
+	c.expect(404, "POST", "/riders/"+outbox.NewID()+"/settlements", admin, map[string]any{"kind": "payout", "amountPaisa": 100})
+	if out := settle(409, "payout", 32701); out["message"] != "The rider is owed only 32700 paisa" {
+		t.Fatalf("over-payout: %v", out)
+	}
+	kept := settle(201, "kept_from_cash", 32700)
+	if kept["kind"] != "kept_from_cash" || kept["amountPaisa"] != 32700.0 || kept["note"] != "Office, Shahrah-e-Faisal" ||
+		kept["recordedBy"] != admin["X-User-Id"] || kept["riderId"] != rider {
+		t.Fatalf("settlement: %v", kept)
+	}
+	settle(409, "cash_deposit", 117201)
+	settle(201, "cash_deposit", 117200)
+	settle(400, "refund", 100)
+
+	balance = c.expect(200, "GET", "/riders/"+rider+"/earnings", admin, nil)["balance"].(money)
+	if balance["cashInHandPaisa"] != 0.0 || balance["unpaidEarningsPaisa"] != 0.0 || balance["netPaisa"] != 0.0 {
+		t.Fatalf("settled balance: %v", balance)
+	}
+	history := c.expect(200, "GET", "/riders/me/settlements", me, nil)["items"].([]any)
+	if len(history) != 2 || history[0].(money)["kind"] != "cash_deposit" {
+		t.Fatalf("history: %v", history)
+	}
+	c.expect(200, "GET", "/riders/"+rider+"/settlements?limit=1", admin, nil)
+	c.expect(403, "GET", "/riders/"+rider+"/earnings", me, nil)
+}
+
+func TestConcurrentSettlementsCannotSpendOneBalanceTwice(t *testing.T) {
+	pool := testdb.Open(t)
+	c := client{t: t, h: api.New(api.Deps{DB: pool, Riders: riders.Service{DB: pool}, Earnings: earnings.Service{DB: pool}})}
+	me := newUser("customer")
+	admin := newUser("customer,admin")
+	c.expect(201, "POST", "/riders", me, map[string]string{"name": "Ali", "vehicle": "motorbike", "city": "Karachi"})
+	delivered(t, pool, me["X-User-Id"], 9900, 0, 0, time.Now())
+
+	codes := make(chan int, 2)
+	for range 2 {
+		go func() {
+			got, _ := c.do("POST", "/riders/"+me["X-User-Id"]+"/settlements", admin, map[string]any{"kind": "payout", "amountPaisa": 9900})
+			codes <- got
+		}()
+	}
+	if a, b := <-codes, <-codes; a+b != 201+409 {
+		t.Fatalf("got %d and %d, want one 201 and one 409", a, b)
 	}
 }

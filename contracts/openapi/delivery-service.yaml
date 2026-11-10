@@ -22,6 +22,16 @@ info:
     and is never offered to them again. A rejected or cancelled order cancels
     its delivery and frees the rider.
 
+    **Earnings.** A rider earns each delivered order's delivery fee and the
+    customer's tip, in full. For cash on delivery they also collect the
+    order total at the door, which belongs to FoodKoala. Admins record how
+    that is settled: `cash_deposit` (cash handed in), `payout` (FoodKoala
+    pays the rider) or `kept_from_cash` (the rider keeps their earnings out
+    of the cash, settling both at once). A settlement can't hand in more
+    cash than the rider holds or pay more than they are owed. The balance is
+    worked out from deliveries and settlements; `netPaisa` above 0 means
+    FoodKoala owes the rider, below 0 the rider owes FoodKoala.
+
     **Who sees what.** Riders see and act on their own deliveries. The
     customer sees their order's delivery and rider. Admins see everything.
 
@@ -38,6 +48,8 @@ security:
 tags:
   - name: riders
     description: Rider sign-up, shifts and location
+  - name: earnings
+    description: What riders earn and the cash they collect
   - name: deliveries
     description: Deliveries and the rider's steps
   - name: admin
@@ -172,6 +184,109 @@ paths:
               schema: { $ref: '#/components/schemas/Delivery' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+
+  /riders/me/earnings:
+    get:
+      tags: [earnings]
+      operationId: getMyEarnings
+      summary: What I earned in a period, and my balance with FoodKoala now
+      parameters:
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+      responses:
+        '200':
+          description: Earnings
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Earnings' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /riders/me/settlements:
+    get:
+      tags: [earnings]
+      operationId: listMySettlements
+      summary: Cash I handed in and payouts I received, newest first
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Page of settlements
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SettlementPage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /riders/{userId}/earnings:
+    parameters:
+      - $ref: '#/components/parameters/RiderId'
+    get:
+      tags: [admin]
+      operationId: getRiderEarnings
+      summary: A rider's earnings and balance (admin)
+      parameters:
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+      responses:
+        '200':
+          description: Earnings
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Earnings' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /riders/{userId}/settlements:
+    parameters:
+      - $ref: '#/components/parameters/RiderId'
+    get:
+      tags: [admin]
+      operationId: listRiderSettlements
+      summary: A rider's settlements, newest first (admin)
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Page of settlements
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SettlementPage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [admin]
+      operationId: settleWithRider
+      summary: Record cash handed in, a payout, or earnings kept from the cash (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SettlementCreate' }
+            example: { kind: cash_deposit, amountPaisa: 117200, note: Handed in at the Gulshan office }
+      responses:
+        '201':
+          description: Settlement
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Settlement' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: More cash than the rider holds, or more than they are owed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
 
   /riders/{userId}/status:
     parameters:
@@ -339,6 +454,21 @@ components:
       in: path
       required: true
       schema: { type: string, format: uuid }
+    RiderId:
+      name: userId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    From:
+      name: from
+      in: query
+      description: Start of the period (RFC 3339), inclusive; 7 days before `to` by default
+      schema: { type: string, format: date-time }
+    To:
+      name: to
+      in: query
+      description: End of the period (RFC 3339), exclusive; now by default
+      schema: { type: string, format: date-time }
     Page:
       name: page
       in: query
@@ -451,6 +581,7 @@ components:
         - customerPhone
         - cashToCollectPaisa
         - deliveryFeePaisa
+        - tipPaisa
         - rider
         - foodReadyAt
         - assignedAt
@@ -479,6 +610,7 @@ components:
         customerPhone: { type: string }
         cashToCollectPaisa: { type: integer, description: 'The order total for cash on delivery, else 0' }
         deliveryFeePaisa: { type: integer, description: What the rider earns for it }
+        tipPaisa: { type: integer, description: 'The customer''s tip, also the rider''s' }
         rider:
           description: Null until a rider is assigned
           oneOf:
@@ -519,6 +651,67 @@ components:
         items:
           type: array
           items: { $ref: '#/components/schemas/Delivery' }
+        page: { type: integer }
+        limit: { type: integer }
+        hasMore: { type: boolean }
+
+    Earnings:
+      type: object
+      required: [period, balance]
+      properties:
+        period:
+          type: object
+          description: Orders the rider dropped off in [from, to)
+          required: [from, to, deliveries, deliveryFeesPaisa, tipsPaisa, earnedPaisa, cashCollectedPaisa]
+          properties:
+            from: { type: string, format: date-time }
+            to: { type: string, format: date-time }
+            deliveries: { type: integer }
+            deliveryFeesPaisa: { type: integer }
+            tipsPaisa: { type: integer }
+            earnedPaisa: { type: integer, description: deliveryFeesPaisa + tipsPaisa }
+            cashCollectedPaisa: { type: integer }
+        balance:
+          type: object
+          description: Everything delivered and settled so far
+          required: [cashInHandPaisa, unpaidEarningsPaisa, netPaisa]
+          properties:
+            cashInHandPaisa: { type: integer, description: Cash collected and not handed in }
+            unpaidEarningsPaisa: { type: integer, description: Earnings not paid out }
+            netPaisa: { type: integer, description: 'unpaidEarningsPaisa - cashInHandPaisa: above 0 FoodKoala owes the rider, below 0 the rider owes FoodKoala' }
+
+    SettlementKind:
+      type: string
+      enum: [cash_deposit, payout, kept_from_cash]
+
+    SettlementCreate:
+      type: object
+      required: [kind, amountPaisa]
+      additionalProperties: false
+      properties:
+        kind: { $ref: '#/components/schemas/SettlementKind' }
+        amountPaisa: { type: integer, minimum: 1 }
+        note: { type: [string, 'null'], minLength: 1, maxLength: 200 }
+
+    Settlement:
+      type: object
+      required: [id, riderId, kind, amountPaisa, note, recordedBy, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        riderId: { type: string, format: uuid }
+        kind: { $ref: '#/components/schemas/SettlementKind' }
+        amountPaisa: { type: integer }
+        note: { type: [string, 'null'] }
+        recordedBy: { type: string, format: uuid, description: The admin who recorded it }
+        createdAt: { type: string, format: date-time }
+
+    SettlementPage:
+      type: object
+      required: [items, page, limit, hasMore]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Settlement' }
         page: { type: integer }
         limit: { type: integer }
         hasMore: { type: boolean }

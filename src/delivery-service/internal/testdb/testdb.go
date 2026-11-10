@@ -27,7 +27,7 @@ func Open(t *testing.T) *pgxpool.Pool {
 		t.Fatal(err)
 	}
 	t.Cleanup(pool.Close)
-	if _, err := pool.Exec(ctx, `TRUNCATE delivery.deliveries, delivery.riders, delivery.processed_events, delivery.outbox`); err != nil {
+	if _, err := pool.Exec(ctx, `TRUNCATE delivery.settlements, delivery.deliveries, delivery.riders, delivery.processed_events, delivery.outbox`); err != nil {
 		t.Fatal(err)
 	}
 	return pool

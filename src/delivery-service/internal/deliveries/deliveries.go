@@ -52,6 +52,7 @@ type Delivery struct {
 	CustomerPhone      string     `json:"customerPhone"`
 	CashToCollectPaisa int        `json:"cashToCollectPaisa"`
 	DeliveryFeePaisa   int        `json:"deliveryFeePaisa"`
+	TipPaisa           int        `json:"tipPaisa"`
 	Rider              *RiderInfo `json:"rider"`
 	FoodReadyAt        *time.Time `json:"foodReadyAt"`
 	AssignedAt         *time.Time `json:"assignedAt"`
@@ -73,7 +74,7 @@ type RiderInfo struct {
 
 const selectDelivery = `SELECT d.id, d.order_id, d.status, d.restaurant_id, d.restaurant_name, d.pickup_lat, d.pickup_lng,
 	d.dropoff_lat, d.dropoff_lng, d.dropoff_text, d.dropoff_landmark, d.customer_phone, d.cash_to_collect_paisa,
-	d.delivery_fee_paisa, d.food_ready_at, d.assigned_at, d.picked_up_at, d.delivered_at, d.cancelled_at, d.created_at,
+	d.delivery_fee_paisa, d.tip_paisa, d.food_ready_at, d.assigned_at, d.picked_up_at, d.delivered_at, d.cancelled_at, d.created_at,
 	d.customer_id, r.user_id, r.name, r.phone, r.vehicle, r.lat, r.lng
 	FROM delivery.deliveries d LEFT JOIN delivery.riders r ON r.user_id = d.rider_id `
 
@@ -83,7 +84,7 @@ func scanDelivery(row pgx.Row) (Delivery, error) {
 	var lat, lng *float64
 	err := row.Scan(&d.ID, &d.OrderID, &d.Status, &d.Restaurant.ID, &d.Restaurant.Name, &d.Restaurant.Location.Lat,
 		&d.Restaurant.Location.Lng, &d.Dropoff.Location.Lat, &d.Dropoff.Location.Lng, &d.Dropoff.Text, &d.Dropoff.Landmark,
-		&d.CustomerPhone, &d.CashToCollectPaisa, &d.DeliveryFeePaisa, &d.FoodReadyAt, &d.AssignedAt, &d.PickedUpAt,
+		&d.CustomerPhone, &d.CashToCollectPaisa, &d.DeliveryFeePaisa, &d.TipPaisa, &d.FoodReadyAt, &d.AssignedAt, &d.PickedUpAt,
 		&d.DeliveredAt, &d.CancelledAt, &d.CreatedAt, &d.customerID, &riderID, &riderName, &riderPhone, &vehicle, &lat, &lng)
 	if riderID != nil {
 		d.Rider = &RiderInfo{UserID: *riderID, Name: *riderName, Phone: *riderPhone, Vehicle: *vehicle}
@@ -131,12 +132,7 @@ func (s Service) ForOrder(ctx context.Context, me identity.Identity, orderID str
 	return Delivery{}, errNotFound
 }
 
-type Page struct {
-	Items   []Delivery `json:"items"`
-	Page    int        `json:"page"`
-	Limit   int        `json:"limit"`
-	HasMore bool       `json:"hasMore"`
-}
+type Page = httpx.Page[Delivery]
 
 var statuses = map[string]bool{"waiting": true, "searching": true, "assigned": true, "picked_up": true, "delivered": true, "cancelled": true}
 
@@ -154,14 +150,7 @@ func (s Service) List(ctx context.Context, status string, page, limit int) (Page
 	if err != nil {
 		return Page{}, err
 	}
-	p := Page{Items: items, Page: page, Limit: limit, HasMore: len(items) > limit}
-	if p.HasMore {
-		p.Items = items[:limit]
-	}
-	if p.Items == nil {
-		p.Items = []Delivery{}
-	}
-	return p, nil
+	return httpx.PageOf(items, page, limit), nil
 }
 
 // step moves the caller's delivery from one status to the next and writes its event.
