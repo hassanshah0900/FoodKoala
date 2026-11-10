@@ -183,12 +183,7 @@ func (s Service) UpdateLocation(ctx context.Context, me identity.Identity, at Lo
 	return nil
 }
 
-type Page struct {
-	Items   []Rider `json:"items"`
-	Page    int     `json:"page"`
-	Limit   int     `json:"limit"`
-	HasMore bool    `json:"hasMore"`
-}
+type Page = httpx.Page[Rider]
 
 var statuses = map[string]bool{"pending": true, "approved": true, "suspended": true}
 
@@ -206,14 +201,7 @@ func (s Service) List(ctx context.Context, status string, page, limit int) (Page
 	if err != nil {
 		return Page{}, err
 	}
-	p := Page{Items: items, Page: page, Limit: limit, HasMore: len(items) > limit}
-	if p.HasMore {
-		p.Items = items[:limit]
-	}
-	if p.Items == nil {
-		p.Items = []Rider{}
-	}
-	return p, nil
+	return httpx.PageOf(items, page, limit), nil
 }
 
 // SetStatus approves, suspends or returns a rider to pending (admins). Suspension ends their shift.

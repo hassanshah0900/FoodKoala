@@ -57,3 +57,23 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, r, err)
 	}
 }
+
+// Page is the {items, page, limit, hasMore} shape of every list.
+type Page[T any] struct {
+	Items   []T  `json:"items"`
+	Page    int  `json:"page"`
+	Limit   int  `json:"limit"`
+	HasMore bool `json:"hasMore"`
+}
+
+// PageOf builds the page from up to limit+1 rows: the extra one only says there is more.
+func PageOf[T any](rows []T, page, limit int) Page[T] {
+	p := Page[T]{Items: rows, Page: page, Limit: limit, HasMore: len(rows) > limit}
+	if p.HasMore {
+		p.Items = rows[:limit]
+	}
+	if p.Items == nil {
+		p.Items = []T{}
+	}
+	return p
+}
