@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
 import { WaitingCard } from '@/components/admin/WaitingCard';
-import { ridersWithStatus } from '@/lib/api/delivery';
+import { deliveriesWithStatus, ridersWithStatus } from '@/lib/api/delivery';
 import { restaurantsWithStatus } from '@/lib/api/restaurants';
-import { shortDate } from '@/lib/format';
+import { dateTime, shortDate } from '@/lib/format';
 import { requireAdmin } from '@/lib/session';
 
 export const metadata: Metadata = { title: 'Overview' };
@@ -10,7 +10,8 @@ export const metadata: Metadata = { title: 'Overview' };
 /** What is waiting for an admin, oldest first. */
 export default async function AdminOverview() {
   const { token } = await requireAdmin('/admin');
-  const [restaurants, riders] = await Promise.all([
+  const [searching, restaurants, riders] = await Promise.all([
+    deliveriesWithStatus(token, 'searching'),
     restaurantsWithStatus(token, 'pending'),
     ridersWithStatus(token, 'pending'),
   ]);
@@ -19,6 +20,17 @@ export default async function AdminOverview() {
     <div className="space-y-6">
       <h1 className="text-2xl font-extrabold">Overview</h1>
       <div className="grid items-start gap-6 lg:grid-cols-2">
+        <WaitingCard
+          title="Deliveries looking for a rider"
+          page={searching}
+          row={(d) => ({
+            key: d.id,
+            href: `/admin/orders/${d.orderId}`,
+            label: `${d.restaurant.name} → ${d.dropoff.text}`,
+            meta: `since ${dateTime(d.createdAt)}`,
+          })}
+          more={{ href: '/admin/deliveries', label: 'Watch deliveries' }}
+        />
         <WaitingCard
           title="Restaurants waiting for review"
           page={restaurants}

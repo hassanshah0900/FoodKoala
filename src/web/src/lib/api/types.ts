@@ -184,6 +184,8 @@ export type OrderStatus = 'placed' | 'accepted' | 'ready' | 'picked_up' | 'deliv
 export interface Order {
   id: string;
   status: OrderStatus;
+  customerId: string;
+  customerPhone: string;
   restaurant: { id: string; name: string; location: Point | null };
   lines: {
     itemId: string;
@@ -291,3 +293,42 @@ export interface Voucher {
 
 export type VoucherCreate = Omit<Voucher, 'id' | 'active' | 'used' | 'createdAt'>;
 export type VoucherUpdate = Partial<Pick<Voucher, 'description' | 'usageLimit' | 'endsAt' | 'active'>>;
+
+export type DeliveryStatus = 'waiting' | 'searching' | 'assigned' | 'picked_up' | 'delivered' | 'cancelled';
+
+/** Delivery in delivery-service.yaml. */
+export interface Delivery {
+  id: string;
+  orderId: string;
+  status: DeliveryStatus;
+  restaurant: { id: string; name: string; location: Point };
+  dropoff: { location: Point; text: string; landmark: string | null };
+  customerPhone: string;
+  /** The order total for cash on delivery, else 0. */
+  cashToCollectPaisa: number;
+  deliveryFeePaisa: number;
+  tipPaisa: number;
+  rider: { userId: string; name: string; phone: string; vehicle: Rider['vehicle']; location: Point | null } | null;
+  foodReadyAt: string | null;
+  assignedAt: string | null;
+  pickedUpAt: string | null;
+  deliveredAt: string | null;
+  cancelledAt: string | null;
+  createdAt: string;
+}
+
+export type PaymentStatus = 'pending' | 'collected' | 'cancelled';
+
+/** Payment in payment-service.yaml. */
+export interface Payment {
+  id: string;
+  orderId: string;
+  customerId: string;
+  restaurantId: string;
+  method: Order['paymentMethod'];
+  status: PaymentStatus;
+  amountPaisa: number;
+  createdAt: string;
+  collectedAt: string | null;
+  cancelledAt: string | null;
+}

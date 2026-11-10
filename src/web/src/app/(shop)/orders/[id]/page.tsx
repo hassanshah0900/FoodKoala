@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { MoneyRows } from '@/components/checkout/OrderSummary';
 import { AutoRefresh } from '@/components/orders/AutoRefresh';
+import { OrderLines } from '@/components/orders/OrderLines';
 import { StatusTracker } from '@/components/orders/StatusTracker';
 import { addressTitle } from '@/lib/addresses';
 import { getOrder } from '@/lib/api/orders';
@@ -34,22 +34,8 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
               </Link>
             </h2>
             <p className="text-xs text-muted">Order #{order.id.slice(0, 8).toUpperCase()}</p>
-            <ul className="mt-4 space-y-2 text-sm">
-              {order.lines.map((l, i) => (
-                // biome-ignore lint/suspicious/noArrayIndexKey: an order's lines never change or reorder.
-                <li key={i} className="flex justify-between gap-3">
-                  <span>
-                    {l.quantity} × {l.name}
-                    {l.options.length > 0 && (
-                      <span className="block text-xs text-muted">{l.options.map((o) => o.name).join(', ')}</span>
-                    )}
-                  </span>
-                  <span>{rupees(l.lineTotalPaisa)}</span>
-                </li>
-              ))}
-            </ul>
-            <div className="mt-4 border-t border-line pt-4">
-              <MoneyRows s={order} />
+            <div className="mt-4">
+              <OrderLines order={order} />
             </div>
           </section>
           <section className="space-y-4 rounded-xl bg-white p-6 text-sm shadow-sm">
