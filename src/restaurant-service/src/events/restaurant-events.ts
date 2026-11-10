@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { asc, eq, sql } from 'drizzle-orm';
 import type { Tx } from '../db/database';
 import { deliveryZones, outbox, type Polygon, type RestaurantRow, restaurants } from '../db/schema';
+import { ratingOf } from '../restaurants/restaurants.view';
 
 export const RESTAURANT_UPDATED = 'restaurant.updated';
 
@@ -28,6 +29,7 @@ export function restaurantUpdated(row: RestaurantRow, zones: Zone[]) {
     coverUrl: row.coverUrl,
     hours: { weekly: row.weeklyHours, special: row.specialHours },
     pausedUntil: row.pausedUntil?.toISOString() ?? null,
+    rating: ratingOf(row),
     zones,
     updatedAt: row.updatedAt.toISOString(),
   };

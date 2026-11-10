@@ -6,6 +6,9 @@ import { ConfigModule } from './config/config.module';
 import { HealthController } from './health/health.controller';
 import { OutboxRelay } from './outbox/outbox-relay';
 import { EVENT_PUBLISHER, KafkaPublisher } from './outbox/publisher';
+import { OrderReviewedConsumer } from './ratings/order-reviewed-consumer';
+import { RatingsController } from './ratings/ratings.controller';
+import { RatingsService } from './ratings/ratings.service';
 import { RestaurantsController } from './restaurants/restaurants.controller';
 import { RestaurantsService } from './restaurants/restaurants.service';
 import { BrowseController, ZonesController } from './zones/zones.controller';
@@ -20,10 +23,12 @@ import { ZonesService } from './zones/zones.service';
     }),
   ],
   // HealthController first: its static routes must win over `/:id`.
-  controllers: [HealthController, RestaurantsController, BrowseController, ZonesController],
+  controllers: [HealthController, RestaurantsController, BrowseController, ZonesController, RatingsController],
   providers: [
     RestaurantsService,
     ZonesService,
+    RatingsService,
+    OrderReviewedConsumer,
     OutboxRelay,
     {
       provide: EVENT_PUBLISHER,

@@ -1,48 +1,12 @@
 import { randomUUID } from 'node:crypto';
-import { INestApplication } from '@nestjs/common';
-import { getDrizzleToken } from '@nestjs/drizzle';
-import { Test } from '@nestjs/testing';
-import { asc, eq, inArray } from 'drizzle-orm';
-import request from 'supertest';
-import { AppModule } from './app.module';
+import type { INestApplication } from '@nestjs/common';
+import { asc, eq } from 'drizzle-orm';
+import type request from 'supertest';
 import type { Database } from './db/database';
-import { outbox, restaurants } from './db/schema';
-import { setupApp } from './setup-app';
+import { outbox } from './db/schema';
+import { application, gulshan, openEveryDay, removeRestaurantsOf, startApp, userFactory } from './testing/e2e';
 
-const owners: string[] = [];
-
-function newUser(roles = 'customer') {
-  const id = randomUUID();
-  owners.push(id);
-  return { 'X-User-Id': id, 'X-User-Phone': '+923001234567', 'X-User-Roles': roles };
-}
-
-const application = {
-  name: 'Lahori Nihari',
-  cuisines: ['nihari', 'pakistani'],
-  phone: '+924234567890',
-  address: { line1: '12 Food Street', area: 'Gulberg', city: 'Lahore', province: 'punjab' },
-  location: { lat: 31.52, lng: 74.35 },
-};
-
-const allDay = [{ opens: '00:00', closes: '24:00' }];
-const hours = {
-  weekly: { mon: allDay, tue: allDay, wed: allDay, thu: allDay, fri: allDay, sat: allDay, sun: allDay },
-  special: [],
-};
-
-const gulberg = {
-  type: 'Polygon',
-  coordinates: [
-    [
-      [74.3, 31.5],
-      [74.4, 31.5],
-      [74.4, 31.55],
-      [74.3, 31.55],
-      [74.3, 31.5],
-    ],
-  ],
-};
+const { ids: owners, newUser } = userFactory();
 
 interface Envelope {
   id: string;
@@ -58,23 +22,11 @@ describe('restaurant.updated (e2e)', () => {
   const admin = newUser('customer,admin');
 
   beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
-    app = setupApp(moduleRef.createNestApplication({ logger: false }));
-    await app.init();
-    http = request(app.getHttpServer());
-    db = app.get<Database>(getDrizzleToken());
+    ({ app, http, db } = await startApp());
   });
 
   afterAll(async () => {
-    const mine = await db.select({ id: restaurants.id }).from(restaurants).where(inArray(restaurants.ownerId, owners));
-    if (mine.length)
-      await db.delete(outbox).where(
-        inArray(
-          outbox.key,
-          mine.map((r) => r.id),
-        ),
-      );
-    await db.delete(restaurants).where(inArray(restaurants.ownerId, owners));
+    await removeRestaurantsOf(db, owners);
     await app.close();
   });
 
@@ -100,25 +52,26 @@ describe('restaurant.updated (e2e)', () => {
       data: {
         restaurantId: id,
         revision: 1,
-        name: 'Lahori Nihari',
-        description: null,
-        cuisines: ['nihari', 'pakistani'],
+        name: application.name,
+        description: application.description,
+        cuisines: application.cuisines,
         status: 'pending',
         address: application.address,
         location: application.location,
         hours: { weekly: {}, special: [] },
         pausedUntil: null,
+        rating: { average: null, count: 0 },
         zones: [],
       },
     });
 
-    await http.put(`/${id}/hours`).set(owner).send(hours).expect(200);
+    await http.put(`/${id}/hours`).set(owner).send(openEveryDay).expect(200);
     const zone = await http
       .post(`/${id}/zones`)
       .set(owner)
       .send({
-        name: 'Gulberg',
-        area: gulberg,
+        name: 'Gulshan',
+        area: gulshan,
         deliveryFeePaisa: 7900,
         minimumOrderPaisa: 40000,
         deliveryTimeMinutes: 30,
@@ -126,19 +79,19 @@ describe('restaurant.updated (e2e)', () => {
       .expect(201);
     await http.patch(`/${id}/zones/${zone.body.id}`).set(owner).send({ deliveryFeePaisa: 5900 }).expect(200);
     await http.post(`/${id}/status`).set(admin).send({ status: 'approved' }).expect(200);
-    await http.patch(`/${id}`).set(owner).send({ name: 'Lahori Nihari House' }).expect(200);
+    await http.patch(`/${id}`).set(owner).send({ name: 'Biryani House Gulshan' }).expect(200);
     await http.put(`/${id}/pause`).set(owner).send({ minutes: 30 }).expect(200);
     await http.delete(`/${id}/zones/${zone.body.id}`).set(owner).expect(204);
 
     sent = await events(id);
     expect(sent.map((e) => e.data.revision)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
-    expect(sent[1].data.hours).toEqual(hours);
+    expect(sent[1].data.hours).toEqual(openEveryDay);
     expect(sent[2].data.zones).toEqual([
-      { id: zone.body.id, area: gulberg, deliveryFeePaisa: 7900, minimumOrderPaisa: 40000, deliveryTimeMinutes: 30 },
+      { id: zone.body.id, area: gulshan, deliveryFeePaisa: 7900, minimumOrderPaisa: 40000, deliveryTimeMinutes: 30 },
     ]);
     expect(sent[3].data.zones[0].deliveryFeePaisa).toBe(5900);
     expect(sent[4].data.status).toBe('approved');
-    expect(sent[5].data.name).toBe('Lahori Nihari House');
+    expect(sent[5].data.name).toBe('Biryani House Gulshan');
     expect(Date.parse(sent[6].data.pausedUntil)).toBeGreaterThan(Date.now());
     expect(sent[7].data.zones).toEqual([]);
     expect(new Set(sent.map((e) => e.id)).size).toBe(8);

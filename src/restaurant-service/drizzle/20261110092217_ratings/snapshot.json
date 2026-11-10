@@ -1,0 +1,307 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "b95cd305-0bf4-4c2c-a409-7a93b7a1e79c",
+  "prevIds": [
+    "c46b9f16-78d3-4273-a5e6-119c966b2741"
+  ],
+  "footprints": [
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "restaurants",
+        "reviews"
+      ],
+      "writes": [
+        "s|tbl|restaurants.reviews",
+        "n|tbl|restaurants.reviews",
+        "e|tbl|restaurants.reviews",
+        "n|rel|restaurants.reviews",
+        "n|type|restaurants.reviews",
+        "n|rel|restaurants.reviews_pkey"
+      ],
+      "reads": [
+        "n|sch|restaurants"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "restaurants",
+        "restaurants",
+        "rating_sum"
+      ],
+      "writes": [
+        "s|col|restaurants.restaurants.rating_sum",
+        "n|col|restaurants.restaurants.rating_sum",
+        "e|col|restaurants.restaurants.rating_sum"
+      ],
+      "reads": [
+        "n|tbl|restaurants.restaurants",
+        "n|sch|restaurants"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "restaurants",
+        "restaurants",
+        "rating_count"
+      ],
+      "writes": [
+        "s|col|restaurants.restaurants.rating_count",
+        "n|col|restaurants.restaurants.rating_count",
+        "e|col|restaurants.restaurants.rating_count"
+      ],
+      "reads": [
+        "n|tbl|restaurants.restaurants",
+        "n|sch|restaurants"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "restaurants",
+        "reviews",
+        "reviews_restaurant_id_created_at_idx"
+      ],
+      "writes": [
+        "s|idx|restaurants.reviews_restaurant_id_created_at_idx",
+        "n|idx|restaurants.reviews_restaurant_id_created_at_idx",
+        "e|idx|restaurants.reviews_restaurant_id_created_at_idx",
+        "n|rel|restaurants.reviews_restaurant_id_created_at_idx"
+      ],
+      "reads": [
+        "n|tbl|restaurants.reviews",
+        "n|sch|restaurants",
+        "n|col|restaurants.reviews.restaurant_id",
+        "n|col|restaurants.reviews.created_at"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "restaurants",
+        "reviews"
+      ],
+      "writes": [
+        "s|fk|restaurants.reviews.reviews_restaurant_id_restaurants_id_fkey",
+        "n|fk|restaurants.reviews.reviews_restaurant_id_restaurants_id_fkey",
+        "e|fk|restaurants.reviews.reviews_restaurant_id_restaurants_id_fkey",
+        "n|con|restaurants.reviews.reviews_restaurant_id_restaurants_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|restaurants.reviews",
+        "n|sch|restaurants",
+        "n|tbl|restaurants.restaurants",
+        "n|sch|restaurants",
+        "n|col|restaurants.reviews.restaurant_id",
+        "n|col|restaurants.restaurants.id",
+        "e|uniqueness|restaurants.restaurants.id"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "restaurants",
+        "name": "reviews",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "restaurants",
+        "table": "restaurants",
+        "name": "rating_sum",
+        "type": "integer",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "0",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "restaurants",
+        "table": "restaurants",
+        "name": "rating_count",
+        "type": "integer",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "0",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "restaurants",
+        "table": "reviews",
+        "name": "order_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "restaurants",
+        "table": "reviews",
+        "name": "restaurant_id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "restaurants",
+        "table": "reviews",
+        "name": "rating",
+        "type": "smallint",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "restaurants",
+        "table": "reviews",
+        "name": "comment",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "restaurants",
+        "table": "reviews",
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "restaurants",
+        "table": "reviews",
+        "name": "reviews_restaurant_id_created_at_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "restaurant_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "created_at",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "restaurants",
+        "table": "reviews",
+        "name": "reviews_restaurant_id_restaurants_id_fkey",
+        "nameExplicit": false,
+        "columns": [
+          "restaurant_id"
+        ],
+        "schemaTo": "restaurants",
+        "tableTo": "restaurants",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "restaurants",
+        "table": "reviews",
+        "name": "reviews_pkey",
+        "columns": [
+          "order_id"
+        ],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "restaurants",
+        "table": "reviews",
+        "name": "reviews_rating_range",
+        "value": "\"rating\" between 1 and 5",
+        "entityType": "checks"
+      }
+    }
+  ]
+}

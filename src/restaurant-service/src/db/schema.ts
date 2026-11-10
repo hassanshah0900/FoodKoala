@@ -8,6 +8,7 @@ import {
   integer,
   jsonb,
   pgSchema,
+  smallint,
   text,
   timestamp,
   uuid,
@@ -87,6 +88,9 @@ export const restaurants = restaurantsSchema.table(
     statusReason: text('status_reason'),
     /** Bumped by every change to the restaurant, its hours or its zones; sent as `revision` in restaurant.updated. */
     revision: integer('revision').notNull().default(0),
+    /** Sum and number of customer ratings (order.reviewed), for the average. */
+    ratingSum: integer('rating_sum').notNull().default(0),
+    ratingCount: integer('rating_count').notNull().default(0),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .notNull()
@@ -123,6 +127,24 @@ export const deliveryZones = restaurantsSchema.table(
     index('delivery_zones_area_gist_idx').using('gist', t.area),
     // Self-crossing shapes would make "is this point inside?" meaningless.
     check('delivery_zones_area_valid', sql`ST_IsValid(${t.area})`),
+  ],
+);
+
+/** Customers' reviews, copied from order.reviewed: one per order. */
+export const reviews = restaurantsSchema.table(
+  'reviews',
+  {
+    orderId: uuid('order_id').primaryKey(),
+    restaurantId: uuid('restaurant_id')
+      .notNull()
+      .references(() => restaurants.id, { onDelete: 'cascade' }),
+    rating: smallint('rating').notNull(),
+    comment: text('comment'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+  },
+  (t) => [
+    index('reviews_restaurant_id_created_at_idx').on(t.restaurantId, t.createdAt),
+    check('reviews_rating_range', sql`${t.rating} between 1 and 5`),
   ],
 );
 
