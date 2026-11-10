@@ -9,6 +9,9 @@ info:
     them. Approved riders go online with their location and keep sending it
     while on shift. They can't go offline while carrying an order.
 
+    **Ratings.** Customers rate the rider when reviewing a delivered order
+    (order-service). `order.reviewed` adds that to the rider's `rating`.
+
     **Deliveries** come from order events. `order.placed` creates one
     (`waiting`); when the restaurant accepts it starts `searching`. The
     service then gives it to the nearest approved, online, free rider within
@@ -412,7 +415,7 @@ components:
 
     Rider:
       type: object
-      required: [userId, name, phone, vehicle, city, status, online, location, locatedAt, createdAt, updatedAt]
+      required: [userId, name, phone, vehicle, city, status, online, location, locatedAt, rating, createdAt, updatedAt]
       properties:
         userId: { type: string, format: uuid }
         name: { type: string }
@@ -426,8 +429,16 @@ components:
             - $ref: '#/components/schemas/Location'
             - type: 'null'
         locatedAt: { type: [string, 'null'], format: date-time }
+        rating: { $ref: '#/components/schemas/Rating' }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+
+    Rating:
+      type: object
+      required: [average, count]
+      properties:
+        average: { type: [number, 'null'], description: One decimal (4.3); null until the first rating }
+        count: { type: integer }
 
     Delivery:
       type: object

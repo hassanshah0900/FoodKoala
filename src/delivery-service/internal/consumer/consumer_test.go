@@ -13,6 +13,7 @@ import (
 	"github.com/hassanshah0900/FoodKoala/src/delivery-service/internal/consumer"
 	"github.com/hassanshah0900/FoodKoala/src/delivery-service/internal/deliveries"
 	"github.com/hassanshah0900/FoodKoala/src/delivery-service/internal/identity"
+	"github.com/hassanshah0900/FoodKoala/src/delivery-service/internal/inbox"
 	"github.com/hassanshah0900/FoodKoala/src/delivery-service/internal/outbox"
 	"github.com/hassanshah0900/FoodKoala/src/delivery-service/internal/testdb"
 )
@@ -58,7 +59,7 @@ func TestConsumesOrderEventsInAnyOrder(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c, err := consumer.New(strings.Split(brokers, ","), "test-"+run, []string{placedTopic, changedTopic}, svc.Apply)
+	c, err := consumer.New(strings.Split(brokers, ","), "test-"+run, []string{placedTopic, changedTopic}, inbox.Inbox{DB: pool, Handlers: svc.Handlers()}.Apply)
 	if err != nil {
 		t.Fatal(err)
 	}

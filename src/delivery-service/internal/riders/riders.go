@@ -38,16 +38,20 @@ type Rider struct {
 	Online    bool       `json:"online"`
 	Location  *Location  `json:"location"`
 	LocatedAt *time.Time `json:"locatedAt"`
+	Rating    Rating     `json:"rating"`
 	CreatedAt time.Time  `json:"createdAt"`
 	UpdatedAt time.Time  `json:"updatedAt"`
 }
 
-const columns = `user_id, name, phone, vehicle, city, status, online, lat, lng, located_at, created_at, updated_at`
+const columns = `user_id, name, phone, vehicle, city, status, online, lat, lng, located_at, rating_sum, rating_count, created_at, updated_at`
 
 func scan(row pgx.Row) (Rider, error) {
 	var r Rider
 	var lat, lng *float64
-	err := row.Scan(&r.UserID, &r.Name, &r.Phone, &r.Vehicle, &r.City, &r.Status, &r.Online, &lat, &lng, &r.LocatedAt, &r.CreatedAt, &r.UpdatedAt)
+	var ratingSum, ratingCount int
+	err := row.Scan(&r.UserID, &r.Name, &r.Phone, &r.Vehicle, &r.City, &r.Status, &r.Online, &lat, &lng, &r.LocatedAt,
+		&ratingSum, &ratingCount, &r.CreatedAt, &r.UpdatedAt)
+	r.Rating = ratingOf(ratingSum, ratingCount)
 	if lat != nil && lng != nil {
 		r.Location = &Location{Lat: *lat, Lng: *lng}
 	}
