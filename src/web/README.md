@@ -37,6 +37,11 @@ restaurant they own is a switch away. Only its owner can open a restaurant's con
   order-service gives to answer; the owner accepts with a prep time or rejects with a reason. Then "Food is ready"
   for the rider. Pausing new orders for 15 minutes to 2 hours, and taking them again.
 - **`/vendor/{restaurantId}/history`**: past orders, with why any were rejected or cancelled.
+- **`/vendor/{restaurantId}/menu`**: the menu as customers will see it: add, rename, reorder and delete categories;
+  reorder items, and mark one sold out or back in stock in one click.
+- **`/vendor/{restaurantId}/menu/new`** and **`/menu/items/{itemId}`**: a dish's name, price, description, photo
+  link, category and choices (groups like "Size: pick 1" with what each option adds). Option ids are kept when an
+  item is saved, so carts holding them stay valid.
 
 ### Admin console (`/admin`)
 

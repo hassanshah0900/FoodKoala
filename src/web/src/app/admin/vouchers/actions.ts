@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 import { refusal } from '@/lib/api/http';
 import { createVoucher, updateVoucher } from '@/lib/api/orders';
 import type { VoucherUpdate } from '@/lib/api/types';
+import { formValues } from '@/lib/form-values';
 import { requireAdmin } from '@/lib/session';
 import { fromPktInput, readVoucherForm } from '@/lib/vouchers';
 
@@ -14,13 +15,10 @@ export type VoucherFormState = {
   values?: Record<string, string>;
 };
 
-const valuesOf = (form: FormData) =>
-  Object.fromEntries([...form.entries()].filter(([k]) => !k.startsWith('$')).map(([k, v]) => [k, String(v)]));
-
 /** Creates the voucher and goes back to the list, or says what to fix. */
 export async function addVoucher(_prev: VoucherFormState, form: FormData): Promise<VoucherFormState> {
   const { token } = await requireAdmin('/admin/vouchers/new');
-  const values = valuesOf(form);
+  const values = formValues(form);
   const read = readVoucherForm((name) => values[name] ?? '');
   if ('errors' in read) return { errors: read.errors, values };
   try {

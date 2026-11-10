@@ -25,6 +25,7 @@ export default async function VendorLayout({
       links={[
         { href: base, label: 'Orders', icon: 'bag', exact: true },
         { href: `${base}/history`, label: 'Past orders', icon: 'clock' },
+        { href: `${base}/menu`, label: 'Menu', icon: 'menu' },
       ]}
       side={
         others.length > 0 && (
