@@ -56,12 +56,12 @@ render already uses them) and the response. A refresh token that auth-service re
 
 ## Layout
 
-| Folder            | What it holds                                                                                            |
-| ----------------- | -------------------------------------------------------------------------------------------------------- |
-| `src/app/`        | Routes. Each page loads its data on the server and arranges components. `(shop)/` holds the customer's pages under the header and footer; `admin/` the console. |
-| `src/components/` | Presentation only: they receive data as props and fetch nothing.                                         |
-| `src/lib/api/`    | One file per service the app calls through api-gateway, typed after `contracts/openapi`. Server only.    |
-| `src/lib/`        | Pure helpers (money, the location cookie, listing filters, menu prices), each with a `.spec.ts`.         |
+| Folder            | What it holds                                                                                                     |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `src/app/`        | Routes: each page loads its data and arranges components. `(shop)/` is the customer's side, `admin/` the console. |
+| `src/components/` | Presentation only: they receive data as props and fetch nothing.                                                  |
+| `src/lib/api/`    | One file per service the app calls through api-gateway, typed after `contracts/openapi`. Server only.             |
+| `src/lib/`        | Pure helpers (money, the location cookie, listing filters, menu prices), each with a `.spec.ts`.                  |
 
 **Design.** The palette is in `src/app/globals.css` as Tailwind theme tokens: `brand-600` (`#7a1fb3`) is the
 FoodKoala purple of buttons, links and the logo; lighter shades tint backgrounds, darker ones are hover states.
