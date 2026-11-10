@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectDrizzle } from '@nestjs/drizzle';
-import { eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import type { Database } from '../db/database';
-import { type User, users } from '../db/schema';
+import { type Role, type User, users } from '../db/schema';
 
 @Injectable()
 export class UsersRepository {
@@ -15,5 +15,19 @@ export class UsersRepository {
 
     const [existing] = await this.db.select().from(users).where(eq(users.phone, phone));
     return { user: existing, isNew: false };
+  }
+
+  /** Adds `role` unless the user has it already; returns the user as stored now. */
+  async grantRole(user: User, role: Role): Promise<User> {
+    if (user.roles.includes(role)) return user;
+    // The condition keeps two sign-ins at once from appending the role twice.
+    const [updated] = await this.db
+      .update(users)
+      .set({ roles: sql`array_append(${users.roles}, ${role}::auth.role)` })
+      .where(and(eq(users.id, user.id), sql`not (${role}::auth.role = any(${users.roles}))`))
+      .returning();
+    if (updated) return updated;
+    const [current] = await this.db.select().from(users).where(eq(users.id, user.id));
+    return current;
   }
 }
