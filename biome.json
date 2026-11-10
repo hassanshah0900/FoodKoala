@@ -4,12 +4,15 @@
   "files": {
     "includes": [
       "src/*-service/**",
+      "src/web/**",
       "!**/node_modules",
       "!**/dist",
+      "!**/.next",
       "!**/drizzle",
       "!**/package-lock.json",
       "!**/*.py",
-      "!**/*.go"
+      "!**/*.go",
+      "!**/next-env.d.ts"
     ]
   },
   "formatter": {
@@ -56,5 +59,10 @@
         }
       }
     }
-  ]
+  ],
+  "css": {
+    "parser": {
+      "tailwindDirectives": true
+    }
+  }
 }
