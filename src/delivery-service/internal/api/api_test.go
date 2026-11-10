@@ -101,6 +101,12 @@ func TestRiderSignsUpGetsApprovedAndWorksAShift(t *testing.T) {
 		t.Fatalf("pending: %v", pending)
 	}
 	c.expect(400, "GET", "/riders?status=flying", admin, nil)
+	c.expect(403, "GET", "/riders/"+me["X-User-Id"], me, nil)
+	c.expect(404, "GET", "/riders/"+outbox.NewID(), admin, nil)
+	c.expect(400, "GET", "/riders/not-an-id", admin, nil)
+	if got := c.expect(200, "GET", "/riders/"+me["X-User-Id"], admin, nil); got["name"] != "Ali Raza" {
+		t.Fatalf("rider for admin: %v", got)
+	}
 	c.expect(404, "POST", "/riders/"+outbox.NewID()+"/status", admin, map[string]string{"status": "approved"})
 	c.expect(200, "POST", "/riders/"+me["X-User-Id"]+"/status", admin, map[string]string{"status": "approved"})
 
@@ -241,7 +247,7 @@ func TestRidersSeeTheirEarningsAndAdminsSettleThem(t *testing.T) {
 	}
 	c.expect(403, "POST", "/riders/"+rider+"/settlements", me, map[string]any{"kind": "payout", "amountPaisa": 100})
 	c.expect(404, "POST", "/riders/"+outbox.NewID()+"/settlements", admin, map[string]any{"kind": "payout", "amountPaisa": 100})
-	if out := settle(409, "payout", 32701); out["message"] != "The rider is owed only 32700 paisa" {
+	if out := settle(409, "payout", 32701); out["message"] != "The rider is owed only Rs 327" {
 		t.Fatalf("over-payout: %v", out)
 	}
 	kept := settle(201, "kept_from_cash", 32700)

@@ -221,3 +221,48 @@ export interface VoucherDiscount {
   description: string;
   discountPaisa: number;
 }
+
+export type RiderStatus = 'pending' | 'approved' | 'suspended';
+
+/** Rider in delivery-service.yaml. */
+export interface Rider {
+  userId: string;
+  name: string;
+  phone: string;
+  vehicle: 'motorbike' | 'bicycle' | 'car';
+  city: string;
+  status: RiderStatus;
+  online: boolean;
+  location: Point | null;
+  locatedAt: string | null;
+  rating: Rating;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Earnings {
+  /** Orders the rider dropped off in [from, to). */
+  period: {
+    from: string;
+    to: string;
+    deliveries: number;
+    deliveryFeesPaisa: number;
+    tipsPaisa: number;
+    earnedPaisa: number;
+    cashCollectedPaisa: number;
+  };
+  /** Everything delivered and settled so far. */
+  balance: { cashInHandPaisa: number; unpaidEarningsPaisa: number; netPaisa: number };
+}
+
+export type SettlementKind = 'cash_deposit' | 'payout' | 'kept_from_cash';
+
+export interface Settlement {
+  id: string;
+  riderId: string;
+  kind: SettlementKind;
+  amountPaisa: number;
+  note: string | null;
+  recordedBy: string;
+  createdAt: string;
+}

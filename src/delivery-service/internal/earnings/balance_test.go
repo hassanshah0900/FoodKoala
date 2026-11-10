@@ -42,3 +42,11 @@ func TestAllow(t *testing.T) {
 		}
 	}
 }
+
+func TestRupees(t *testing.T) {
+	for paisa, want := range map[int]string{0: "Rs 0", 50000: "Rs 500", 117250: "Rs 1,172.50", 32701: "Rs 327.01", 123456700: "Rs 1,234,567"} {
+		if got := rupees(paisa); got != want {
+			t.Errorf("rupees(%d) = %q, want %q", paisa, got, want)
+		}
+	}
+}

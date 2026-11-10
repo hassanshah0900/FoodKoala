@@ -52,6 +52,10 @@ export const get = <T>(path: string, opts?: Omit<RequestOptions, 'body'>) => req
 export const post = <T>(path: string, body?: unknown, opts?: Omit<RequestOptions, 'body'>) =>
   request<T>('POST', path, { ...opts, body });
 
+/** The service's reason for refusing a request (a 4xx), to show on the form; null for failures a form can't fix. */
+export const refusal = (err: unknown): string | null =>
+  err instanceof ApiError && err.status < 500 ? err.message : null;
+
 /** The value, or null when the gateway says 404. */
 export async function orNull<T>(pending: Promise<T>): Promise<T | null> {
   try {
