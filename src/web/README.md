@@ -20,6 +20,12 @@ their menus. Signing in, the cart, checkout and order tracking come next, then t
   button. The cart sits beside the menu (on phones, a "View your cart" bar opens `/cart`), with steppers that
   work without JavaScript, the delivery fee and how much is missing for the minimum order. A cart holds one
   restaurant: adding from another asks before starting a new cart. Guests are sent to sign in first.
+- **`/checkout`**: the delivery address (pick a saved one, or add one at the chosen area), a voucher, a tip for
+  the rider and cash on delivery, with the order on the right. Choices live in the URL, so the server prices them
+  as order-service will; the order is placed with an Idempotency-Key fixed when the page rendered, so a double
+  click can't order twice.
+- **`/orders/{id}`**: where the order is, a row of steps and the arrival time, refreshed every 15 seconds until
+  it is delivered, rejected or cancelled; then what was ordered, the money and the address.
 - **`/login`**: sign in or sign up with a mobile number and the 6-digit code texted to it (auth-service).
 
 ## Sessions

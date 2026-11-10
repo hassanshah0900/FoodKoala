@@ -20,6 +20,8 @@ export interface RequestOptions {
   body?: unknown;
   /** The caller's access token, for routes that need a signed-in user. */
   token?: string | null;
+  /** Extra headers, e.g. Idempotency-Key. */
+  headers?: Record<string, string>;
   /** Cache a GET for this many seconds (menus change rarely); otherwise every request asks again. */
   revalidate?: number;
 }
@@ -28,7 +30,7 @@ export interface RequestOptions {
 export async function request<T>(method: string, path: string, opts: RequestOptions = {}): Promise<T> {
   const url = new URL(`/api/v1/${path}`, API_URL);
   for (const [k, v] of Object.entries(opts.query ?? {})) if (v !== undefined) url.searchParams.set(k, String(v));
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = { ...opts.headers };
   if (opts.body !== undefined) headers['content-type'] = 'application/json';
   if (opts.token) headers.authorization = `Bearer ${opts.token}`;
   const cacheable = method === 'GET' && opts.revalidate !== undefined && !opts.token;

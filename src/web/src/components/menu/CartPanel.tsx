@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { changeQuantity } from '@/app/cart/actions';
+import { MoneyRows } from '@/components/checkout/OrderSummary';
 import { BagIcon } from '@/components/icons';
 import type { Cart, Delivery } from '@/lib/api/types';
 import { summarize } from '@/lib/cart-summary';
@@ -100,25 +101,20 @@ function CartLines({ cart, restaurantId, delivery }: { cart: Cart; restaurantId:
           </li>
         ))}
       </ul>
-      <dl className="space-y-1.5 border-t border-line pt-4 text-sm">
-        <div className="flex justify-between">
-          <dt className="text-muted">Subtotal</dt>
-          <dd>{rupees(s.subtotalPaisa)}</dd>
-        </div>
-        <div className="flex justify-between">
-          <dt className="text-muted">Delivery fee</dt>
-          <dd>{s.deliveryFeePaisa === null ? '—' : s.deliveryFeePaisa === 0 ? 'Free' : rupees(s.deliveryFeePaisa)}</dd>
-        </div>
-        <div className="flex justify-between pt-1 text-base font-bold">
-          <dt>Total</dt>
-          <dd>{rupees(s.totalPaisa)}</dd>
-        </div>
-      </dl>
+      <div className="border-t border-line pt-4">
+        <MoneyRows s={s} />
+      </div>
       {s.shortOfMinimumPaisa > 0 && (
         <p className="mt-3 rounded-lg bg-brand-50 px-3 py-2 text-xs font-semibold text-brand-800">
           Add {rupees(s.shortOfMinimumPaisa)} more to reach the minimum order.
         </p>
       )}
+      <Link
+        href="/checkout"
+        className="mt-4 flex h-12 items-center justify-center rounded-lg bg-brand-600 font-bold text-white hover:bg-brand-700"
+      >
+        Review payment and address
+      </Link>
     </>
   );
 }
