@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "restaurant.updated",
+  "title": "RestaurantUpdated",
+  "description": "`data` of the restaurant.updated event, published by restaurant-service after every change to a restaurant, its opening hours or its delivery zones, whatever its status. It is the restaurant's whole public state, not a diff: a consumer replaces what it has. Keyed by restaurantId. `revision` grows by one with every change, so a consumer can drop an event older than what it already holds (redelivery, or a backfill racing a live change).",
+  "type": "object",
+  "required": ["restaurantId", "revision", "name", "description", "cuisines", "status", "address", "location", "logoUrl", "coverUrl", "hours", "pausedUntil", "zones", "updatedAt"],
+  "properties": {
+    "restaurantId": { "type": "string", "format": "uuid" },
+    "revision": { "type": "integer", "minimum": 1 },
+    "name": { "type": "string" },
+    "description": { "type": ["string", "null"] },
+    "cuisines": { "type": "array", "items": { "type": "string" } },
+    "status": {
+      "enum": ["pending", "approved", "rejected", "suspended"],
+      "description": "Only approved restaurants may be shown to customers"
+    },
+    "address": {
+      "type": "object",
+      "required": ["line1", "area", "city", "province"],
+      "properties": {
+        "line1": { "type": "string" },
+        "area": { "type": "string" },
+        "city": { "type": "string" },
+        "province": { "type": "string" }
+      }
+    },
+    "location": { "$ref": "#/$defs/location" },
+    "logoUrl": { "type": ["string", "null"] },
+    "coverUrl": { "type": ["string", "null"] },
+    "hours": {
+      "type": "object",
+      "description": "Hours in openapi/restaurant-service.yaml: weekly ranges and special days, Asia/Karachi local time",
+      "required": ["weekly", "special"],
+      "properties": {
+        "weekly": { "type": "object" },
+        "special": { "type": "array" }
+      }
+    },
+    "pausedUntil": { "type": ["string", "null"], "format": "date-time", "description": "Not taking orders until then; may already be in the past" },
+    "zones": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "area", "deliveryFeePaisa", "minimumOrderPaisa", "deliveryTimeMinutes"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "area": { "type": "object", "description": "GeoJSON Polygon, [lng, lat] positions" },
+          "deliveryFeePaisa": { "type": "integer" },
+          "minimumOrderPaisa": { "type": "integer" },
+          "deliveryTimeMinutes": { "type": "integer" }
+        }
+      }
+    },
+    "updatedAt": { "type": "string", "format": "date-time" }
+  },
+  "$defs": {
+    "location": {
+      "type": "object",
+      "required": ["lat", "lng"],
+      "properties": { "lat": { "type": "number" }, "lng": { "type": "number" } }
+    }
+  }
+}
