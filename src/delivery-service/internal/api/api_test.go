@@ -247,7 +247,7 @@ func TestRidersSeeTheirEarningsAndAdminsSettleThem(t *testing.T) {
 	}
 	c.expect(403, "POST", "/riders/"+rider+"/settlements", me, map[string]any{"kind": "payout", "amountPaisa": 100})
 	c.expect(404, "POST", "/riders/"+outbox.NewID()+"/settlements", admin, map[string]any{"kind": "payout", "amountPaisa": 100})
-	if out := settle(409, "payout", 32701); out["message"] != "The rider is owed only 32700 paisa" {
+	if out := settle(409, "payout", 32701); out["message"] != "The rider is owed only Rs 327" {
 		t.Fatalf("over-payout: %v", out)
 	}
 	kept := settle(201, "kept_from_cash", 32700)

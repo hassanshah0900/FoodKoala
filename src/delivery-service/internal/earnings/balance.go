@@ -1,7 +1,9 @@
 package earnings
 
 import (
+	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/hassanshah0900/FoodKoala/src/delivery-service/internal/httpx"
 )
@@ -41,10 +43,22 @@ func (b Balance) allow(kind string, amount int) error {
 		return httpx.Errorf(http.StatusBadRequest, "amountPaisa must be positive")
 	}
 	if kind != "payout" && amount > b.CashInHandPaisa {
-		return httpx.Errorf(http.StatusConflict, "The rider holds only %d paisa in cash", b.CashInHandPaisa)
+		return httpx.Errorf(http.StatusConflict, "The rider holds only %s in cash", rupees(b.CashInHandPaisa))
 	}
 	if kind != "cash_deposit" && amount > b.UnpaidEarningsPaisa {
-		return httpx.Errorf(http.StatusConflict, "The rider is owed only %d paisa", b.UnpaidEarningsPaisa)
+		return httpx.Errorf(http.StatusConflict, "The rider is owed only %s", rupees(b.UnpaidEarningsPaisa))
 	}
 	return nil
+}
+
+// rupees reads paisa the way an admin does: 117250 -> "Rs 1,172.50", 50000 -> "Rs 500".
+func rupees(paisa int) string {
+	whole := strconv.Itoa(paisa / 100)
+	for i := len(whole) - 3; i > 0; i -= 3 {
+		whole = whole[:i] + "," + whole[i:]
+	}
+	if paisa%100 == 0 {
+		return "Rs " + whole
+	}
+	return fmt.Sprintf("Rs %s.%02d", whole, paisa%100)
 }
