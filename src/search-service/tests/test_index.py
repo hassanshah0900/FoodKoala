@@ -4,6 +4,7 @@ from datetime import UTC, datetime, timedelta
 
 from elasticsearch import Elasticsearch
 
+from app.events import RestaurantUpdated
 from app.index import SearchIndex
 from tests.factories import HOME, box, item, menu, restaurant, zone
 
@@ -166,7 +167,8 @@ def test_result_has_delivery_terms_and_availability(index: SearchIndex) -> None:
     assert got["matchingDishes"] == []
     assert set(got) == {
         "id", "name", "cuisines", "area", "city", "logoUrl", "coverUrl", "location",
-        "distanceMeters", "openNow", "pausedUntil", "acceptingOrders", "delivery", "matchingDishes",
+        "distanceMeters", "openNow", "pausedUntil", "acceptingOrders", "rating", "delivery",
+        "matchingDishes",
     }  # fmt: skip
 
     shut = next(x for x in page["items"] if x["id"] == str(closed.restaurantId))
@@ -222,3 +224,39 @@ def test_cuisines_near_the_point_most_common_first(index: SearchIndex) -> None:
         {"cuisine": "bbq", "restaurants": 1},
         {"cuisine": "biryani", "restaurants": 1},
     ]
+
+
+def test_ratings_show_and_sort_best_first_unrated_last(index: SearchIndex) -> None:
+    good = restaurant(
+        name="Good", rating={"average": 4.6, "count": 120}, location={"lat": 24.94, "lng": 67.13}
+    )
+    fine = restaurant(
+        name="Fine", rating={"average": 3.9, "count": 8}, location={"lat": 24.921, "lng": 67.091}
+    )
+    new = restaurant(
+        name="New", location={"lat": 24.9205, "lng": 67.0905}
+    )  # nearest, no reviews yet
+    for r in [good, fine, new]:
+        index.apply_restaurant(r)
+    refresh(index)
+
+    by_rating = search(index, sort="rating")["items"]
+    assert [r["name"] for r in by_rating] == ["Good", "Fine", "New"]
+    assert by_rating[0]["rating"] == {"average": 4.6, "count": 120}
+    assert by_rating[2]["rating"] == {"average": None, "count": 0}
+    assert [r["name"] for r in search(index)["items"]] == ["New", "Fine", "Good"]  # nearest first
+
+
+def test_events_from_before_ratings_count_as_unrated(index: SearchIndex) -> None:
+    old = restaurant().model_dump(mode="json")
+    del old["rating"]
+    index.apply_restaurant(RestaurantUpdated.model_validate(old))
+    refresh(index)
+    assert search(index)["items"][0]["rating"] == {"average": None, "count": 0}
+
+
+def test_ensure_adds_new_fields_to_an_existing_index(index: SearchIndex, es: Elasticsearch) -> None:
+    index.ensure()  # the alias exists already: only the mapping is brought up to date
+    mapping = es.indices.get_mapping(index=index.alias)
+    (properties,) = (m["mappings"]["properties"] for m in mapping.body.values())
+    assert properties["rating"]["properties"]["average"]["type"] == "float"

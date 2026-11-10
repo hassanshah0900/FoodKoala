@@ -25,7 +25,7 @@ def search_restaurants(
     lng: Lng,
     q: Annotated[str | None, Query(min_length=1, max_length=100)] = None,
     cuisine: Annotated[str | None, Query(max_length=50)] = None,
-    sort: Literal["relevance", "distance"] = "relevance",
+    sort: Literal["relevance", "distance", "rating"] = "relevance",
     page: Annotated[int, Query(ge=1, le=50)] = 1,
     limit: Annotated[int, Query(ge=1, le=50)] = 20,
 ) -> dict:
