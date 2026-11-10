@@ -31,7 +31,7 @@
   "linter": {
     "enabled": true,
     "rules": {
-      "recommended": true,
+      "preset": "recommended",
       "style": {
         "useImportType": "off",
         "noNonNullAssertion": "off"
@@ -47,10 +47,7 @@
   },
   "overrides": [
     {
-      "includes": [
-        "**/*.spec.ts",
-        "**/*.e2e-spec.ts"
-      ],
+      "includes": ["**/*.spec.ts", "**/*.e2e-spec.ts"],
       "linter": {
         "rules": {
           "suspicious": {
