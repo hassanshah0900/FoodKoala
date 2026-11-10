@@ -30,8 +30,13 @@ their menus. Signing in, the cart, checkout and order tracking come next, then t
 
 ### Restaurant console (`/vendor`)
 
-For owners: `/vendor` opens their restaurant (someone without one is told how to get listed), and another
-restaurant they own is a switch away. Only its owner can open a restaurant's console.
+For owners: `/vendor` opens their restaurant (someone without one is sent to list it), and another restaurant
+they own is a switch away. Only its owner can open a restaurant's console.
+
+- **`/vendor/new`**: list a restaurant: name, phone (mobile or landline), cuisines, address (quick-filled from an
+  area), its place on the map ("lat, lng", or the owner's own location) and photo links. It starts pending, and its
+  orders page lists what is left: menu, hours, zones, then FoodKoala's approval.
+- **`/vendor/{restaurantId}/details`**: the same listing, to change; a rejected restaurant asks for review again.
 
 - **`/vendor/{restaurantId}`**: the kitchen board, refreshed every 15 seconds. New orders count down the 10 minutes
   order-service gives to answer; the owner accepts with a prep time or rejects with a reason. Then "Food is ready"

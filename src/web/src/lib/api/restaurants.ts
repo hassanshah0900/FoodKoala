@@ -1,3 +1,4 @@
+import type { RestaurantInput } from '../restaurant-form';
 import type { ZoneInput } from '../zones';
 import { del, get, orNull, patch, post, put } from './http';
 import type {
@@ -73,3 +74,10 @@ export const updateZone = (token: string, id: string, zoneId: string, zone: Part
 
 export const deleteZone = (token: string, id: string, zoneId: string) =>
   del<void>(`restaurants/${id}/zones/${zoneId}`, { token });
+
+/** Lists a new restaurant; it starts pending until an admin approves it. */
+export const applyRestaurant = (token: string, r: RestaurantInput) =>
+  post<ManagedRestaurant>('restaurants', r, { token });
+
+export const updateRestaurant = (token: string, id: string, r: Partial<RestaurantInput>) =>
+  patch<ManagedRestaurant>(`restaurants/${id}`, r, { token });

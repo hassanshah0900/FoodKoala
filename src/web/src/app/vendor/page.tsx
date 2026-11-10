@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation';
 import { KoalaMark } from '@/components/Logo';
 import { ownRestaurants } from '@/lib/owner';
 
-export const metadata: Metadata = { title: 'For restaurants · FoodKoala' };
+export const metadata: Metadata = { title: 'For restaurants' };
 
 /** Straight to the owner's restaurant; someone without one is told how to get listed. */
 export default async function Vendor() {
@@ -17,7 +17,13 @@ export default async function Vendor() {
       <p className="mt-2 max-w-md text-muted">
         Once your restaurant is listed, this is where you take orders, keep your menu up to date and see your sales.
       </p>
-      <Link href="/" className="mt-6 rounded-lg bg-brand-600 px-5 py-2.5 font-bold text-white hover:bg-brand-700">
+      <Link
+        href="/vendor/new"
+        className="mt-6 rounded-lg bg-brand-600 px-5 py-2.5 font-bold text-white hover:bg-brand-700"
+      >
+        List your restaurant
+      </Link>
+      <Link href="/" className="mt-3 text-sm font-semibold text-brand-700">
         Back to ordering
       </Link>
     </main>

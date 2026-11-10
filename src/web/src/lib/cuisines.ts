@@ -33,3 +33,6 @@ export function cuisineLabel(tag: string): string {
 
 /** A food picture for the tag, or null for cuisines we have none for. */
 export const cuisineEmoji = (tag: string): string | null => KNOWN[tag]?.emoji ?? null;
+
+/** The cuisines restaurants pick from when they list themselves. */
+export const CUISINES = Object.keys(KNOWN);
