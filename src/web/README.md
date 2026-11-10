@@ -41,6 +41,10 @@ else gets a 404. It has its own frame, with the sections down the side.
 - **`/admin/riders/{userId}`**: approve, suspend or reinstate; the last 7 days' deliveries, fees, tips and cash;
   the balance (cash in hand, unpaid earnings, who owes whom); and settling it: cash handed in, a payout, or
   earnings kept from the cash, filled in with the entry that clears the most.
+- **`/admin/vouchers`**: every voucher with its terms, uses and dates, and whether it is live, scheduled, paused,
+  ended or used up; pause or resume one, or change its end, total uses and description.
+- **`/admin/vouchers/new`**: a percent (optionally capped) or rupee discount, a minimum order, one restaurant or
+  any, first orders only, total and per-customer uses, and when it runs (Pakistan time).
 
 ## Sessions
 

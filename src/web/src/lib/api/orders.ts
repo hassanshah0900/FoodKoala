@@ -1,5 +1,5 @@
-import { get, orNull, post } from './http';
-import type { Order, VoucherDiscount } from './types';
+import { get, orNull, patch, post } from './http';
+import type { Order, Page, Voucher, VoucherCreate, VoucherDiscount, VoucherUpdate } from './types';
 
 export interface PlaceOrder {
   addressId: string;
@@ -22,3 +22,16 @@ export const getOrder = (token: string, id: string) => orNull(get<Order>(`orders
 /** What the code takes off the caller's cart now; 422 with the reason if nothing. */
 export const voucherDiscount = (token: string, code: string) =>
   get<VoucherDiscount>(`orders/vouchers/${encodeURIComponent(code)}/discount`, { token });
+
+// Admin: the vouchers customers apply at checkout.
+
+/** Every voucher, newest first. */
+export const listVouchers = (token: string, page = 1) =>
+  get<Page<Voucher>>('orders/vouchers', { token, query: { page } });
+
+export const createVoucher = (token: string, voucher: VoucherCreate) =>
+  post<Voucher>('orders/vouchers', voucher, { token });
+
+/** Pause or resume it, or change its description, limit or end. */
+export const updateVoucher = (token: string, id: string, change: VoucherUpdate) =>
+  patch<Voucher>(`orders/vouchers/${id}`, change, { token });

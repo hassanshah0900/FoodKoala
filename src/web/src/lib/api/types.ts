@@ -266,3 +266,28 @@ export interface Settlement {
   recordedBy: string;
   createdAt: string;
 }
+
+/** Voucher in order-service.yaml. */
+export interface Voucher {
+  id: string;
+  code: string;
+  description: string;
+  kind: 'percent' | 'flat';
+  /** Percent off for `percent`, paisa off for `flat`. */
+  value: number;
+  maxDiscountPaisa: number | null;
+  minSubtotalPaisa: number;
+  restaurantId: string | null;
+  firstOrderOnly: boolean;
+  usageLimit: number | null;
+  perCustomerLimit: number;
+  startsAt: string;
+  endsAt: string;
+  active: boolean;
+  /** Orders that carry it and were not rejected or cancelled. */
+  used: number;
+  createdAt: string;
+}
+
+export type VoucherCreate = Omit<Voucher, 'id' | 'active' | 'used' | 'createdAt'>;
+export type VoucherUpdate = Partial<Pick<Voucher, 'description' | 'usageLimit' | 'endsAt' | 'active'>>;

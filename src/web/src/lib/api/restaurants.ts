@@ -26,6 +26,17 @@ export const latestReviews = (id: string, limit = 3) =>
 export const restaurantsWithStatus = (token: string, status: RestaurantStatus, page = 1) =>
   get<Page<ManagedRestaurant>>('restaurants/admin', { token, query: { status, page } });
 
+/** Every restaurant with a status, for choosing one (up to 1,000). */
+export async function allWithStatus(token: string, status: RestaurantStatus): Promise<ManagedRestaurant[]> {
+  const all: ManagedRestaurant[] = [];
+  for (let page = 1; page <= 20; page++) {
+    const p = await get<Page<ManagedRestaurant>>('restaurants/admin', { token, query: { status, page, limit: 50 } });
+    all.push(...p.items);
+    if (!p.hasMore) break;
+  }
+  return all;
+}
+
 /** Any restaurant, in any status, as its owner and admins see it. */
 export const managedRestaurant = (token: string, id: string) =>
   orNull(get<ManagedRestaurant>(`restaurants/${id}`, { token }));
