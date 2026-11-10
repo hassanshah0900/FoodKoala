@@ -3,6 +3,7 @@ import { InjectDrizzle } from '@nestjs/drizzle';
 import { and, asc, count, eq, sql, type SQL } from 'drizzle-orm';
 import { APP_CONFIG, type AppConfig } from '../config/config';
 import type { Database } from '../db/database';
+import { recordRestaurantChange } from '../events/restaurant-events';
 import { deliveryZones, restaurants, type Polygon } from '../db/schema';
 import type { Location } from '../geo/geo';
 import type { Identity } from '../identity/identity';
@@ -133,30 +134,38 @@ export class ZonesService {
           .insert(deliveryZones)
           .values({ ...dto, restaurantId })
           .returning(zoneColumns);
+        await recordRestaurantChange(tx, restaurantId);
         return toZone(row);
       })
       .catch(rethrowInvalidShape);
   }
 
   async update(me: Identity, restaurantId: string, zoneId: string, dto: ZoneUpdateDto): Promise<DeliveryZone> {
-    await this.restaurants.findManageable(this.db, me, restaurantId);
-    const [row] = await this.db
-      .update(deliveryZones)
-      .set(dto)
-      .where(and(eq(deliveryZones.id, zoneId), eq(deliveryZones.restaurantId, restaurantId)))
-      .returning(zoneColumns)
+    return this.db
+      .transaction(async (tx) => {
+        await this.restaurants.findManageable(tx, me, restaurantId, { lock: true });
+        const [row] = await tx
+          .update(deliveryZones)
+          .set(dto)
+          .where(and(eq(deliveryZones.id, zoneId), eq(deliveryZones.restaurantId, restaurantId)))
+          .returning(zoneColumns);
+        if (!row) throw new NotFoundException('Delivery zone not found');
+        await recordRestaurantChange(tx, restaurantId);
+        return toZone(row);
+      })
       .catch(rethrowInvalidShape);
-    if (!row) throw new NotFoundException('Delivery zone not found');
-    return toZone(row);
   }
 
   async remove(me: Identity, restaurantId: string, zoneId: string): Promise<void> {
-    await this.restaurants.findManageable(this.db, me, restaurantId);
-    const deleted = await this.db
-      .delete(deliveryZones)
-      .where(and(eq(deliveryZones.id, zoneId), eq(deliveryZones.restaurantId, restaurantId)))
-      .returning({ id: deliveryZones.id });
-    if (deleted.length === 0) throw new NotFoundException('Delivery zone not found');
+    await this.db.transaction(async (tx) => {
+      await this.restaurants.findManageable(tx, me, restaurantId, { lock: true });
+      const deleted = await tx
+        .delete(deliveryZones)
+        .where(and(eq(deliveryZones.id, zoneId), eq(deliveryZones.restaurantId, restaurantId)))
+        .returning({ id: deliveryZones.id });
+      if (deleted.length === 0) throw new NotFoundException('Delivery zone not found');
+      await recordRestaurantChange(tx, restaurantId);
+    });
   }
 
   /** Approved restaurants with a zone containing `at`, nearest first. */

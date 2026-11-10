@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import {
+  bigserial,
   check,
   customType,
   doublePrecision,
@@ -84,6 +85,8 @@ export const restaurants = restaurantsSchema.table(
     pausedUntil: timestamp('paused_until', { withTimezone: true }),
     status: statusEnum('status').notNull().default('pending'),
     statusReason: text('status_reason'),
+    /** Bumped by every change to the restaurant, its hours or its zones; sent as `revision` in restaurant.updated. */
+    revision: integer('revision').notNull().default(0),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .notNull()
@@ -121,6 +124,27 @@ export const deliveryZones = restaurantsSchema.table(
     // Self-crossing shapes would make "is this point inside?" meaningless.
     check('delivery_zones_area_valid', sql`ST_IsValid(${t.area})`),
   ],
+);
+
+/**
+ * Transactional outbox: events written with the change that caused them, so
+ * none is lost or sent for a change that rolled back. A relay publishes
+ * unpublished rows to Kafka in `id` order and sets `published_at`.
+ */
+export const outbox = restaurantsSchema.table(
+  'outbox',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    /** The event's envelope id (contracts/README.md#event-envelope). */
+    eventId: uuid('event_id').notNull().unique(),
+    topic: text('topic').notNull(),
+    key: text('key').notNull(),
+    /** The full envelope, `data` included. */
+    payload: jsonb('payload').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    publishedAt: timestamp('published_at', { withTimezone: true }),
+  },
+  (t) => [index('outbox_unpublished_idx').on(t.id).where(sql`${t.publishedAt} is null`)],
 );
 
 export type RestaurantRow = typeof restaurants.$inferSelect;

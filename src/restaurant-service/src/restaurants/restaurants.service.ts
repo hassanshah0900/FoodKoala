@@ -9,6 +9,7 @@ import { InjectDrizzle } from '@nestjs/drizzle';
 import { asc, count, desc, eq } from 'drizzle-orm';
 import type { Database, Tx } from '../db/database';
 import { deliveryZones, restaurants, type RestaurantRow, type Status } from '../db/schema';
+import { recordRestaurantChange } from '../events/restaurant-events';
 import { hasWeeklyHours, type HoursDto } from '../hours/hours';
 import { isAdmin, type Identity } from '../identity/identity';
 import type { RestaurantCreateDto, RestaurantUpdateDto, ReviewQuery, StatusChangeDto } from './restaurants.dto';
@@ -38,11 +39,13 @@ export class RestaurantsService {
   constructor(@InjectDrizzle() private readonly db: Database) {}
 
   async create(me: Identity, { address, location, ...fields }: RestaurantCreateDto): Promise<ManagedRestaurant> {
-    const [row] = await this.db
-      .insert(restaurants)
-      .values({ ...fields, ...address, ...location, ownerId: me.userId })
-      .returning();
-    return toManagedRestaurant(row);
+    return this.db.transaction(async (tx) => {
+      const [row] = await tx
+        .insert(restaurants)
+        .values({ ...fields, ...address, ...location, ownerId: me.userId })
+        .returning({ id: restaurants.id });
+      return toManagedRestaurant(await recordRestaurantChange(tx, row.id));
+    });
   }
 
   async listMine(me: Identity): Promise<ManagedRestaurant[]> {
@@ -79,23 +82,19 @@ export class RestaurantsService {
   }
 
   async update(me: Identity, id: string, { address, location, ...fields }: RestaurantUpdateDto) {
-    await this.findManageable(this.db, me, id);
-    return this.save(id, { ...fields, ...address, ...location });
+    return this.save(me, id, { ...fields, ...address, ...location });
   }
 
   async setHours(me: Identity, id: string, { weekly, special }: HoursDto) {
-    await this.findManageable(this.db, me, id);
-    return this.save(id, { weeklyHours: weekly, specialHours: special });
+    return this.save(me, id, { weeklyHours: weekly, specialHours: special });
   }
 
   async pause(me: Identity, id: string, minutes: number) {
-    await this.findManageable(this.db, me, id);
-    return this.save(id, { pausedUntil: new Date(Date.now() + minutes * 60_000) });
+    return this.save(me, id, { pausedUntil: new Date(Date.now() + minutes * 60_000) });
   }
 
   async resume(me: Identity, id: string) {
-    await this.findManageable(this.db, me, id);
-    return this.save(id, { pausedUntil: null });
+    return this.save(me, id, { pausedUntil: null });
   }
 
   async changeStatus(me: Identity, id: string, { status, reason }: StatusChangeDto): Promise<ManagedRestaurant> {
@@ -117,12 +116,11 @@ export class RestaurantsService {
         }
       }
 
-      const [updated] = await tx
+      await tx
         .update(restaurants)
         .set({ status, statusReason: rule.needsReason ? reason : null })
-        .where(eq(restaurants.id, id))
-        .returning();
-      return toManagedRestaurant(updated);
+        .where(eq(restaurants.id, id));
+      return toManagedRestaurant(await recordRestaurantChange(tx, id));
     });
   }
 
@@ -140,9 +138,16 @@ export class RestaurantsService {
     return row;
   }
 
-  private async save(id: string, values: Partial<typeof restaurants.$inferInsert>): Promise<ManagedRestaurant> {
-    const [row] = await this.db.update(restaurants).set(values).where(eq(restaurants.id, id)).returning();
-    if (!row) throw new NotFoundException('Restaurant not found');
-    return toManagedRestaurant(row);
+  /** Applies `values` to a restaurant `me` manages and records the change. */
+  private async save(
+    me: Identity,
+    id: string,
+    values: Partial<typeof restaurants.$inferInsert>,
+  ): Promise<ManagedRestaurant> {
+    return this.db.transaction(async (tx) => {
+      await this.findManageable(tx, me, id, { lock: true });
+      await tx.update(restaurants).set(values).where(eq(restaurants.id, id));
+      return toManagedRestaurant(await recordRestaurantChange(tx, id));
+    });
   }
 }
