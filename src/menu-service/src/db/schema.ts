@@ -1,4 +1,5 @@
-import { boolean, index, integer, jsonb, pgSchema, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
+import { bigserial, boolean, index, integer, jsonb, pgSchema, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 
 /** menu-service owns the `menu` Postgres schema and nothing else (ADR 0003). */
 export const menuSchema = pgSchema('menu');
@@ -63,6 +64,35 @@ export const items = menuSchema.table(
     index('items_category_id_position_idx').on(t.categoryId, t.position),
     index('items_restaurant_id_idx').on(t.restaurantId),
   ],
+);
+
+/** One row per restaurant whose menu has changed: the `revision` sent in menu.updated. */
+export const menus = menuSchema.table('menus', {
+  restaurantId: uuid('restaurant_id').primaryKey(),
+  /** Bumped by every change to the restaurant's menu. */
+  revision: integer('revision').notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
+ * Transactional outbox: events written with the change that caused them, so
+ * none is lost or sent for a change that rolled back. A relay publishes
+ * unpublished rows to Kafka in `id` order and sets `published_at`.
+ */
+export const outbox = menuSchema.table(
+  'outbox',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    /** The event's envelope id (contracts/README.md#event-envelope). */
+    eventId: uuid('event_id').notNull().unique(),
+    topic: text('topic').notNull(),
+    key: text('key').notNull(),
+    /** The full envelope, `data` included. */
+    payload: jsonb('payload').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    publishedAt: timestamp('published_at', { withTimezone: true }),
+  },
+  (t) => [index('outbox_unpublished_idx').on(t.id).where(sql`${t.publishedAt} is null`)],
 );
 
 export type CategoryRow = typeof categories.$inferSelect;

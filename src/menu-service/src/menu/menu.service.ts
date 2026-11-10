@@ -4,6 +4,7 @@ import { and, asc, count, eq, max, sql } from 'drizzle-orm';
 import { APP_CONFIG, type AppConfig } from '../config/config';
 import type { Database, Tx } from '../db/database';
 import { categories, items, type CategoryRow, type ItemRow } from '../db/schema';
+import { recordMenuChange } from '../events/menu-events';
 import type { Identity } from '../identity/identity';
 import { RestaurantAccess } from '../restaurants/restaurant-access';
 import {
@@ -85,15 +86,20 @@ export class MenuService {
         .insert(categories)
         .values({ ...dto, restaurantId, position: (last ?? -1) + 1 })
         .returning();
+      await recordMenuChange(tx, restaurantId);
       return toCategory(row);
     });
   }
 
   async updateCategory(me: Identity, categoryId: string, dto: CategoryUpdateDto): Promise<Category> {
     const category = await this.manageableCategory(me, categoryId);
-    const [row] = await this.db.update(categories).set(dto).where(eq(categories.id, category.id)).returning();
-    if (!row) throw new NotFoundException('Category not found');
-    return toCategory(row);
+    return this.db.transaction(async (tx) => {
+      await lockRestaurant(tx, category.restaurantId);
+      const [row] = await tx.update(categories).set(dto).where(eq(categories.id, category.id)).returning();
+      if (!row) throw new NotFoundException('Category not found');
+      await recordMenuChange(tx, category.restaurantId);
+      return toCategory(row);
+    });
   }
 
   async deleteCategory(me: Identity, categoryId: string): Promise<void> {
@@ -103,6 +109,7 @@ export class MenuService {
       const [{ total }] = await tx.select({ total: count() }).from(items).where(eq(items.categoryId, categoryId));
       if (total > 0) throw new ConflictException('Move or delete the items in this category first');
       await tx.delete(categories).where(eq(categories.id, categoryId));
+      await recordMenuChange(tx, category.restaurantId);
     });
   }
 
@@ -118,6 +125,7 @@ export class MenuService {
         throw new BadRequestException('Send every category id of the restaurant exactly once');
       }
       await applyOrder(tx, categories, ids);
+      await recordMenuChange(tx, restaurantId);
     });
   }
 
@@ -148,6 +156,7 @@ export class MenuService {
           position: await this.nextItemPosition(tx, categoryId),
         })
         .returning();
+      await recordMenuChange(tx, category.restaurantId);
       return toItem(row);
     });
   }
@@ -171,13 +180,19 @@ export class MenuService {
         .where(eq(items.id, itemId))
         .returning();
       if (!row) throw new NotFoundException('Item not found');
+      await recordMenuChange(tx, item.restaurantId);
       return toItem(row);
     });
   }
 
   async deleteItem(me: Identity, itemId: string): Promise<void> {
     const item = await this.manageableItem(me, itemId);
-    await this.db.delete(items).where(eq(items.id, item.id));
+    await this.db.transaction(async (tx) => {
+      await lockRestaurant(tx, item.restaurantId);
+      const deleted = await tx.delete(items).where(eq(items.id, item.id)).returning({ id: items.id });
+      if (!deleted.length) throw new NotFoundException('Item not found');
+      await recordMenuChange(tx, item.restaurantId);
+    });
   }
 
   async reorderItems(me: Identity, categoryId: string, ids: string[]): Promise<void> {
@@ -189,6 +204,7 @@ export class MenuService {
         throw new BadRequestException('Send every item id of the category exactly once');
       }
       await applyOrder(tx, items, ids);
+      await recordMenuChange(tx, category.restaurantId);
     });
   }
 
