@@ -12,6 +12,7 @@ import (
 
 	"github.com/hassanshah0900/FoodKoala/src/delivery-service/internal/deliveries"
 	"github.com/hassanshah0900/FoodKoala/src/delivery-service/internal/identity"
+	"github.com/hassanshah0900/FoodKoala/src/delivery-service/internal/inbox"
 	"github.com/hassanshah0900/FoodKoala/src/delivery-service/internal/outbox"
 	"github.com/hassanshah0900/FoodKoala/src/delivery-service/internal/testdb"
 )
@@ -25,16 +26,18 @@ var (
 )
 
 type fixture struct {
-	t   *testing.T
-	ctx context.Context
-	db  *pgxpool.Pool
-	svc deliveries.Service
+	t     *testing.T
+	ctx   context.Context
+	db    *pgxpool.Pool
+	svc   deliveries.Service
+	inbox inbox.Inbox
 }
 
 func setup(t *testing.T) fixture {
 	pool := testdb.Open(t)
-	return fixture{t: t, ctx: context.Background(), db: pool,
-		svc: deliveries.Service{DB: pool, MaxPickupMeters: 5000, LocationFreshFor: 5 * time.Minute}}
+	svc := deliveries.Service{DB: pool, MaxPickupMeters: 5000, LocationFreshFor: 5 * time.Minute}
+	return fixture{t: t, ctx: context.Background(), db: pool, svc: svc,
+		inbox: inbox.Inbox{DB: pool, Handlers: svc.Handlers()}}
 }
 
 func (f fixture) event(typ string, data map[string]any) []byte {
@@ -44,7 +47,7 @@ func (f fixture) event(typ string, data map[string]any) []byte {
 
 func (f fixture) apply(raw []byte) {
 	f.t.Helper()
-	if err := f.svc.Apply(f.ctx, raw); err != nil {
+	if err := f.inbox.Apply(f.ctx, raw); err != nil {
 		f.t.Fatal(err)
 	}
 }
@@ -144,7 +147,7 @@ func TestStatusBeforeItsOrderWaitsUnlessItIsOld(t *testing.T) {
 	f := setup(t)
 	orderID := outbox.NewID()
 	early := f.status(orderID, "accepted", "restaurant", time.Now())
-	if err := f.svc.Apply(f.ctx, early); !errors.Is(err, deliveries.ErrNotYet) {
+	if err := f.inbox.Apply(f.ctx, early); !errors.Is(err, inbox.ErrNotYet) {
 		t.Fatalf("expected ErrNotYet, got %v", err)
 	}
 	f.apply(f.placed(orderID, outbox.NewID()))
@@ -159,7 +162,7 @@ func TestMalformedEventsAreReported(t *testing.T) {
 	f := setup(t)
 	for _, raw := range [][]byte{[]byte("not json"), f.event("order.eaten", map[string]any{}),
 		f.event("order.placed", map[string]any{"orderId": outbox.NewID()})} {
-		if err := f.svc.Apply(f.ctx, raw); !errors.Is(err, deliveries.ErrMalformed) {
+		if err := f.inbox.Apply(f.ctx, raw); !errors.Is(err, inbox.ErrMalformed) {
 			t.Fatalf("expected ErrMalformed, got %v", err)
 		}
 	}

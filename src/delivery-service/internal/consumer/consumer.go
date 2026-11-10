@@ -1,4 +1,4 @@
-// Package consumer reads order events from Kafka and hands them to deliveries.Apply.
+// Package consumer reads events from Kafka and hands them to inbox.Inbox.Apply.
 package consumer
 
 import (
@@ -10,16 +10,14 @@ import (
 
 	"github.com/twmb/franz-go/pkg/kgo"
 
-	"github.com/hassanshah0900/FoodKoala/src/delivery-service/internal/deliveries"
+	"github.com/hassanshah0900/FoodKoala/src/delivery-service/internal/inbox"
 )
 
-var Topics = []string{"order.placed", "order.status_changed"}
-
-// Applier is deliveries.Service.Apply.
+// Applier is inbox.Inbox.Apply.
 type Applier func(ctx context.Context, raw []byte) error
 
 // Consumer commits a record's offset only after it was applied. A record that
-// must wait (a status change ahead of its order.placed) or that failed (Postgres
+// must wait (inbox.ErrNotYet) or that failed (Postgres
 // down) stops its partition: the partition is rewound to it and retried after a
 // pause, while other partitions carry on. Malformed records are logged and skipped.
 type Consumer struct {
@@ -79,10 +77,10 @@ func (c *Consumer) ProcessFetches(ctx context.Context, fetches kgo.Fetches) bool
 			err := c.Apply(ctx, r.Value)
 			switch {
 			case err == nil:
-			case errors.Is(err, deliveries.ErrMalformed):
+			case errors.Is(err, inbox.ErrMalformed):
 				slog.Error("skipping malformed event", "topic", r.Topic, "partition", r.Partition, "offset", r.Offset, "err", err)
 			default:
-				if !errors.Is(err, deliveries.ErrNotYet) {
+				if !errors.Is(err, inbox.ErrNotYet) {
 					slog.Error("could not apply event; retrying", "topic", r.Topic, "offset", r.Offset, "err", err)
 				}
 				if rewind[p.Topic] == nil {

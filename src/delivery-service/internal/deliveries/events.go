@@ -9,23 +9,13 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+
+	"github.com/hassanshah0900/FoodKoala/src/delivery-service/internal/inbox"
 )
-
-// ErrNotYet means a status change arrived before its order.placed (separate topics): retry later.
-var ErrNotYet = errors.New("delivery not recorded yet")
-
-// ErrMalformed means the event can never be applied; skip it so it doesn't block its partition.
-var ErrMalformed = errors.New("malformed event")
 
 // How long a status change may wait for its order.placed. Older orders (e.g. placed
 // before delivery-service ran) have no delivery and never will; their events are skipped.
 const waitForPlaced = 10 * time.Minute
-
-type envelope struct {
-	ID   string          `json:"id"`
-	Type string          `json:"type"`
-	Data json.RawMessage `json:"data"`
-}
 
 type location struct {
 	Lat *float64 `json:"lat"`
@@ -62,42 +52,36 @@ type orderStatusChanged struct {
 	At      time.Time `json:"at"`
 }
 
-// Apply applies one order event in its own transaction, once per envelope id.
-func (s Service) Apply(ctx context.Context, raw []byte) error {
-	var env envelope
-	if err := json.Unmarshal(raw, &env); err != nil || env.ID == "" {
-		return fmt.Errorf("%w: %v", ErrMalformed, err)
+// Handlers are the order events deliveries follow, for the inbox.
+func (s Service) Handlers() inbox.Handlers {
+	return inbox.Handlers{
+		"order.placed":         s.onPlaced,
+		"order.status_changed": s.onStatusChanged,
 	}
-	return pgx.BeginFunc(ctx, s.DB, func(tx pgx.Tx) error {
-		tag, err := tx.Exec(ctx, `INSERT INTO delivery.processed_events (event_id, type) VALUES ($1, $2) ON CONFLICT DO NOTHING`, env.ID, env.Type)
-		if err != nil {
-			return err
-		}
-		if tag.RowsAffected() == 0 {
-			return nil // applied before
-		}
-		switch env.Type {
-		case "order.placed":
-			var d orderPlaced
-			if err := json.Unmarshal(env.Data, &d); err != nil {
-				return fmt.Errorf("%w: %v", ErrMalformed, err)
-			}
-			return s.placed(ctx, tx, d)
-		case "order.status_changed":
-			var d orderStatusChanged
-			if err := json.Unmarshal(env.Data, &d); err != nil || d.OrderID == "" {
-				return fmt.Errorf("%w: %v", ErrMalformed, err)
-			}
-			return s.statusChanged(ctx, tx, d)
-		default:
-			return fmt.Errorf("%w: type %q", ErrMalformed, env.Type)
-		}
-	})
+}
+
+func (s Service) onPlaced(ctx context.Context, tx pgx.Tx, data json.RawMessage) error {
+	var d orderPlaced
+	if err := inbox.Decode(data, &d); err != nil {
+		return err
+	}
+	return s.placed(ctx, tx, d)
+}
+
+func (s Service) onStatusChanged(ctx context.Context, tx pgx.Tx, data json.RawMessage) error {
+	var d orderStatusChanged
+	if err := inbox.Decode(data, &d); err != nil {
+		return err
+	}
+	if d.OrderID == "" {
+		return fmt.Errorf("%w: no orderId", inbox.ErrMalformed)
+	}
+	return s.statusChanged(ctx, tx, d)
 }
 
 func (s Service) placed(ctx context.Context, tx pgx.Tx, d orderPlaced) error {
 	if !d.RestaurantLocation.ok() || !d.DeliveryAddress.ok() || d.Totals.TotalPaisa == nil || d.Totals.DeliveryFeePaisa == nil {
-		return fmt.Errorf("%w: order %s lacks a location or totals", ErrMalformed, d.OrderID)
+		return fmt.Errorf("%w: order %s lacks a location or totals", inbox.ErrMalformed, d.OrderID)
 	}
 	cash := 0
 	if d.PaymentMethod == "cod" {
@@ -123,7 +107,7 @@ func (s Service) statusChanged(ctx context.Context, tx pgx.Tx, d orderStatusChan
 			slog.Warn("status change for an order without a delivery; skipping", "order", d.OrderID, "to", d.To)
 			return nil
 		}
-		return ErrNotYet
+		return inbox.ErrNotYet
 	}
 	if err != nil {
 		return err

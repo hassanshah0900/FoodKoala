@@ -23,6 +23,7 @@ import (
 	"github.com/hassanshah0900/FoodKoala/src/delivery-service/internal/consumer"
 	"github.com/hassanshah0900/FoodKoala/src/delivery-service/internal/db"
 	"github.com/hassanshah0900/FoodKoala/src/delivery-service/internal/deliveries"
+	"github.com/hassanshah0900/FoodKoala/src/delivery-service/internal/inbox"
 	"github.com/hassanshah0900/FoodKoala/src/delivery-service/internal/outbox"
 	"github.com/hassanshah0900/FoodKoala/src/delivery-service/internal/riders"
 )
@@ -68,7 +69,8 @@ func run() error {
 
 	start(func() { dels.RunAssigner(ctx, cfg.AssignEvery) })
 	if len(cfg.KafkaBrokers) > 0 {
-		c, err := consumer.New(cfg.KafkaBrokers, cfg.KafkaGroupID, consumer.Topics, dels.Apply)
+		in := inbox.Inbox{DB: pool, Handlers: inbox.Merge(dels.Handlers(), rs.Handlers())}
+		c, err := consumer.New(cfg.KafkaBrokers, cfg.KafkaGroupID, in.Topics(), in.Apply)
 		if err != nil {
 			return err
 		}
