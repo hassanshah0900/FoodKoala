@@ -15,6 +15,11 @@ their menus. Signing in, the cart, checkout and order tracking come next, then t
 - **`/restaurant/{id}`**: the restaurant (restaurant-service), its delivery terms to the chosen area and its menu
   (menu-service), with sticky category tabs that follow the scroll.
 
+- **Cart.** Tapping a menu item opens its sheet: choices (one-choice groups as radio buttons, others as boxes up
+  to their limit, required ones marked until met), special instructions and a quantity, with the price on the
+  button. The cart sits beside the menu (on phones, a "View your cart" bar opens `/cart`), with steppers that
+  work without JavaScript, the delivery fee and how much is missing for the minimum order. A cart holds one
+  restaurant: adding from another asks before starting a new cart. Guests are sent to sign in first.
 - **`/login`**: sign in or sign up with a mobile number and the 6-digit code texted to it (auth-service).
 
 ## Sessions
