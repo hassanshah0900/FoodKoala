@@ -4,6 +4,7 @@ import {
   doublePrecision,
   index,
   pgSchema,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -57,6 +58,22 @@ export const addresses = usersSchema.table(
     index('addresses_user_id_idx').on(t.userId),
     // At most one default address per user, enforced by the database.
     uniqueIndex('addresses_one_default_per_user').on(t.userId).where(sql`${t.isDefault}`),
+  ],
+);
+
+/** Restaurants a user starred; restaurant ids are restaurant-service's (another schema, no foreign key). */
+export const favouriteRestaurants = usersSchema.table(
+  'favourite_restaurants',
+  {
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    restaurantId: uuid('restaurant_id').notNull(),
+    addedAt: timestamp('added_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.restaurantId] }),
+    index('favourite_restaurants_user_id_added_at_idx').on(t.userId, t.addedAt),
   ],
 );
 

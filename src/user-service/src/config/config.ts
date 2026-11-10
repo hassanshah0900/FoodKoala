@@ -7,6 +7,10 @@ const configSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3002),
   DATABASE_URL: z.url(),
   MAX_ADDRESSES_PER_USER: z.coerce.number().int().positive().default(10),
+  MAX_FAVOURITES_PER_USER: z.coerce.number().int().positive().default(100),
+  /** Asked whether a restaurant is listed, and for what favourites show. */
+  RESTAURANT_SERVICE_URL: z.url().default('http://localhost:3003'),
+  RESTAURANT_SERVICE_TIMEOUT_MS: z.coerce.number().int().positive().default(2000),
 });
 
 export type AppConfig = z.infer<typeof configSchema>;
