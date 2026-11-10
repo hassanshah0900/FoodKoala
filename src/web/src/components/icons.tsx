@@ -119,3 +119,10 @@ export const TicketIcon = (p: IconProps) => (
     <path d="M13 6v2M13 11v2M13 16v2" />
   </Svg>
 );
+
+export const MenuIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M7 3v8a2 2 0 0 0 2 2v8M11 3v6a2 2 0 0 1-2 2M7 3v6" />
+    <path d="M17 21V3c-2 1-3 4-3 7s1 4 3 4" />
+  </Svg>
+);

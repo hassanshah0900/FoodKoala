@@ -42,3 +42,12 @@ export const shortDate = (iso: string) =>
 /** "10 Nov, 13:30" in Pakistan time. */
 export const dateTime = (iso: string) =>
   `${new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: PKT })}, ${clockTime(iso)}`;
+
+/** How long ago, for a kitchen's tickets: "just now", "4 min ago", "1 h 5 min ago". */
+export function ago(iso: string, now = Date.now()): string {
+  const minutes = Math.max(0, Math.floor((now - Date.parse(iso)) / 60_000));
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes} min ago`;
+  const rest = minutes % 60;
+  return `${Math.floor(minutes / 60)} h${rest ? ` ${rest} min` : ''} ago`;
+}

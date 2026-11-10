@@ -14,7 +14,7 @@ export async function changeOrderStatus(
 ): Promise<StatusChangeState> {
   const { token } = await requireAdmin(`/admin/orders/${id}`);
   return statusChange(form, async (to, reason) => {
-    await setOrderStatus(token, id, to as OrderStatus, reason);
+    await setOrderStatus(token, id, { status: to as OrderStatus, reason });
     revalidatePath('/admin', 'layout');
   });
 }

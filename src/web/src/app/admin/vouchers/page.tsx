@@ -1,9 +1,9 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { Pager } from '@/components/admin/Pager';
-import { StatusBadge } from '@/components/admin/StatusBadge';
-import { Table } from '@/components/admin/Table';
 import { VoucherActions } from '@/components/admin/VoucherActions';
+import { Pager } from '@/components/console/Pager';
+import { StatusBadge } from '@/components/console/StatusBadge';
+import { Table } from '@/components/console/Table';
 import { listVouchers } from '@/lib/api/orders';
 import { shortDate } from '@/lib/format';
 import { pageParam } from '@/lib/paging';

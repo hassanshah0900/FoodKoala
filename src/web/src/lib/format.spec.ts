@@ -1,4 +1,4 @@
-import { clockTime, dateTime, deliveryWindow, distance, ratingCount, rupees, shortDate } from './format';
+import { ago, clockTime, dateTime, deliveryWindow, distance, ratingCount, rupees, shortDate } from './format';
 
 describe('format', () => {
   it.each([
@@ -27,5 +27,13 @@ describe('format', () => {
   it('gives dates in Pakistan time', () => {
     expect(shortDate('2026-11-09T20:30:00Z')).toBe('10 Nov 2026');
     expect(dateTime('2026-11-09T20:30:00Z')).toBe('10 Nov, 01:30');
+  });
+
+  it('says how long ago', () => {
+    const now = Date.parse('2026-11-11T12:00:00Z');
+    expect(ago('2026-11-11T11:59:40Z', now)).toBe('just now');
+    expect(ago('2026-11-11T11:56:00Z', now)).toBe('4 min ago');
+    expect(ago('2026-11-11T10:55:00Z', now)).toBe('1 h 5 min ago');
+    expect(ago('2026-11-11T10:00:00Z', now)).toBe('2 h ago');
   });
 });

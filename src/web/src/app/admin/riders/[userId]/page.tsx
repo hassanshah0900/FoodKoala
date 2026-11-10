@@ -1,11 +1,11 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { Pager } from '@/components/admin/Pager';
 import { SettlementForm } from '@/components/admin/SettlementForm';
-import { StatusActions } from '@/components/admin/StatusActions';
-import { StatusBadge } from '@/components/admin/StatusBadge';
 import { Section } from '@/components/checkout/Section';
+import { Pager } from '@/components/console/Pager';
+import { StatusActions } from '@/components/console/StatusActions';
+import { StatusBadge } from '@/components/console/StatusBadge';
 import { RatingLabel } from '@/components/restaurants/RatingLabel';
 import { rupeesField } from '@/lib/amount';
 import { getRider, riderEarnings, riderSettlements } from '@/lib/api/delivery';
