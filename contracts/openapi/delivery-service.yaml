@@ -221,6 +221,24 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /riders/{userId}:
+    parameters:
+      - $ref: '#/components/parameters/RiderId'
+    get:
+      tags: [admin]
+      operationId: getRider
+      summary: A rider (admin)
+      responses:
+        '200':
+          description: Rider
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Rider' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /riders/{userId}/earnings:
     parameters:
       - $ref: '#/components/parameters/RiderId'
