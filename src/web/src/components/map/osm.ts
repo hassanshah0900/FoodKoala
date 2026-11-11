@@ -7,7 +7,8 @@ export const loadLeaflet = (): Promise<Leaflet> => import('leaflet');
 
 /** A map in `box` with OpenStreetMap tiles, their attribution and zoom buttons at the bottom right; it follows the box's size. */
 export function drawMap(L: Leaflet, box: HTMLElement): LeafletMap {
-  const map = L.map(box, { zoomControl: false });
+  // The wheel scrolls the page, not the map: these maps sit inside long pages. Buttons and pinch still zoom.
+  const map = L.map(box, { zoomControl: false, scrollWheelZoom: false });
   const resized = new ResizeObserver(() => map.invalidateSize({ pan: false }));
   resized.observe(box);
   map.on('unload', () => resized.disconnect());

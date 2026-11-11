@@ -4,9 +4,19 @@ import { Logo } from '@/components/Logo';
 import type { DeliveryLocation } from '@/lib/location';
 import type { Claims } from '@/lib/session-tokens';
 import { AccountMenu } from './AccountMenu';
+import { NotificationBell } from './NotificationBell';
 
-/** White bar on every page: the logo, where the customer is ordering to, and who is signed in. */
-export function Header({ location, user }: { location: DeliveryLocation | null; user: Claims | null }) {
+/** White bar on every page: the logo, where the customer is ordering to, who is signed in and their notifications. */
+export function Header({
+  location,
+  user,
+  unread,
+}: {
+  location: DeliveryLocation | null;
+  user: Claims | null;
+  /** Unread notifications of the signed-in user. */
+  unread: number;
+}) {
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-white">
       <div className="mx-auto flex h-16 max-w-7xl items-center gap-6 px-4">
@@ -24,7 +34,10 @@ export function Header({ location, user }: { location: DeliveryLocation | null; 
         )}
         <div className="ml-auto flex items-center gap-2">
           {user ? (
-            <AccountMenu user={user} />
+            <>
+              <NotificationBell initial={unread} />
+              <AccountMenu user={user} />
+            </>
           ) : (
             <>
               <Link
