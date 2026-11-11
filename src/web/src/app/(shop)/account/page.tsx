@@ -72,12 +72,12 @@ export default async function Account() {
             {location ? (
               <>
                 <p className="mt-3 text-xs text-muted">
-                  The rider is sent to <span className="font-semibold text-ink">{location.label}</span>.{' '}
+                  The pin starts at <span className="font-semibold text-ink">{location.label}</span>.{' '}
                   <Link href="/" className="font-semibold text-brand-600 hover:underline">
                     Change
                   </Link>
                 </p>
-                <AddAddressForm action={addAccountAddress} start={areaAndCity(location.label)} />
+                <AddAddressForm action={addAccountAddress} start={areaAndCity(location.label)} pin={location} />
               </>
             ) : (
               <p className="mt-3 text-sm">

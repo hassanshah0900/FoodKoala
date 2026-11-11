@@ -1,12 +1,16 @@
+import type { Point } from '@/lib/api/types';
+import { PinPicker } from './PinPicker';
+
 const field = 'h-11 w-full rounded-lg border border-line px-3 text-sm outline-none focus:border-brand-600';
 
 /**
- * A new address's details, inside a two-column form: its label, house and street, area and city
- * (started from the chosen area), landmark and a note for the rider. The pin is the chosen area.
+ * A new address's details, inside a two-column form: the pin on the map (starting at the chosen area),
+ * its label, house and street, area and city (started from the chosen area), landmark and a note for the rider.
  */
-export function AddressFields({ start }: { start: { area: string; city: string } }) {
+export function AddressFields({ start, pin }: { start: { area: string; city: string }; pin: Point }) {
   return (
     <>
+      <PinPicker start={pin} />
       <fieldset className="flex gap-2 sm:col-span-2">
         <legend className="sr-only">Label</legend>
         {(['home', 'work', 'other'] as const).map((l, i) => (
