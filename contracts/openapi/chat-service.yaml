@@ -26,6 +26,13 @@ info:
     and served only through `GET /orders/{orderId}/photos/{photoId}` to
     the people who may read the chat.
 
+    **Telling someone who isn't looking.** When a message has waited a
+    minute unread, chat-service publishes `chat.message_waiting` once for
+    that unread streak, and notification-service puts it in their inbox and
+    texts them. Reading the chat (opening it, `POST .../read`, or sending a
+    message) ends the streak. Someone with the chat open reads at once, so
+    they are never texted.
+
     **Live.** `GET /orders/{orderId}/live` is a WebSocket (subprotocol
     `foodkoala.chat.v1`). It sends a `snapshot` (the whole chat) first,
     then each `message` and `read` as it happens, and a new `snapshot`
