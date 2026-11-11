@@ -63,6 +63,7 @@ export function orderPlaced(
       landmark: a.landmark,
     },
     estimatedDeliveryAt: order.estimatedDeliveryAt.toISOString(),
+    scheduledFor: order.scheduledFor?.toISOString() ?? null,
     placedAt: order.placedAt.toISOString(),
   });
 }

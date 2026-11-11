@@ -22,6 +22,12 @@ export const checkoutSchema = z.strictObject({
   voucherCode: z.string().trim().min(1).max(32).nullable().default(null),
   /** For the rider, added to the total. */
   tipPaisa: z.int().min(0).max(MAX_TIP_PAISA).default(0),
+  /** When it should arrive, for an order scheduled ahead; null for as soon as possible. */
+  scheduledFor: z.iso
+    .datetime({ offset: true })
+    .transform((s) => new Date(s))
+    .nullable()
+    .default(null),
 });
 export type CheckoutDto = z.output<typeof checkoutSchema>;
 

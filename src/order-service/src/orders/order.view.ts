@@ -36,6 +36,10 @@ export interface Order {
   note: string | null;
   prepTimeMinutes: number | null;
   estimatedDeliveryAt: string;
+  /** When the customer wants it at the door; null for as soon as possible. */
+  scheduledFor: string | null;
+  /** When the restaurant may accept it. */
+  releaseAt: string;
   timeline: { status: Status; at: string; by: Actor; reason: string | null }[];
   placedAt: string;
   updatedAt: string;
@@ -87,6 +91,8 @@ export function toOrder(
     note: row.note,
     prepTimeMinutes: row.prepTimeMinutes,
     estimatedDeliveryAt: row.estimatedDeliveryAt.toISOString(),
+    scheduledFor: row.scheduledFor?.toISOString() ?? null,
+    releaseAt: row.releaseAt.toISOString(),
     timeline: history
       .filter((h) => h.orderId === row.id)
       .sort((a, b) => a.id - b.id)

@@ -24,6 +24,7 @@ import { decide, estimateOnAccept, LABEL, needsOwnership, ruleFor } from './life
 import { type Order, type Page, toOrder } from './order.view';
 import { codeRange } from './order-code';
 import type { CheckoutDto, PageQuery, RestaurantOrdersQuery, StatusChangeDto } from './orders.dto';
+import { assertReleased, checkSchedule, releaseAt } from './schedule';
 
 /** At most this many orders share a code in the answer; with 8 hex digits two are already rare. */
 export const CODE_MATCHES = 10;
@@ -54,6 +55,8 @@ export class OrdersService {
   async checkout(me: Identity, key: string, dto: CheckoutDto): Promise<{ order: Order; created: boolean }> {
     const previous = await this.findByKey(me.userId, key);
     if (previous) return { order: previous, created: false };
+    const now = new Date();
+    checkSchedule(dto.scheduledFor, now);
 
     const [cart, address] = await Promise.all([this.cart.get(me), this.users.address(me, dto.addressId)]);
     try {
@@ -67,11 +70,18 @@ export class OrdersService {
     const [restaurant, quote] = address
       ? await Promise.all([
           this.restaurants.get(cart.restaurantId),
-          this.restaurants.quote(cart.restaurantId, address.location),
+          this.restaurants.quote(cart.restaurantId, address.location, dto.scheduledFor ?? undefined),
         ])
       : [null, null];
-    const now = new Date();
-    const draft = draftOrder({ cart, address, restaurant, quote, now, tipPaisa: dto.tipPaisa });
+    const draft = draftOrder({
+      cart,
+      address,
+      restaurant,
+      quote,
+      now,
+      tipPaisa: dto.tipPaisa,
+      scheduledFor: dto.scheduledFor,
+    });
 
     let orderId: string;
     try {
@@ -95,6 +105,8 @@ export class OrdersService {
             note: dto.note,
             // The same instant the promised delivery time was counted from.
             placedAt: now,
+            scheduledFor: dto.scheduledFor,
+            releaseAt: releaseAt(dto.scheduledFor, now),
             updatedAt: now,
           })
           .returning();
@@ -176,6 +188,7 @@ export class OrdersService {
     const by = decide(from, { to, reason, prepTimeMinutes }, roles);
 
     const now = new Date();
+    if (to === 'accepted') assertReleased(row, now);
     const accepted =
       to === 'accepted'
         ? {
@@ -225,8 +238,9 @@ export class OrdersService {
   }
 
   /**
-   * Rejects up to `limit` orders still `placed` that were placed before
-   * `cutoff`: the restaurant never answered. Rows are locked with SKIP LOCKED,
+   * Rejects up to `limit` orders still `placed` that were released to the
+   * restaurant before `cutoff` (placed then, or due in the kitchen then if
+   * scheduled): the restaurant never answered. Rows are locked with SKIP LOCKED,
    * so replicas share the work and a restaurant accepting at the same moment
    * either wins (the order is no longer placed) or waits and gets 409.
    * Returns the ids rejected.
@@ -236,8 +250,8 @@ export class OrdersService {
       const stale = await tx
         .select({ id: orders.id })
         .from(orders)
-        .where(and(eq(orders.status, 'placed'), lt(orders.placedAt, cutoff)))
-        .orderBy(asc(orders.placedAt))
+        .where(and(eq(orders.status, 'placed'), lt(orders.releaseAt, cutoff)))
+        .orderBy(asc(orders.releaseAt))
         .limit(limit)
         .for('update', { skipLocked: true });
       const minutes = this.config.ACCEPT_TIMEOUT_MINUTES;

@@ -129,6 +129,10 @@ export const orders = ordersSchema.table(
     prepTimeMinutes: smallint('prep_time_minutes'),
     estimatedDeliveryAt: timestamp('estimated_delivery_at', { withTimezone: true }).notNull(),
     placedAt: timestamp('placed_at', { withTimezone: true }).notNull().defaultNow(),
+    /** When the customer wants it at the door; null for as soon as possible. */
+    scheduledFor: timestamp('scheduled_for', { withTimezone: true }),
+    /** When the restaurant may accept it: placedAt, or the kitchen's lead before scheduledFor (orders/schedule.ts). */
+    releaseAt: timestamp('release_at', { withTimezone: true }).notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .notNull()
       .defaultNow()
@@ -138,6 +142,8 @@ export const orders = ordersSchema.table(
     unique('orders_customer_id_idempotency_key_key').on(t.customerId, t.idempotencyKey),
     index('orders_customer_id_placed_at_idx').on(t.customerId, t.placedAt),
     index('orders_restaurant_id_placed_at_idx').on(t.restaurantId, t.placedAt),
+    // The accept timeout looks for placed orders released long ago.
+    index('orders_placed_release_at_idx').on(t.releaseAt).where(sql`${t.status} = 'placed'`),
     index('orders_voucher_id_idx').on(t.voucherId).where(sql`${t.voucherId} is not null`),
     check(
       'orders_total_adds_up',
