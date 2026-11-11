@@ -74,7 +74,8 @@ func run() error {
 		if err != nil {
 			return err
 		}
-		if err := ph.EnsureBucket(startCtx); err != nil {
+		// The storage may still be starting next to us (compose): keep trying until startCtx ends.
+		if err := retry(startCtx, ph.EnsureBucket); err != nil {
 			return err
 		}
 		svc.Photos = ph
@@ -131,6 +132,22 @@ func run() error {
 	_ = srv.Shutdown(shutdownCtx)
 	workers.Wait()
 	return nil
+}
+
+// retry runs f every second until it succeeds or ctx ends, returning its last error then.
+func retry(ctx context.Context, f func(context.Context) error) error {
+	for {
+		err := f(ctx)
+		if err == nil {
+			return nil
+		}
+		slog.Warn("not ready yet, retrying", "err", err)
+		select {
+		case <-ctx.Done():
+			return err
+		case <-time.After(time.Second):
+		}
+	}
 }
 
 func healthcheck() int {
