@@ -2,13 +2,13 @@
 
 The main journeys through the whole stack, in a real browser (Playwright):
 
-| Test | Journey |
-| --- | --- |
-| `order-to-door` | A customer orders, the kitchen accepts and cooks, a rider picks up, they chat, the rider delivers, the customer rates |
-| `onboarding` | A restaurant applies, builds its menu, hours and zone, is approved, and customers find it; a rider applies, is approved and goes on shift |
-| `order-exceptions` | The customer cancels before the kitchen accepts; the kitchen rejects with a reason the customer sees |
-| `scheduled-order` | An order for later waits in the kitchen's Scheduled list and can't be accepted early |
-| `chat-alert` | A rider's unread message reaches the customer by SMS after a minute, and the bell leads back to the chat |
+| Test               | Journey                                                                                                                                   |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `order-to-door`    | A customer orders, the kitchen accepts and cooks, a rider picks up, they chat, the rider delivers, the customer rates                     |
+| `onboarding`       | A restaurant applies, builds its menu, hours and zone, is approved, and customers find it; a rider applies, is approved and goes on shift |
+| `order-exceptions` | The customer cancels before the kitchen accepts; the kitchen rejects with a reason the customer sees                                      |
+| `scheduled-order`  | An order for later waits in the kitchen's Scheduled list and can't be accepted early                                                      |
+| `chat-alert`       | A rider's unread message reaches the customer by SMS after a minute, and the bell leads back to the chat                                  |
 
 ## Running them
 
