@@ -14,7 +14,14 @@ import {
 import { type Location, pointQuerySchema } from '../geo/geo';
 import { CurrentUser, type Identity, IdentityGuard } from '../identity/identity';
 import { idSchema, type PageQuery, pageQuerySchema } from '../restaurants/restaurants.dto';
-import { type ZoneCreateDto, type ZoneUpdateDto, zoneCreateSchema, zoneUpdateSchema } from './zones.dto';
+import {
+  type QuoteQuery,
+  quoteQuerySchema,
+  type ZoneCreateDto,
+  type ZoneUpdateDto,
+  zoneCreateSchema,
+  zoneUpdateSchema,
+} from './zones.dto';
 import { ZonesService } from './zones.service';
 
 /** Public: who delivers here, and on which terms. */
@@ -28,8 +35,9 @@ export class BrowseController {
   }
 
   @Get(':id/delivery-quote')
-  quote(@Param('id', { schema: idSchema }) id: string, @Query({ schema: pointQuerySchema }) at: Location) {
-    return this.zones.quote(id, at);
+  quote(@Param('id', { schema: idSchema }) id: string, @Query({ schema: quoteQuerySchema }) query: QuoteQuery) {
+    const { at, ...point } = query;
+    return this.zones.quote(id, point, at);
   }
 }
 

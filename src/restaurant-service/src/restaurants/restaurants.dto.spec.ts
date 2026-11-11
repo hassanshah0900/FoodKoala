@@ -2,6 +2,7 @@ import {
   restaurantCreateSchema,
   restaurantUpdateSchema,
   reviewQuerySchema,
+  slotsQuerySchema,
   statusChangeSchema,
 } from './restaurants.dto';
 
@@ -52,5 +53,19 @@ describe('reviewQuerySchema', () => {
     expect(reviewQuerySchema.parse({})).toEqual({ status: 'pending', page: 1, limit: 20 });
     expect(reviewQuerySchema.parse({ page: '2', limit: '5' })).toMatchObject({ page: 2, limit: 5 });
     expect(reviewQuerySchema.safeParse({ limit: '500' }).success).toBe(false);
+  });
+});
+
+describe('slotsQuerySchema', () => {
+  const from = '2026-11-09T07:00:00Z';
+
+  it('defaults to quarter hours', () => {
+    expect(slotsQuerySchema.parse({ from, to: '2026-11-10T07:00:00Z' }).step).toBe(15);
+  });
+
+  it('needs a range forwards of at most 8 days, in 15, 30 or 60 minute steps', () => {
+    expect(slotsQuerySchema.safeParse({ from, to: from }).success).toBe(false);
+    expect(slotsQuerySchema.safeParse({ from, to: '2026-11-18T07:00:00Z' }).success).toBe(false);
+    expect(slotsQuerySchema.safeParse({ from, to: '2026-11-10T07:00:00Z', step: '20' }).success).toBe(false);
   });
 });

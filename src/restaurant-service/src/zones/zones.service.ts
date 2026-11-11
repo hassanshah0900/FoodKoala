@@ -224,8 +224,8 @@ export class ZonesService {
     };
   }
 
-  /** Whether an approved restaurant delivers to `at`, on which terms. */
-  async quote(restaurantId: string, at: Location): Promise<DeliveryQuote> {
+  /** Whether an approved restaurant delivers to `at`, on which terms, and takes orders `when` (default now). */
+  async quote(restaurantId: string, at: Location, when = new Date()): Promise<DeliveryQuote> {
     const [found] = await this.db
       .select({ restaurant: restaurants, distance: distanceFrom(at).as('distance') })
       .from(restaurants)
@@ -241,7 +241,7 @@ export class ZonesService {
 
     return {
       deliverable: !!delivery,
-      acceptingOrders: availability(found.restaurant, new Date()).acceptingOrders,
+      acceptingOrders: availability(found.restaurant, when).acceptingOrders,
       distanceMeters: Math.round(found.distance),
       delivery: delivery ?? null,
     };

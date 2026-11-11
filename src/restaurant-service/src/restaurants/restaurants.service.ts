@@ -12,8 +12,20 @@ import { deliveryZones, type RestaurantRow, restaurants, type Status } from '../
 import { recordRestaurantChange } from '../events/restaurant-events';
 import { type HoursDto, hasWeeklyHours } from '../hours/hours';
 import { type Identity, isAdmin } from '../identity/identity';
-import type { RestaurantCreateDto, RestaurantUpdateDto, ReviewQuery, StatusChangeDto } from './restaurants.dto';
-import { type ManagedRestaurant, type Restaurant, toManagedRestaurant, toRestaurant } from './restaurants.view';
+import type {
+  RestaurantCreateDto,
+  RestaurantUpdateDto,
+  ReviewQuery,
+  SlotsQuery,
+  StatusChangeDto,
+} from './restaurants.dto';
+import {
+  type ManagedRestaurant,
+  openSlots,
+  type Restaurant,
+  toManagedRestaurant,
+  toRestaurant,
+} from './restaurants.view';
 
 /** Allowed status changes; see POST /{id}/status in the contract. */
 const TRANSITIONS: Partial<Record<`${Status}>${Status}`, { adminOnly: boolean; needsReason: boolean }>> = {
@@ -79,6 +91,13 @@ export class RestaurantsService {
     if (row && canManage(me, row)) return toManagedRestaurant(row);
     if (row?.status === 'approved') return toRestaurant(row);
     throw new NotFoundException('Restaurant not found');
+  }
+
+  /** When an approved restaurant takes orders between `from` and `to`, for scheduling one. */
+  async openSlots(id: string, { from, to, step }: SlotsQuery): Promise<{ slots: string[] }> {
+    const [row] = await this.db.select().from(restaurants).where(eq(restaurants.id, id));
+    if (row?.status !== 'approved') throw new NotFoundException('Restaurant not found');
+    return { slots: openSlots(row, from, to, step).map((d) => d.toISOString()) };
   }
 
   async update(me: Identity, id: string, { address, location, ...fields }: RestaurantUpdateDto) {

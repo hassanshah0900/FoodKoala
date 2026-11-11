@@ -356,5 +356,36 @@ describe('restaurant-service (e2e)', () => {
       await http.get(`/${pending}/delivery-quote`).query(customer).expect(404);
       await http.get(`/${far}/delivery-quote`).expect(400);
     });
+
+    it('quotes for a later time and lists open slots, skipping a pause', async () => {
+      const owner = newUser();
+      const paused = await listed(owner, { lat: 30.21, lng: 71.48 }, [zone(covering)]);
+      const until = Date.parse(
+        (await http.put(`/${paused}/pause`).set(owner).send({ minutes: 60 }).expect(200)).body.pausedUntil,
+      );
+
+      const now = await http.get(`/${paused}/delivery-quote`).query(customer).expect(200);
+      expect(now.body.acceptingOrders).toBe(false);
+      const later = new Date(until + 30 * 60_000).toISOString();
+      const then = await http
+        .get(`/${paused}/delivery-quote`)
+        .query({ ...customer, at: later })
+        .expect(200);
+      expect(then.body.acceptingOrders).toBe(true);
+
+      const from = new Date();
+      const to = new Date(from.getTime() + 3 * 3_600_000);
+      const res = await http
+        .get(`/${paused}/open-slots`)
+        .query({ from: from.toISOString(), to: to.toISOString(), step: 30 })
+        .expect(200);
+      const slots: number[] = res.body.slots.map((s: string) => Date.parse(s));
+      expect(slots.length).toBeGreaterThanOrEqual(3);
+      expect(slots.every((t) => t >= until && t <= to.getTime() && t % (30 * 60_000) === 0)).toBe(true);
+
+      await http.get(`/${pending}/open-slots`).query({ from: from.toISOString(), to: to.toISOString() }).expect(404);
+      const tooFar = new Date(from.getTime() + 9 * 86_400_000).toISOString();
+      await http.get(`/${paused}/open-slots`).query({ from: from.toISOString(), to: tooFar }).expect(400);
+    });
   });
 });

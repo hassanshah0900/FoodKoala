@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { polygonSchema } from '../geo/geo';
+import { pointQuerySchema, polygonSchema } from '../geo/geo';
 
 // Shapes match DeliveryZoneCreate / DeliveryZoneUpdate in contracts/openapi/restaurant-service.yaml.
 
@@ -19,3 +19,7 @@ export const zoneUpdateSchema = z
   .partial()
   .refine((v) => Object.keys(v).length > 0, 'send at least one field');
 export type ZoneUpdateDto = z.output<typeof zoneUpdateSchema>;
+
+/** `?lat=&lng=` and, for an order scheduled ahead, `at`: whether the restaurant takes orders then instead of now. */
+export const quoteQuerySchema = pointQuerySchema.extend({ at: z.coerce.date().optional() });
+export type QuoteQuery = z.output<typeof quoteQuerySchema>;

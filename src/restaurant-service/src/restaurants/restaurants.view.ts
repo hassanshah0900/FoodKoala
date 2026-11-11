@@ -77,3 +77,26 @@ export function toManagedRestaurant(row: RestaurantRow, now = new Date()): Manag
     updatedAt: row.updatedAt,
   };
 }
+
+/** How far ahead open slots may be asked for: a week and a day, so a whole week fits whatever the hour. */
+export const MAX_SLOT_RANGE_MS = 8 * 86_400_000;
+
+/**
+ * The instants in [from, to] on the clock's `stepMinutes` (13:00, 13:15...) when the restaurant
+ * takes orders: approved, inside its hours and not paused. Pakistan is a whole number of hours from
+ * UTC, so steps line up with the local clock too.
+ */
+export function openSlots(
+  row: Pick<RestaurantRow, 'status' | 'weeklyHours' | 'specialHours' | 'pausedUntil'>,
+  from: Date,
+  to: Date,
+  stepMinutes: number,
+): Date[] {
+  const step = stepMinutes * 60_000;
+  const slots: Date[] = [];
+  for (let t = Math.ceil(from.getTime() / step) * step; t <= to.getTime(); t += step) {
+    const at = new Date(t);
+    if (availability(row, at).acceptingOrders) slots.push(at);
+  }
+  return slots;
+}

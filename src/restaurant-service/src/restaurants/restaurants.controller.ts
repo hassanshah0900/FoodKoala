@@ -23,7 +23,9 @@ import {
   restaurantCreateSchema,
   restaurantUpdateSchema,
   reviewQuerySchema,
+  type SlotsQuery,
   type StatusChangeDto,
+  slotsQuerySchema,
   statusChangeSchema,
 } from './restaurants.dto';
 import { RestaurantsService } from './restaurants.service';
@@ -49,6 +51,12 @@ export class RestaurantsController {
   @UseGuards(AdminGuard)
   forReview(@Query({ schema: reviewQuerySchema }) query: ReviewQuery) {
     return this.restaurants.listByStatus(query);
+  }
+
+  /** Public: when the restaurant takes orders in a range, for scheduling one. */
+  @Get(':id/open-slots')
+  openSlots(@Param('id', { schema: idSchema }) id: string, @Query({ schema: slotsQuerySchema }) query: SlotsQuery) {
+    return this.restaurants.openSlots(id, query);
   }
 
   @Get(':id')
