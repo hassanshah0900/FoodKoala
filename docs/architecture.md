@@ -63,5 +63,6 @@ libs/                 shared code, one folder per language
 contracts/            OpenAPI specs and event schemas
 deploy/compose/       local Docker Compose files
 deploy/k8s/           Kubernetes manifests
+e2e/                  end-to-end tests of the main journeys (Playwright)
 docs/                 architecture and ADRs
 ```
