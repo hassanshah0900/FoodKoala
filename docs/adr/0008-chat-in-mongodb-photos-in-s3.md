@@ -38,7 +38,14 @@ private to the two sides of one chat.
 
 - One more datastore to run and back up. MongoDB was already part of the
   local stack.
-- chat-service publishes no events yet, so it needs no outbox (ADR 0007).
-  Telling an offline person about a new message (SMS or push) will need one.
+- Telling someone who isn't looking about a message: chat-service publishes
+  `chat.message_waiting` once a message has waited a minute unread (once per
+  unread streak, which reading ends), and notification-service texts them
+  and adds it to their inbox. The event goes through an `outbox` collection
+  (ADR 0007): MongoDB here runs without a replica set, so there are no
+  multi-document transactions. Instead the event's id is derived from the
+  streak and written before the streak is marked told, so a retry after a
+  crash collides on the id instead of telling them twice. Replicas may
+  publish the same outbox entry twice; consumers drop repeats by envelope id.
 - Uploads pass through chat-service and the gateway, limited to 5 MB. Larger
   files would call for presigned uploads straight to the bucket.
