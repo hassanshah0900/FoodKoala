@@ -5,11 +5,12 @@
 Tells customers what is happening with their orders: an in-app inbox, and SMS for the updates that matter.
 
 - API: [`contracts/openapi/notification-service.yaml`](../../contracts/openapi/notification-service.yaml) (gateway: `/api/v1/notifications/...`)
-- Reads [`order.placed`](../../contracts/events/order.placed.schema.json), [`order.status_changed`](../../contracts/events/order.status_changed.schema.json) and [`delivery.assigned`](../../contracts/events/delivery.assigned.schema.json) from Kafka.
+- Reads [`order.placed`](../../contracts/events/order.placed.schema.json), [`order.status_changed`](../../contracts/events/order.status_changed.schema.json), [`delivery.assigned`](../../contracts/events/delivery.assigned.schema.json) and [`chat.message_waiting`](../../contracts/events/chat.message_waiting.schema.json) from Kafka.
 
 ## What it does
 
 - **Rider assigned.** `delivery.assigned` gives the customer an inbox entry naming their rider, vehicle and phone, and the rider an entry with the job (where to collect, the customer's number) plus a text, since riders may not be looking at the app.
+- **Chat messages nobody has seen.** `chat.message_waiting` (chat-service sends it when a message has waited a minute unread, once per unread streak, never to someone with the chat open) becomes an inbox entry and a text: the customer hears their rider's first name and what they wrote, the rider hears "the customer of order #...".
 - **Inbox.** One entry per order event and person, with a title, a body and the order id to link to. `GET /` lists them newest first with the unread count; `POST /{id}/read` and `POST /read-all` mark them read.
 - **SMS** for: accepted (with the expected time, Pakistan time), on its way, rejected, cancelled by the restaurant or support. Placed, ready, delivered and the customer's own cancellation stay in the inbox only.
 - **At least once, never twice** ([ADR 0007](../../docs/adr/0007-transactional-outbox-for-events.md)). The inbox entry and its queued SMS are written in one transaction, unique per event and person, and the Kafka offset is committed after that, so a replay adds nothing. A malformed event is logged and skipped. While Postgres is down the same event is retried.
