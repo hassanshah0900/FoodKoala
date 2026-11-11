@@ -110,6 +110,11 @@ render already uses them) and the response. A refresh token that auth-service re
 tracking-service on the server and passes each update on as a Server-Sent Event. The token goes no further than
 the Next.js server, so it stays out of the page's scripts. The map is Leaflet with OpenStreetMap tiles, loaded only in the browser.
 
+**Address pins.** New addresses get a map pin the customer drags to their door, a "Use my location" button, and a
+search for a street or block. Searches go through `/places`, which asks a Nominatim geocoder: the public
+OpenStreetMap one by default, or the one `GEOCODER_URL` points at. The public one allows about a search a second,
+so production should run its own. Results are cached for a day.
+
 ## Layout
 
 | Folder            | What it holds                                                                                                     |

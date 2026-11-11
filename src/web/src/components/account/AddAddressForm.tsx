@@ -3,15 +3,24 @@
 import { useActionState } from 'react';
 import type { AccountState } from '@/app/(shop)/account/actions';
 import { AddressFields } from '@/components/checkout/AddressFields';
+import type { Point } from '@/lib/api/types';
 
 type Action = (prev: AccountState, form: FormData) => Promise<AccountState>;
 
 /** A new address at the area the customer chose, the same fields checkout asks for. */
-export function AddAddressForm({ action, start }: { action: Action; start: { area: string; city: string } }) {
+export function AddAddressForm({
+  action,
+  start,
+  pin,
+}: {
+  action: Action;
+  start: { area: string; city: string };
+  pin: Point;
+}) {
   const [state, submit, pending] = useActionState(action, {});
   return (
     <form action={submit} className="mt-4 grid gap-3 sm:grid-cols-2">
-      <AddressFields start={start} />
+      <AddressFields start={start} pin={pin} />
       {state.error && (
         <p role="alert" className="text-sm text-red-700 sm:col-span-2">
           {state.error}

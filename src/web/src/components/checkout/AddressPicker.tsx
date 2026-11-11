@@ -47,12 +47,12 @@ export function AddressPicker({
           <form action={addAddress} className="mt-4 grid gap-3 sm:grid-cols-2">
             <input type="hidden" name="choices" value={checkoutHref(choices, {}).split('?')[1] ?? ''} />
             <p className="text-xs text-muted sm:col-span-2">
-              The rider is sent to <span className="font-semibold text-ink">{location.label}</span>.{' '}
+              The pin starts at <span className="font-semibold text-ink">{location.label}</span>.{' '}
               <Link href="/" className="font-semibold text-brand-600 hover:underline">
                 Change
               </Link>
             </p>
-            <AddressFields start={start} />
+            <AddressFields start={start} pin={location} />
             <button
               type="submit"
               className="h-11 rounded-lg bg-brand-600 font-bold text-white hover:bg-brand-700 sm:col-span-2"
