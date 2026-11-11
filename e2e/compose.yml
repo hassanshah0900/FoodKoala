@@ -1,0 +1,45 @@
+# Layered over deploy/compose/*.yml for the end-to-end tests (make e2e-up).
+# Relative paths resolve against deploy/compose/, the first file's folder.
+#
+# What changes from the everyday stack:
+#   - auth-service and notification-service "text" through fake-sms, a stand-in
+#     for Twilio the tests read login codes and alerts from;
+#   - one number signs in as an admin, so tests can approve restaurants and riders;
+#   - OTP limits are loosened, since tests sign people in many times an hour.
+# The tests drive the web app from web.yml (its production image) on :3000.
+
+x-fake-twilio: &fake-twilio
+  SMS_PROVIDER: twilio
+  TWILIO_ACCOUNT_SID: AC00000000000000000000000000000000
+  TWILIO_AUTH_TOKEN: e2e
+  TWILIO_FROM: "+15005550006"
+  TWILIO_API_URL: http://fake-sms:4010
+
+services:
+  fake-sms:
+    image: node:24-alpine
+    command: ["node", "/app/server.ts"]
+    volumes:
+      - ../../e2e/fake-sms:/app:ro
+    ports: ["4010:4010"]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:4010/healthz"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+
+  auth-service:
+    environment:
+      <<: *fake-twilio
+      # Matches ADMIN_PHONE in e2e/support/people.ts
+      ADMIN_PHONES: "03009999999"
+      OTP_RESEND_SECONDS: 1
+      OTP_MAX_PER_HOUR: 1000
+    depends_on:
+      fake-sms: { condition: service_healthy }
+
+  notification-service:
+    environment:
+      <<: *fake-twilio
+    depends_on:
+      fake-sms: { condition: service_healthy }
