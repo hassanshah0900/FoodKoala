@@ -1,4 +1,4 @@
-import { clock, messagesFor, ref, rupees } from './messages';
+import { chatMessage, clock, messagesFor, ref, rupees } from './messages';
 import { type OrderEvent, orderEventSchema } from './order-events';
 
 const orderId = 'ab12cd34-0000-4000-8000-000000000000';
@@ -139,5 +139,71 @@ describe('messagesFor', () => {
         body: 'FoodKoala: New delivery #AB12CD34: collect it from Karachi Broast. Open the rider app for the details.',
       },
     });
+  });
+});
+
+describe('chat messages waiting', () => {
+  const riderId = '5b1f8e2a-0000-4000-8000-000000000001';
+  const waiting = (over: object = {}) =>
+    ({
+      id: crypto.randomUUID(),
+      type: 'chat.message_waiting',
+      occurredAt: '2026-11-08T14:30:00.000Z',
+      data: {
+        orderId,
+        recipientId: customerId,
+        recipientRole: 'customer',
+        recipientPhone: '+923001234567',
+        senderRole: 'rider',
+        senderName: 'Imran Ali',
+        restaurantName: 'Karachi Broast',
+        unread: 1,
+        preview: 'Two minutes away',
+        photo: false,
+        since: '2026-11-08T14:29:00.000Z',
+        ...over,
+      },
+    }) as OrderEvent;
+
+  it('tells the customer what their rider wrote, in the inbox and by text', () => {
+    const [m] = messagesFor(orderEventSchema.parse(waiting()));
+    expect(m).toEqual({
+      userId: customerId,
+      kind: 'chat_message',
+      title: 'Message from Imran',
+      body: 'Imran: "Two minutes away"',
+      data: { orderId, chat: 'customer' },
+      sms: {
+        phone: '+923001234567',
+        body: 'FoodKoala: Imran, your rider, sent you "Two minutes away". Reply in the FoodKoala app.',
+      },
+    });
+  });
+
+  it("tells the rider about the order, never the customer's name", () => {
+    const m = chatMessage(
+      (
+        waiting({
+          recipientId: riderId,
+          recipientRole: 'rider',
+          recipientPhone: '+923000000031',
+          senderRole: 'customer',
+          senderName: null,
+          unread: 3,
+          preview: '',
+          photo: true,
+        }) as Extract<OrderEvent, { type: 'chat.message_waiting' }>
+      ).data,
+    );
+    expect(m.userId).toBe(riderId);
+    expect(m.title).toBe(`Message about order ${ref(orderId)}`);
+    expect(m.body).toBe('The customer: a photo (3 new messages)');
+    expect(m.sms?.body).toBe(
+      `FoodKoala: the customer of order ${ref(orderId)} sent you a photo (3 new messages). Reply in the rider app.`,
+    );
+  });
+
+  it('refuses an event without a phone to text', () => {
+    expect(orderEventSchema.safeParse(waiting({ recipientPhone: 'none' })).success).toBe(false);
   });
 });

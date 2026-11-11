@@ -19,6 +19,7 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
 	"github.com/hassanshah0900/FoodKoala/src/chat-service/internal/chat"
+	"github.com/hassanshah0900/FoodKoala/src/chat-service/internal/outbox"
 )
 
 // NewID returns a random (version 4) UUID.
@@ -32,9 +33,10 @@ func NewID() string {
 
 // Repo keeps chats and messages in memory, with the store's rules for assignments and retries.
 type Repo struct {
-	mu    sync.Mutex
-	Chats map[string]*chat.Chat
-	Msgs  []chat.Message
+	mu     sync.Mutex
+	Chats  map[string]*chat.Chat
+	Msgs   []chat.Message
+	Outbox []outbox.Event
 }
 
 func NewRepo() *Repo { return &Repo{Chats: map[string]*chat.Chat{}} }
@@ -43,7 +45,54 @@ func NewRepo() *Repo { return &Repo{Chats: map[string]*chat.Chat{}} }
 func (r *Repo) Open(orderID, customerID, riderID string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.Chats[orderID] = &chat.Chat{OrderID: orderID, CustomerID: customerID, RiderID: riderID, RiderName: "Imran Ali"}
+	r.Chats[orderID] = &chat.Chat{OrderID: orderID, CustomerID: customerID, RiderID: riderID, RiderName: "Imran Ali",
+		RestaurantName: "Karahi Darbar", CustomerPhone: "+923000000023", RiderPhone: "+923000000031"}
+}
+
+func (r *Repo) waiting(c *chat.Chat, role string) **chat.Waiting {
+	if role == chat.Rider {
+		return &c.RiderWaiting
+	}
+	return &c.CustomerWaiting
+}
+
+func (r *Repo) Waiting(_ context.Context, orderID, role string, at time.Time) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if c := r.Chats[orderID]; c != nil && *r.waiting(c, role) == nil {
+		*r.waiting(c, role) = &chat.Waiting{Since: at}
+	}
+	return nil
+}
+
+func (r *Repo) Due(_ context.Context, cutoff time.Time) ([]chat.Chat, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	var due []chat.Chat
+	for _, c := range r.Chats {
+		for _, w := range []*chat.Waiting{c.CustomerWaiting, c.RiderWaiting} {
+			if w != nil && !w.Nudged && !w.Since.After(cutoff) {
+				cp := *c
+				due = append(due, cp)
+				break
+			}
+		}
+	}
+	return due, nil
+}
+
+func (r *Repo) Nudged(_ context.Context, orderID, role string, since time.Time, event *outbox.Event) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if event != nil && !slices.ContainsFunc(r.Outbox, func(e outbox.Event) bool { return e.ID == event.ID }) {
+		r.Outbox = append(r.Outbox, *event)
+	}
+	if c := r.Chats[orderID]; c != nil {
+		if w := *r.waiting(c, role); w != nil && w.Since.Equal(since) {
+			w.Nudged = true
+		}
+	}
+	return nil
 }
 
 func (r *Repo) Apply(_ context.Context, c chat.Change) (bool, error) {
@@ -128,6 +177,9 @@ func (r *Repo) MarkRead(_ context.Context, orderID, role string, at time.Time) (
 	mark := &c.CustomerReadAt
 	if role == chat.Rider {
 		mark = &c.RiderReadAt
+	}
+	if w := *r.waiting(c, role); w != nil && !w.Since.After(at) {
+		*r.waiting(c, role) = nil
 	}
 	if *mark != nil && !at.After(**mark) {
 		return false, nil

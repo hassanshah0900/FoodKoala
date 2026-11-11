@@ -170,6 +170,45 @@ describe('notification-service (e2e)', () => {
     expect(sender.sent).toEqual([{ phone: riderPhone, body: expect.stringContaining('FoodKoala: New delivery') }]);
   });
 
+  it("tells someone about chat messages they haven't read, in the inbox and by text, once", async () => {
+    const me = user();
+    const myPhone = phone();
+    const event = {
+      id: randomUUID(),
+      type: 'chat.message_waiting',
+      version: 1,
+      occurredAt: new Date().toISOString(),
+      source: 'chat-service',
+      data: {
+        orderId: randomUUID(),
+        recipientId: me,
+        recipientRole: 'customer',
+        recipientPhone: myPhone,
+        senderRole: 'rider',
+        senderName: 'Ali Raza',
+        restaurantName: 'Karachi Broast',
+        unread: 2,
+        preview: "I'm outside",
+        photo: false,
+        since: new Date().toISOString(),
+      },
+    };
+    await consumer.handle('chat.message_waiting', 0, { value: Buffer.from(JSON.stringify(event)), offset: '0' });
+    await consumer.handle('chat.message_waiting', 0, { value: Buffer.from(JSON.stringify(event)), offset: '1' });
+
+    const mine = (await http.get('/').set(as(me)).expect(200)).body.items;
+    expect(mine).toEqual([
+      expect.objectContaining({
+        kind: 'chat_message',
+        title: 'Message from Ali',
+        body: 'Ali: "I\'m outside" (2 new messages)',
+        data: { orderId: event.data.orderId, chat: 'customer' },
+      }),
+    ]);
+    await dispatcher.sendDue();
+    expect(sender.sent).toEqual([{ phone: myPhone, body: expect.stringContaining('Ali, your rider, sent you') }]);
+  });
+
   it('keeps quiet updates in the inbox without texting', async () => {
     const me = user();
     await deliver(statusChanged(me, 'ready', { from: 'accepted' }));

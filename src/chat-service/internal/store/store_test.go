@@ -2,10 +2,12 @@ package store_test
 
 import (
 	"context"
+	"slices"
 	"testing"
 	"time"
 
 	"github.com/hassanshah0900/FoodKoala/src/chat-service/internal/chat"
+	"github.com/hassanshah0900/FoodKoala/src/chat-service/internal/outbox"
 	"github.com/hassanshah0900/FoodKoala/src/chat-service/internal/store"
 	"github.com/hassanshah0900/FoodKoala/src/chat-service/internal/testenv"
 )
@@ -13,7 +15,8 @@ import (
 var at = time.Date(2026, 11, 11, 12, 0, 0, 0, time.UTC)
 
 func assign(order, rider string, when time.Time) chat.Change {
-	return chat.Change{OrderID: order, Assign: &chat.Assignment{CustomerID: "c1", RiderID: rider, RiderName: rider, RestaurantName: "Karahi Darbar", At: when}}
+	return chat.Change{OrderID: order, Assign: &chat.Assignment{CustomerID: "c1", CustomerPhone: "+923000000023", RiderID: rider,
+		RiderPhone: "+923000000031", RiderName: rider, RestaurantName: "Karahi Darbar", At: when}}
 }
 
 func closing(order string, when time.Time) chat.Change {
@@ -105,6 +108,80 @@ func TestMessagesRetriesAndReadMarks(t *testing.T) {
 	}
 	c, _ := s.Get(ctx, o)
 	if c.RiderReadAt == nil || !c.RiderReadAt.Equal(at.Add(time.Minute)) || c.CustomerReadAt != nil {
+		t.Fatalf("got %+v", c)
+	}
+}
+
+func TestUnreadStreaksAndTheOutbox(t *testing.T) {
+	s := store.Store{DB: testenv.Mongo(t)}
+	ctx := context.Background()
+	if err := s.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+	o := testenv.NewID()
+	if _, err := s.Apply(ctx, assign(o, "r1", at)); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Waiting(ctx, o, chat.Customer, at); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Waiting(ctx, o, chat.Customer, at.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	c, _ := s.Get(ctx, o)
+	if c.CustomerWaiting == nil || !c.CustomerWaiting.Since.Equal(at) || c.CustomerWaiting.Nudged {
+		t.Fatalf("a streak starts at its first message: %+v", c.CustomerWaiting)
+	}
+	if due, _ := s.Due(ctx, at.Add(-time.Second)); slices.ContainsFunc(due, func(d chat.Chat) bool { return d.OrderID == o }) {
+		t.Fatal("not due before the cutoff")
+	}
+	due, err := s.Due(ctx, at)
+	if err != nil || !slices.ContainsFunc(due, func(d chat.Chat) bool { return d.OrderID == o }) {
+		t.Fatalf("due: %v", err)
+	}
+
+	e, _ := outbox.New(outbox.StableID("t", o), "chat.message_waiting", o, at, map[string]string{"orderId": o})
+	for range 2 { // a retry after a crash writes nothing new
+		if err := s.Nudged(ctx, o, chat.Customer, at, &e); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if due, _ := s.Due(ctx, at); slices.ContainsFunc(due, func(d chat.Chat) bool { return d.OrderID == o }) {
+		t.Fatal("told once")
+	}
+	pending, err := s.Unpublished(ctx, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mine := slices.IndexFunc(pending, func(p outbox.Event) bool { return p.ID == e.ID })
+	if mine < 0 || slices.ContainsFunc(pending[mine+1:], func(p outbox.Event) bool { return p.ID == e.ID }) {
+		t.Fatal("one event in the outbox")
+	}
+	if err := s.MarkPublished(ctx, []string{e.ID}, at); err != nil {
+		t.Fatal(err)
+	}
+	if pending, _ := s.Unpublished(ctx, 100); slices.ContainsFunc(pending, func(p outbox.Event) bool { return p.ID == e.ID }) {
+		t.Fatal("published")
+	}
+
+	// Reading ends the streak; a handover gives the new rider a clean slate.
+	if _, err := s.MarkRead(ctx, o, chat.Customer, at.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Waiting(ctx, o, chat.Rider, at); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.MarkRead(ctx, o, chat.Rider, at); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Waiting(ctx, o, chat.Rider, at.Add(time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Apply(ctx, assign(o, "r2", at.Add(time.Hour))); err != nil {
+		t.Fatal(err)
+	}
+	c, _ = s.Get(ctx, o)
+	if c.CustomerWaiting != nil || c.RiderWaiting != nil || c.RiderReadAt != nil || c.RiderPhone == "" {
 		t.Fatalf("got %+v", c)
 	}
 }

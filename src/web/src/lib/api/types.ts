@@ -430,3 +430,20 @@ export type ChatEvent =
   | { type: 'snapshot'; chat: ChatView }
   | { type: 'message'; message: ChatMessage }
   | { type: 'read'; role: 'customer' | 'rider'; readAt: string };
+
+/** notification-service: one entry of the signed-in user's inbox. */
+export interface Notification {
+  id: string;
+  kind: string;
+  title: string;
+  body: string;
+  /** What to link to, e.g. `{ orderId }`; chat messages add `chat`, the reader's role. */
+  data: Record<string, string>;
+  read: boolean;
+  createdAt: string;
+}
+
+export interface NotificationPage extends Page<Notification> {
+  /** All unread notifications, not just this page's. */
+  unreadCount: number;
+}

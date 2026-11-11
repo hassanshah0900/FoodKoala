@@ -15,6 +15,7 @@ import (
 	"github.com/hassanshah0900/FoodKoala/src/chat-service/internal/chat"
 	"github.com/hassanshah0900/FoodKoala/src/chat-service/internal/httpx"
 	"github.com/hassanshah0900/FoodKoala/src/chat-service/internal/identity"
+	"github.com/hassanshah0900/FoodKoala/src/chat-service/internal/outbox"
 )
 
 // Repo keeps chats and messages (store.Store).
@@ -25,7 +26,13 @@ type Repo interface {
 	Add(ctx context.Context, m chat.Message) (chat.Message, bool, error)
 	Photo(ctx context.Context, orderID, photoID string) (*chat.Photo, error)
 	MarkRead(ctx context.Context, orderID, role string, at time.Time) (bool, error)
+	Waiting(ctx context.Context, orderID, role string, at time.Time) error
+	Due(ctx context.Context, cutoff time.Time) ([]chat.Chat, error)
+	Nudged(ctx context.Context, orderID, role string, since time.Time, event *outbox.Event) error
 }
+
+// NudgeTopic is the event telling notification-service someone has messages waiting.
+const NudgeTopic = "chat.message_waiting"
 
 // Photos keeps photo bytes (photos.S3).
 type Photos interface {
@@ -180,6 +187,10 @@ func (s Service) add(ctx context.Context, me identity.Identity, orderID, clientI
 		s.announce(ctx, orderID, chat.Event{Type: "message", Message: &saved})
 		// Sending is reading: everything before your own message has been seen.
 		s.markRead(ctx, orderID, role, saved.SentAt)
+		// The other side has something to read; if they don't within a minute, they are told.
+		if err := s.Repo.Waiting(ctx, orderID, chat.Other(role), saved.SentAt); err != nil {
+			slog.Warn("starting an unread streak failed", "order", orderID, "err", err)
+		}
 	}
 	return saved, created, nil
 }
@@ -224,6 +235,66 @@ func (s Service) Photo(ctx context.Context, me identity.Identity, orderID, photo
 	}
 	body, err := s.Photos.Get(ctx, p.Key)
 	return body, p, err
+}
+
+// NudgeDue tells everyone who has had a message waiting unread for chat.NudgeAfter, once per
+// unread streak: a chat.message_waiting event goes to the outbox, and notification-service turns it
+// into an inbox entry and an SMS. Returns how many were told.
+func (s Service) NudgeDue(ctx context.Context) (int, error) {
+	now := s.now()
+	chats, err := s.Repo.Due(ctx, now.Add(-chat.NudgeAfter))
+	if err != nil {
+		return 0, err
+	}
+	told := 0
+	for i := range chats {
+		c := &chats[i]
+		due := c.Due(now)
+		if len(due) == 0 {
+			continue
+		}
+		msgs, err := s.Repo.Messages(ctx, c.OrderID)
+		if err != nil {
+			return told, err
+		}
+		for _, role := range due {
+			since := c.CustomerWaiting.Since
+			if role == chat.Rider {
+				since = c.RiderWaiting.Since
+			}
+			var event *outbox.Event
+			if n := c.NudgeFor(role, msgs); n != nil {
+				e, err := outbox.New(outbox.StableID(NudgeTopic, c.OrderID, role, since.Format(time.RFC3339Nano)),
+					NudgeTopic, c.OrderID, now, n)
+				if err != nil {
+					return told, err
+				}
+				event = &e
+				told++
+			}
+			// Without anything to say (no phone on record), the streak is still marked, so it isn't looked at again.
+			if err := s.Repo.Nudged(ctx, c.OrderID, role, since, event); err != nil {
+				return told, err
+			}
+		}
+	}
+	return told, nil
+}
+
+// RunNudges looks for messages waiting too long every `every` until ctx ends.
+func (s Service) RunNudges(ctx context.Context, every time.Duration) {
+	for {
+		if n, err := s.NudgeDue(ctx); err != nil && ctx.Err() == nil {
+			slog.Warn("telling people about waiting messages failed", "err", err)
+		} else if n > 0 {
+			slog.Info("told people about waiting messages", "count", n)
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(every):
+		}
+	}
 }
 
 // newID is a random (version 4) UUID.

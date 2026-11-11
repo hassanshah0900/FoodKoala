@@ -145,8 +145,13 @@ components:
   schemas:
     Kind:
       type: string
-      description: "`rider_assigned` is the customer's (who is bringing the order), `delivery_assigned` the rider's (a new job, also texted)."
-      enum: [order_placed, order_accepted, order_ready, order_picked_up, order_delivered, order_rejected, order_cancelled, rider_assigned, delivery_assigned]
+      description: |
+        `rider_assigned` is the customer's (who is bringing the order),
+        `delivery_assigned` the rider's (a new job, also texted).
+        `chat_message` is either side's: a chat message waited a minute
+        unread (chat.message_waiting), also texted; its data has `chat`, the
+        reader's role, so the app opens the order (customer) or the rider app.
+      enum: [order_placed, order_accepted, order_ready, order_picked_up, order_delivered, order_rejected, order_cancelled, rider_assigned, delivery_assigned, chat_message]
 
     Notification:
       type: object

@@ -12,6 +12,7 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
 	"github.com/hassanshah0900/FoodKoala/src/chat-service/internal/chat"
+	"github.com/hassanshah0900/FoodKoala/src/chat-service/internal/outbox"
 )
 
 // History is how many of the latest messages a chat shows; a delivery's chat is far shorter.
@@ -23,6 +24,9 @@ type Store struct {
 
 func (s Store) chats() *mongo.Collection    { return s.DB.Collection("chats") }
 func (s Store) messages() *mongo.Collection { return s.DB.Collection("messages") }
+func (s Store) outbox() *mongo.Collection   { return s.DB.Collection("outbox") }
+
+func waitingField(role string) string { return role + "Waiting" }
 
 // Migrate creates the indexes; it is safe to run on every start.
 func (s Store) Migrate(ctx context.Context) error {
@@ -34,6 +38,19 @@ func (s Store) Migrate(ctx context.Context) error {
 			Options: options.Index().SetUnique(true),
 		},
 		{Keys: bson.D{{Key: "orderId", Value: 1}, {Key: "photo.id", Value: 1}}, Options: options.Index().SetSparse(true)},
+	})
+	if err != nil {
+		return err
+	}
+	_, err = s.chats().Indexes().CreateMany(ctx, []mongo.IndexModel{
+		{Keys: bson.D{{Key: "customerWaiting.since", Value: 1}}, Options: options.Index().SetSparse(true)},
+		{Keys: bson.D{{Key: "riderWaiting.since", Value: 1}}, Options: options.Index().SetSparse(true)},
+	})
+	if err != nil {
+		return err
+	}
+	_, err = s.outbox().Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys: bson.D{{Key: "publishedAt", Value: 1}, {Key: "createdAt", Value: 1}},
 	})
 	return err
 }
@@ -58,10 +75,15 @@ func (s Store) Apply(ctx context.Context, c chat.Change) (bool, error) {
 			"closesAt": bson.M{"$exists": false},
 			"$or":      bson.A{bson.M{"assignedAt": bson.M{"$exists": false}}, bson.M{"assignedAt": bson.M{"$lt": a.At}}},
 		}
-		update = bson.M{"$set": bson.M{
-			"customerId": a.CustomerID, "riderId": a.RiderID, "riderName": a.RiderName,
-			"restaurantName": a.RestaurantName, "assignedAt": a.At,
-		}}
+		update = bson.M{
+			"$set": bson.M{
+				"customerId": a.CustomerID, "customerPhone": a.CustomerPhone, "riderId": a.RiderID,
+				"riderPhone": a.RiderPhone, "riderName": a.RiderName, "restaurantName": a.RestaurantName,
+				"assignedAt": a.At,
+			},
+			// A new rider has read nothing yet, and owes nothing to the last one's unread streak.
+			"$unset": bson.M{"riderWaiting": "", "riderReadAt": ""},
+		}
 	case c.ClosesAt != nil:
 		filter = bson.M{"_id": c.OrderID, "closesAt": bson.M{"$exists": false}}
 		update = bson.M{"$set": bson.M{"closesAt": *c.ClosesAt}}
@@ -133,6 +155,61 @@ func (s Store) Photo(ctx context.Context, orderID, photoID string) (*chat.Photo,
 	return m.Photo, nil
 }
 
+// Waiting starts an unread streak for `role` at `at`, unless one is already running.
+func (s Store) Waiting(ctx context.Context, orderID, role string, at time.Time) error {
+	field := waitingField(role)
+	_, err := s.chats().UpdateOne(ctx,
+		bson.M{"_id": orderID, field: bson.M{"$exists": false}},
+		bson.M{"$set": bson.M{field: chat.Waiting{Since: at}}})
+	return err
+}
+
+// Due lists chats where someone has waited since before `cutoff` and wasn't told yet.
+func (s Store) Due(ctx context.Context, cutoff time.Time) ([]chat.Chat, error) {
+	or := bson.A{}
+	for _, role := range []string{chat.Customer, chat.Rider} {
+		f := waitingField(role)
+		or = append(or, bson.M{f + ".nudged": false, f + ".since": bson.M{"$lte": cutoff}})
+	}
+	cur, err := s.chats().Find(ctx, bson.M{"$or": or}, options.Find().SetLimit(100))
+	if err != nil {
+		return nil, err
+	}
+	var due []chat.Chat
+	return due, cur.All(ctx, &due)
+}
+
+// Nudged records that `role` was told about the streak that began at `since`. With an event, it is
+// written to the outbox first under an id made from the streak, so a nudge retried after a crash
+// writes nothing new; then the streak is marked, only if it is still the same one.
+func (s Store) Nudged(ctx context.Context, orderID, role string, since time.Time, event *outbox.Event) error {
+	if event != nil {
+		if _, err := s.outbox().InsertOne(ctx, event); err != nil && !mongo.IsDuplicateKeyError(err) {
+			return err
+		}
+	}
+	f := waitingField(role)
+	_, err := s.chats().UpdateOne(ctx, bson.M{"_id": orderID, f + ".since": since}, bson.M{"$set": bson.M{f + ".nudged": true}})
+	return err
+}
+
+// Unpublished are up to `limit` events not yet published, oldest first.
+func (s Store) Unpublished(ctx context.Context, limit int) ([]outbox.Event, error) {
+	cur, err := s.outbox().Find(ctx, bson.M{"publishedAt": bson.M{"$exists": false}},
+		options.Find().SetSort(bson.D{{Key: "createdAt", Value: 1}}).SetLimit(int64(limit)))
+	if err != nil {
+		return nil, err
+	}
+	var events []outbox.Event
+	return events, cur.All(ctx, &events)
+}
+
+// MarkPublished records that the broker has these events.
+func (s Store) MarkPublished(ctx context.Context, ids []string, at time.Time) error {
+	_, err := s.outbox().UpdateMany(ctx, bson.M{"_id": bson.M{"$in": ids}}, bson.M{"$set": bson.M{"publishedAt": at}})
+	return err
+}
+
 // MarkRead moves a side's read mark forward to `at` (never back); true when it moved.
 func (s Store) MarkRead(ctx context.Context, orderID, role string, at time.Time) (bool, error) {
 	field := map[string]string{chat.Customer: "customerReadAt", chat.Rider: "riderReadAt"}[role]
@@ -141,6 +218,12 @@ func (s Store) MarkRead(ctx context.Context, orderID, role string, at time.Time)
 	}
 	res, err := s.chats().UpdateOne(ctx, bson.M{"_id": orderID}, bson.M{"$max": bson.M{field: at}})
 	if err != nil {
+		return false, err
+	}
+	// Reading ends the unread streak that began before now, whether or not they were told about it.
+	waiting := waitingField(role)
+	if _, err := s.chats().UpdateOne(ctx, bson.M{"_id": orderID, waiting + ".since": bson.M{"$lte": at}},
+		bson.M{"$unset": bson.M{waiting: ""}}); err != nil {
 		return false, err
 	}
 	return res.ModifiedCount > 0, nil

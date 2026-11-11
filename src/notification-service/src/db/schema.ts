@@ -16,6 +16,8 @@ export const KINDS = [
   'rider_assigned',
   /** The rider's: a new job to collect. */
   'delivery_assigned',
+  /** Either side's: a chat message has waited a minute unread (chat-service). */
+  'chat_message',
 ] as const;
 export type Kind = (typeof KINDS)[number];
 export const kindEnum = notificationsSchema.enum('notification_kind', KINDS);
