@@ -1,5 +1,6 @@
 import type { OrderDelivery } from '@/lib/api/types';
 import { rupees } from '@/lib/format';
+import { orderCode } from '@/lib/order-code';
 import { formatPhone } from '@/lib/phone';
 import { directions, nextStep } from '@/lib/rider';
 import { StepButtons } from './StepButtons';
@@ -43,7 +44,7 @@ export function DeliveryCard({ delivery: d }: { delivery: OrderDelivery }) {
   return (
     <section className="space-y-3 rounded-2xl bg-white p-4 shadow-sm">
       <div className="flex items-baseline justify-between">
-        <h2 className="text-lg font-extrabold">Order #{d.orderId.slice(0, 8).toUpperCase()}</h2>
+        <h2 className="text-lg font-extrabold">Order #{orderCode(d.orderId)}</h2>
         {d.deliveryFeePaisa + d.tipPaisa > 0 && (
           <span className="text-sm font-semibold text-green-700">
             You earn {rupees(d.deliveryFeePaisa + d.tipPaisa)}

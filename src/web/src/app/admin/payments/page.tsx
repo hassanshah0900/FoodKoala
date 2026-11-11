@@ -5,6 +5,7 @@ import { StatusTabs } from '@/components/console/StatusTabs';
 import { Table } from '@/components/console/Table';
 import { paymentsWithStatus } from '@/lib/api/payments';
 import { dateTime, rupees } from '@/lib/format';
+import { orderCode } from '@/lib/order-code';
 import { pageParam } from '@/lib/paging';
 import { one, type Params } from '@/lib/params';
 import { PAYMENT_STATUSES } from '@/lib/review';
@@ -30,7 +31,7 @@ export default async function AdminPayments({ searchParams }: { searchParams: Pr
           <tr key={p.id} className="hover:bg-brand-50/40">
             <td>
               <Link href={`/admin/orders/${p.orderId}`} className="font-mono font-bold text-brand-700 hover:underline">
-                #{p.orderId.slice(0, 8).toUpperCase()}
+                #{orderCode(p.orderId)}
               </Link>
             </td>
             <td>{METHODS[p.method]}</td>

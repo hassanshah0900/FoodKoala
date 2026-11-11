@@ -10,6 +10,7 @@ import { StatusTracker } from '@/components/orders/StatusTracker';
 import { addressTitle } from '@/lib/addresses';
 import { getOrder, orderReview } from '@/lib/api/orders';
 import { rupees } from '@/lib/format';
+import { orderCode } from '@/lib/order-code';
 import { isFinal } from '@/lib/order-status';
 import { isUuid } from '@/lib/params';
 import { canReview, riderDelivered } from '@/lib/reviews';
@@ -66,7 +67,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                 {order.restaurant.name}
               </Link>
             </h2>
-            <p className="text-xs text-muted">Order #{order.id.slice(0, 8).toUpperCase()}</p>
+            <p className="text-xs text-muted">Order #{orderCode(order.id)}</p>
             <div className="mt-4">
               <OrderLines order={order} />
             </div>

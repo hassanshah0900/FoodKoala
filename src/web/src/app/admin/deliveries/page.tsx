@@ -5,6 +5,7 @@ import { StatusTabs } from '@/components/console/StatusTabs';
 import { Table } from '@/components/console/Table';
 import { deliveriesWithStatus } from '@/lib/api/delivery';
 import { dateTime, rupees } from '@/lib/format';
+import { orderCode } from '@/lib/order-code';
 import { pageParam } from '@/lib/paging';
 import { one, type Params } from '@/lib/params';
 import { DELIVERY_STATUSES } from '@/lib/review';
@@ -36,7 +37,7 @@ export default async function AdminDeliveries({ searchParams }: { searchParams: 
           <tr key={d.id} className="hover:bg-brand-50/40">
             <td>
               <Link href={`/admin/orders/${d.orderId}`} className="font-mono font-bold text-brand-700 hover:underline">
-                #{d.orderId.slice(0, 8).toUpperCase()}
+                #{orderCode(d.orderId)}
               </Link>
             </td>
             <td>{d.restaurant.name}</td>
