@@ -31,6 +31,8 @@ const order: OrderRow = {
   prepTimeMinutes: null,
   estimatedDeliveryAt: new Date('2026-11-08T10:35:00Z'),
   placedAt: new Date('2026-11-08T10:00:00Z'),
+  scheduledFor: null,
+  releaseAt: new Date('2026-11-08T10:00:00Z'),
   updatedAt: new Date('2026-11-08T10:00:00Z'),
 };
 

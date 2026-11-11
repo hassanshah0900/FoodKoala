@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { reorder } from '@/lib/api/cart';
 import { ApiError, refusal } from '@/lib/api/http';
-import { reviewOrder } from '@/lib/api/orders';
+import { reviewOrder, setOrderStatus } from '@/lib/api/orders';
 import { accessToken, requireUser } from '@/lib/session';
 
 export type AgainState = {
@@ -59,5 +59,22 @@ export async function rateOrder(orderId: string, withRider: boolean, _prev: Revi
   }
   revalidatePath(`/orders/${orderId}`);
   revalidatePath('/orders');
+  return {};
+}
+
+export type CancelState = { error?: string };
+
+/** The customer calls the order off; order-service allows it until the restaurant accepts. */
+export async function cancelOrder(orderId: string, _prev: CancelState, _form: FormData): Promise<CancelState> {
+  await requireUser(`/orders/${orderId}`);
+  const token = (await accessToken())!;
+  try {
+    await setOrderStatus(token, orderId, { status: 'cancelled' });
+  } catch (err) {
+    const error = refusal(err);
+    if (error === null) throw err;
+    return { error };
+  }
+  revalidatePath(`/orders/${orderId}`);
   return {};
 }

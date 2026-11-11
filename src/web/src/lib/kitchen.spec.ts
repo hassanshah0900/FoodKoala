@@ -1,8 +1,17 @@
 import type { Order } from './api/types';
-import { board, minutesToAnswer, readyBy } from './kitchen';
+import { board, held, isHeld, minutesToAnswer, readyBy } from './kitchen';
 
 const order = (id: string, status: Order['status'], placedAt: string, extra: Partial<Order> = {}) =>
-  ({ id, status, placedAt, timeline: [], prepTimeMinutes: null, ...extra }) as unknown as Order;
+  ({
+    id,
+    status,
+    placedAt,
+    releaseAt: placedAt,
+    scheduledFor: null,
+    timeline: [],
+    prepTimeMinutes: null,
+    ...extra,
+  }) as unknown as Order;
 
 describe('kitchen', () => {
   const now = Date.parse('2026-11-11T12:00:00Z');
@@ -22,6 +31,24 @@ describe('kitchen', () => {
     expect(b.placed.map((o) => o.id)).toEqual(['a', 'b']);
     expect(b.accepted.map((o) => o.id)).toEqual(['c']);
     expect(b.ready).toEqual([]);
+  });
+
+  it('holds scheduled orders until their release, the soonest due first', () => {
+    const later = order('l', 'placed', '2026-11-11T10:00:00Z', {
+      scheduledFor: '2026-11-11T15:00:00Z',
+      releaseAt: '2026-11-11T14:15:00Z',
+    });
+    const sooner = order('s', 'placed', '2026-11-11T11:00:00Z', {
+      scheduledFor: '2026-11-11T13:00:00Z',
+      releaseAt: '2026-11-11T12:15:00Z',
+    });
+    const released = order('r', 'placed', '2026-11-11T09:00:00Z', {
+      scheduledFor: '2026-11-11T12:30:00Z',
+      releaseAt: '2026-11-11T11:45:00Z',
+    });
+    expect(isHeld(released, now)).toBe(false);
+    expect(isHeld(order('n', 'placed', '2026-11-11T11:59:00Z'), now)).toBe(false);
+    expect(held([later, released, sooner], now).map((o) => o.id)).toEqual(['s', 'l']);
   });
 
   it('works out when the food should be ready', () => {

@@ -44,6 +44,7 @@ export async function submitOrder(_: PlaceOrderState, form: FormData): Promise<P
       note: text(form, 'note'),
       voucherCode: text(form, 'voucher'),
       tipPaisa: Number(form.get('tip')) || 0,
+      scheduledFor: text(form, 'scheduledFor'),
     });
     orderId = order.id;
   } catch (err) {

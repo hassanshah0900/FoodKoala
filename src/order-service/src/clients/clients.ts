@@ -119,13 +119,16 @@ export class RestaurantClient {
     return res.body;
   }
 
-  /** Whether an approved restaurant delivers to a point; null when it isn't approved (any more). */
-  async quote(id: string, at: { lat: number; lng: number }): Promise<DeliveryQuote | null> {
+  /**
+   * Whether an approved restaurant delivers to a point, and takes orders `when` (now if absent);
+   * null when it isn't approved (any more).
+   */
+  async quote(id: string, at: { lat: number; lng: number }, when?: Date): Promise<DeliveryQuote | null> {
     const res = await call<DeliveryQuote>(
       'restaurant-service',
       this.config.RESTAURANT_SERVICE_URL,
       `${encodeURIComponent(id)}/delivery-quote`,
-      { query: at, timeoutMs: this.config.SERVICE_TIMEOUT_MS },
+      { query: when ? { ...at, at: when.toISOString() } : at, timeoutMs: this.config.SERVICE_TIMEOUT_MS },
     );
     if (res.status === 404) return null;
     if (res.status !== 200) throw unexpected('restaurant-service', res.status);

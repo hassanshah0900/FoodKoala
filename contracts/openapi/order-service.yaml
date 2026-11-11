@@ -36,6 +36,14 @@ info:
     reason "Not accepted within 10 minutes", so a customer never waits on a
     kitchen that isn't looking.
 
+    **Scheduled orders.** `scheduledFor` at checkout asks for the food at a
+    time 60 minutes to 7 days ahead, when the restaurant takes orders
+    (restaurant-service's quote at that time). The order is `placed` at
+    once and the restaurant sees it, but can only accept it from
+    `releaseAt`, 45 minutes before `scheduledFor` (409 before), so the
+    rider search starts in time and not hours early. The 10 minutes count
+    from `releaseAt`. The customer can cancel it until it is accepted.
+
     **Who sees what.** Customers see their own orders. Restaurant owners
     see the orders of their restaurants. Admins see every order. Anyone else
     gets 404.
@@ -128,7 +136,7 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '409':
-          description: The cart is empty, or the restaurant is not taking orders right now
+          description: The cart is empty, or the restaurant is not taking orders right now (or at scheduledFor)
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -137,8 +145,9 @@ paths:
             The order can't be placed as it is: a cart line has a problem, the
             address is unknown, the restaurant doesn't deliver there, the
             subtotal is under the minimum order, the payment method isn't
-            available yet, or the voucher can't be used (see
-            `VoucherRefused`). `message` lists every reason.
+            available yet, the voucher can't be used (see
+            `VoucherRefused`), or scheduledFor is under 60 minutes or over
+            7 days ahead. `message` lists every reason.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -262,7 +271,7 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409':
-          description: The order is not in a status that allows this change
+          description: The order is not in a status that allows this change, or a scheduled order is accepted before its releaseAt
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -607,6 +616,11 @@ components:
         note: { type: [string, 'null'], minLength: 1, maxLength: 500, description: 'For the restaurant, e.g. "no cutlery"' }
         voucherCode: { type: [string, 'null'], minLength: 1, maxLength: 32, description: Takes the voucher's discount off; 422 if it can't be used }
         tipPaisa: { type: integer, minimum: 0, maximum: 100000, default: 0, description: 'For the rider, added to the total' }
+        scheduledFor:
+          type: [string, 'null']
+          format: date-time
+          default: null
+          description: When it should arrive, 60 minutes to 7 days ahead; null for as soon as possible
 
     StatusChange:
       type: object
@@ -680,6 +694,8 @@ components:
         - note
         - prepTimeMinutes
         - estimatedDeliveryAt
+        - scheduledFor
+        - releaseAt
         - timeline
         - placedAt
         - updatedAt
@@ -715,7 +731,17 @@ components:
         estimatedDeliveryAt:
           type: string
           format: date-time
-          description: From the delivery zone's time at checkout, pushed later if the prep time needs it
+          description: |
+            From the delivery zone's time at checkout (or scheduledFor), pushed
+            later if the prep time needs it
+        scheduledFor:
+          type: [string, 'null']
+          format: date-time
+          description: When the customer wants it at the door; null for as soon as possible
+        releaseAt:
+          type: string
+          format: date-time
+          description: When the restaurant may accept it; placedAt unless scheduled, then 45 minutes before scheduledFor
         timeline:
           type: array
           description: Every status the order has had, oldest first

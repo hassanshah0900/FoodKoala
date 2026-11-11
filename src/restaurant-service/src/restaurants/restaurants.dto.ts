@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { PROVINCES, STATUSES } from '../db/schema';
 import { locationSchema } from '../geo/geo';
+import { MAX_SLOT_RANGE_MS } from './restaurants.view';
 
 // Shapes match RestaurantCreate / RestaurantUpdate / StatusChange in contracts/openapi/restaurant-service.yaml.
 
@@ -56,3 +57,20 @@ export type PageQuery = z.output<typeof pageQuerySchema>;
 
 export const reviewQuerySchema = pageQuerySchema.extend({ status: z.enum(STATUSES).default('pending') });
 export type ReviewQuery = z.output<typeof reviewQuerySchema>;
+
+/** `?from=&to=&step=15`: open slots in a range of at most 8 days. */
+export const slotsQuerySchema = z
+  .object({
+    from: z.coerce.date(),
+    to: z.coerce.date(),
+    step: z.coerce
+      .number()
+      .pipe(z.union([z.literal(15), z.literal(30), z.literal(60)]))
+      .default(15),
+  })
+  .refine((q) => q.to > q.from, { message: 'to must be after from', path: ['to'] })
+  .refine((q) => q.to.getTime() - q.from.getTime() <= MAX_SLOT_RANGE_MS, {
+    message: 'Ask for at most 8 days of slots',
+    path: ['to'],
+  });
+export type SlotsQuery = z.output<typeof slotsQuerySchema>;

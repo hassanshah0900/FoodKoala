@@ -271,6 +271,61 @@ describe('order-service (e2e)', () => {
     expect(final.body.timeline).toHaveLength(2);
   });
 
+  describe('scheduled orders', () => {
+    const inHours = (h: number) => new Date(Date.now() + h * 3_600_000);
+
+    it('takes an order for later from a restaurant closed now, and holds it until its kitchen time', async () => {
+      const s = scenario({ acceptingOrders: false, openLater: true });
+      const scheduledFor = inHours(3);
+      const res = await checkout(s.customer, s.addressId, { scheduledFor: scheduledFor.toISOString() }).expect(201);
+      expect(res.body).toMatchObject({
+        status: 'placed',
+        scheduledFor: scheduledFor.toISOString(),
+        estimatedDeliveryAt: scheduledFor.toISOString(),
+        releaseAt: new Date(scheduledFor.getTime() - 45 * 60_000).toISOString(),
+      });
+      placed.push(res.body.id);
+      const [event] = await db.select().from(outbox).where(eq(outbox.key, res.body.id));
+      expect(event.payload).toMatchObject({ data: { scheduledFor: scheduledFor.toISOString() } });
+
+      const early = await http
+        .post(`/${res.body.id}/status`)
+        .set(s.owner)
+        .send({ status: 'accepted', prepTimeMinutes: 20 })
+        .expect(409);
+      expect(early.body.message).toMatch(/^This order is scheduled for .+; accept it from .+$/);
+
+      // Not overdue: the timeout counts from the kitchen time, not from when it was placed.
+      await db
+        .update(orders)
+        .set({ placedAt: new Date(Date.now() - 60 * 60_000) })
+        .where(eq(orders.id, res.body.id));
+      await app.get(AcceptTimeouts).runOnce();
+      expect((await http.get(`/${res.body.id}`).set(s.customer).expect(200)).body.status).toBe('placed');
+
+      await db
+        .update(orders)
+        .set({ releaseAt: new Date(Date.now() - 60_000) })
+        .where(eq(orders.id, res.body.id));
+      const accepted = await http
+        .post(`/${res.body.id}/status`)
+        .set(s.owner)
+        .send({ status: 'accepted', prepTimeMinutes: 20 })
+        .expect(200);
+      expect(accepted.body.estimatedDeliveryAt).toBe(scheduledFor.toISOString());
+    });
+
+    it('refuses times too soon or too far, and times the restaurant is closed', async () => {
+      const s = scenario({ openLater: false });
+      const soon = await checkout(s.customer, s.addressId, { scheduledFor: inHours(0.5).toISOString() }).expect(422);
+      expect(soon.body.message).toEqual([expect.stringContaining('at least 60 minutes ahead')]);
+      await checkout(s.customer, s.addressId, { scheduledFor: inHours(24 * 8).toISOString() }).expect(422);
+      await checkout(s.customer, s.addressId, { scheduledFor: 'tomorrow' }).expect(400);
+      const closed = await checkout(s.customer, s.addressId, { scheduledFor: inHours(5).toISOString() }).expect(409);
+      expect(closed.body.message).toMatch(/is not taking orders at .+; pick another time/);
+    });
+  });
+
   it('rejects orders the restaurant never answered, once, and leaves the rest alone', async () => {
     const [late, fresh, answered] = [scenario(), scenario(), scenario()];
     const lateOrder = await place(late);
@@ -284,7 +339,7 @@ describe('order-service (e2e)', () => {
     const longAgo = new Date(Date.now() - 11 * 60_000);
     await db
       .update(orders)
-      .set({ placedAt: longAgo })
+      .set({ placedAt: longAgo, releaseAt: longAgo })
       .where(inArray(orders.id, [lateOrder.id, answeredOrder.id]));
 
     // Two replicas at once: the order is still rejected only once.

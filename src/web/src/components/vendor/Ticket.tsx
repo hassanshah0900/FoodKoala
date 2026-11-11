@@ -1,19 +1,24 @@
 import { StatusBadge } from '@/components/console/StatusBadge';
 import type { Order } from '@/lib/api/types';
 import { ago, clockTime, rupees } from '@/lib/format';
-import { minutesToAnswer, readyBy } from '@/lib/kitchen';
+import { isHeld, minutesToAnswer, readyBy } from '@/lib/kitchen';
 import { orderCode } from '@/lib/order-code';
 import { formatPhone } from '@/lib/phone';
 
 /** One order on the kitchen board: what to cook, for whom, and how long there is. */
 export function Ticket({ order, now, children }: { order: Order; now: number; children: React.ReactNode }) {
-  const left = order.status === 'placed' ? minutesToAnswer(order.placedAt, now) : null;
+  const left = order.status === 'placed' && !isHeld(order, now) ? minutesToAnswer(order.releaseAt, now) : null;
   const ready = readyBy(order);
   return (
     <article className="space-y-3 rounded-xl bg-white p-4 shadow-sm">
       <header className="flex items-start justify-between gap-2">
         <div>
           <h3 className="font-mono font-bold">#{orderCode(order.id)}</h3>
+          {order.scheduledFor && (
+            <p className="text-xs font-bold text-brand-700">
+              Scheduled · at the door by {clockTime(order.scheduledFor)}
+            </p>
+          )}
           <p className="text-xs text-muted">
             {ago(order.placedAt, now)} · {formatPhone(order.customerPhone)}
           </p>

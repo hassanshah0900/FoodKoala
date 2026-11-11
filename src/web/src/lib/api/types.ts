@@ -221,6 +221,10 @@ export interface Order {
   note: string | null;
   prepTimeMinutes: number | null;
   estimatedDeliveryAt: string;
+  /** When the customer wants it at the door; null for as soon as possible. */
+  scheduledFor: string | null;
+  /** When the restaurant may accept it: placedAt, or 45 minutes before scheduledFor. */
+  releaseAt: string;
   timeline: { status: OrderStatus; at: string; by: string; reason: string | null }[];
   placedAt: string;
 }

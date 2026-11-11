@@ -16,9 +16,17 @@ import type {
 /** The restaurant, or null if there is no such approved restaurant. */
 export const getRestaurant = (id: string) => orNull(get<Restaurant>(`restaurants/${id}`, { revalidate: 60 }));
 
-/** Whether it delivers to `at`, and on what terms. */
-export const deliveryQuote = (id: string, at: Point) =>
-  orNull(get<DeliveryQuote>(`restaurants/${id}/delivery-quote`, { query: { lat: at.lat, lng: at.lng } }));
+/** Whether it delivers to `at`, and on what terms; `when` asks whether it takes orders then rather than now. */
+export const deliveryQuote = (id: string, at: Point, when?: string) =>
+  orNull(get<DeliveryQuote>(`restaurants/${id}/delivery-quote`, { query: { lat: at.lat, lng: at.lng, at: when } }));
+
+/** When it takes orders between `from` and `to`, every `step` minutes, to schedule one. */
+export const openSlots = (id: string, from: Date, to: Date, step: number) =>
+  orNull(
+    get<{ slots: string[] }>(`restaurants/${id}/open-slots`, {
+      query: { from: from.toISOString(), to: to.toISOString(), step },
+    }),
+  );
 
 export const latestReviews = (id: string, limit = 3) =>
   get<Page<Review>>(`restaurants/${id}/reviews`, { query: { limit }, revalidate: 300 });

@@ -2,6 +2,7 @@ import { ConflictException, UnprocessableEntityException } from '@nestjs/common'
 import type { Address, Cart, DeliveryQuote, Restaurant } from '../clients/clients';
 import type { DeliveryAddress, LineOption, PaymentMethod } from '../db/schema';
 import { rupees } from '../money';
+import { pakistanTime } from './schedule';
 
 /** Until payment-service takes online payments, only cash on delivery is offered. */
 export const ACCEPTED_PAYMENT_METHODS: readonly PaymentMethod[] = ['cod'];
@@ -63,11 +64,19 @@ export function draftOrder(input: {
   now: Date;
   /** For the rider. */
   tipPaisa?: number;
+  /** When it should arrive, for an order scheduled ahead (already checked against checkSchedule). */
+  scheduledFor?: Date | null;
 }): OrderDraft {
-  const { cart, address, restaurant, quote, now, tipPaisa = 0 } = input;
+  const { cart, address, restaurant, quote, now, tipPaisa = 0, scheduledFor = null } = input;
   if (!address) throw new UnprocessableEntityException(['Choose one of your saved addresses']);
   if (!restaurant || !quote) throw new ConflictException('This restaurant is not taking orders any more');
-  if (!quote.acceptingOrders) throw new ConflictException(`${restaurant.name} is not taking orders right now`);
+  if (!quote.acceptingOrders) {
+    throw new ConflictException(
+      scheduledFor
+        ? `${restaurant.name} is not taking orders at ${pakistanTime(scheduledFor)}; pick another time`
+        : `${restaurant.name} is not taking orders right now`,
+    );
+  }
   if (!quote.deliverable || !quote.delivery) {
     throw new UnprocessableEntityException([`${restaurant.name} doesn't deliver to ${address.area}, ${address.city}`]);
   }
@@ -108,7 +117,7 @@ export function draftOrder(input: {
     ...money,
     voucherId: null,
     totalPaisa: totalOf(money),
-    estimatedDeliveryAt: new Date(now.getTime() + delivery.deliveryTimeMinutes * 60_000),
+    estimatedDeliveryAt: scheduledFor ?? new Date(now.getTime() + delivery.deliveryTimeMinutes * 60_000),
   };
 }
 

@@ -30,7 +30,14 @@ const addresses = new Map<
 >();
 const restaurants = new Map<
   string,
-  { name: string; ownerId: string; acceptingOrders: boolean; deliverable: boolean }
+  {
+    name: string;
+    ownerId: string;
+    acceptingOrders: boolean;
+    deliverable: boolean;
+    /** Takes orders for later (a quote with `at`) even when closed now. */
+    openLater?: boolean;
+  }
 >();
 /** Set to make restaurant-service answer 503. */
 export const outage = { restaurant: false };
@@ -79,7 +86,7 @@ function fakeServices(): Server {
       if (rest[1] === 'delivery-quote') {
         return send(200, {
           deliverable: r.deliverable,
-          acceptingOrders: r.acceptingOrders,
+          acceptingOrders: url.searchParams.has('at') && r.openLater !== undefined ? r.openLater : r.acceptingOrders,
           distanceMeters: 1800,
           delivery: r.deliverable
             ? { zoneId: randomUUID(), deliveryFeePaisa: 9900, minimumOrderPaisa: 50000, deliveryTimeMinutes: 35 }
@@ -120,7 +127,9 @@ export function fillCart(customer: Headers, restaurantId: string, quantity = 2, 
 }
 
 /** A customer with a priced cart and a saved address, and the restaurant's owner. */
-export function scenario(over: { quantity?: number; acceptingOrders?: boolean; deliverable?: boolean } = {}) {
+export function scenario(
+  over: { quantity?: number; acceptingOrders?: boolean; deliverable?: boolean; openLater?: boolean } = {},
+) {
   const customer = newUser();
   const owner = newUser('customer,vendor');
   const restaurantId = randomUUID();
@@ -222,4 +231,5 @@ interface CheckoutBody {
   key?: string;
   voucherCode?: string;
   tipPaisa?: number;
+  scheduledFor?: string;
 }

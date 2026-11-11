@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ChatPanel } from '@/components/chat/ChatPanel';
 import { AutoRefresh } from '@/components/orders/AutoRefresh';
+import { CancelOrder } from '@/components/orders/CancelOrder';
 import { LiveTracking } from '@/components/orders/LiveTracking';
 import { OrderAgain } from '@/components/orders/OrderAgain';
 import { OrderLines } from '@/components/orders/OrderLines';
@@ -20,7 +21,7 @@ import { isUuid } from '@/lib/params';
 import { canReview, riderDelivered } from '@/lib/reviews';
 import { accessToken, requireUser } from '@/lib/session';
 import { showTracking } from '@/lib/tracking';
-import { orderAgain, rateOrder } from '../actions';
+import { cancelOrder, orderAgain, rateOrder } from '../actions';
 
 export const metadata: Metadata = { title: 'Your order' };
 
@@ -50,6 +51,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
         {chat && (chat.open || chat.messages.length > 0) && (
           <ChatPanel initial={chat} title={`Chat with ${chat.riderName.split(' ')[0]}`} />
         )}
+        {order.status === 'placed' && <CancelOrder action={cancelOrder.bind(null, order.id)} />}
         {order.status === 'delivered' && (
           <section id="rate" className="space-y-4 rounded-xl bg-white p-6 shadow-sm">
             {review ? (

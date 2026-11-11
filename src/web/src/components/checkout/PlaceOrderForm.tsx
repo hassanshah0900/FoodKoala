@@ -11,6 +11,9 @@ export function PlaceOrderForm(props: {
   addressId: string | undefined;
   voucher: string | null;
   tipPaisa: number;
+  /** The time it is scheduled for (ISO) and how to say it; null for as soon as possible. */
+  scheduledFor: string | null;
+  scheduledLabel: string | null;
   totalPaisa: number;
   blocked: string | null;
 }) {
@@ -21,6 +24,7 @@ export function PlaceOrderForm(props: {
       <input type="hidden" name="addressId" value={props.addressId ?? ''} />
       <input type="hidden" name="voucher" value={props.voucher ?? ''} />
       <input type="hidden" name="tip" value={props.tipPaisa} />
+      <input type="hidden" name="scheduledFor" value={props.scheduledFor ?? ''} />
       <div className="flex items-center gap-3 rounded-lg border border-brand-600 bg-brand-50 p-4">
         <CashIcon className="size-6 text-brand-600" />
         <div className="text-sm">
@@ -51,7 +55,11 @@ export function PlaceOrderForm(props: {
         disabled={pending || props.blocked !== null}
         className="h-12 w-full rounded-lg bg-brand-600 font-bold text-white hover:bg-brand-700 disabled:bg-neutral-300"
       >
-        {pending ? 'Placing your order…' : `Place order · ${rupees(props.totalPaisa)}`}
+        {pending
+          ? 'Placing your order…'
+          : props.scheduledLabel
+            ? `Schedule for ${props.scheduledLabel} · ${rupees(props.totalPaisa)}`
+            : `Place order · ${rupees(props.totalPaisa)}`}
       </button>
     </form>
   );
