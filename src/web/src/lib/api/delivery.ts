@@ -1,16 +1,17 @@
-import { get, orNull, post } from './http';
+import { get, orNull, post, put } from './http';
 import type {
   DeliveryStatus,
   Earnings,
   OrderDelivery,
   Page,
+  Point,
   Rider,
   RiderStatus,
   Settlement,
   SettlementKind,
 } from './types';
 
-// delivery-service, as an admin: reviewing riders, settling cash with them, and watching deliveries.
+// delivery-service. Admins review riders, settle cash and watch deliveries; riders work their shifts.
 
 /** Riders with a status, oldest application first. */
 export const ridersWithStatus = (token: string, status: RiderStatus, page = 1) =>
@@ -41,3 +42,27 @@ export const deliveriesWithStatus = (token: string, status: DeliveryStatus, page
 /** An order's delivery, or null when it never had one (e.g. rejected before it was created). */
 export const deliveryOfOrder = (token: string, orderId: string) =>
   orNull(get<OrderDelivery>(`delivery/deliveries/orders/${orderId}`, { token }));
+
+// The rider, as themselves.
+
+/** The caller's rider account, or null when they haven't applied. */
+export const myRider = (token: string) => orNull(get<Rider>('delivery/riders/me', { token }));
+
+export const applyToRide = (token: string, a: { name: string; vehicle: Rider['vehicle']; city: string }) =>
+  post<Rider>('delivery/riders', a, { token });
+
+/** Starts a shift where the rider is. */
+export const goOnline = (token: string, location: Point) =>
+  post<Rider>('delivery/riders/me/online', { location }, { token });
+
+export const goOffline = (token: string) => post<Rider>('delivery/riders/me/offline', undefined, { token });
+
+/** Where the rider is now; while carrying an order the customer sees it. */
+export const sendLocation = (token: string, at: Point) => put<void>('delivery/riders/me/location', at, { token });
+
+/** The delivery the rider is collecting or carrying, or null. */
+export const myDelivery = (token: string) => orNull(get<OrderDelivery>('delivery/riders/me/delivery', { token }));
+
+/** I have the food, I've handed it over, or I hand an assigned delivery back. */
+export const deliveryStep = (token: string, id: string, step: 'pickup' | 'dropoff' | 'decline') =>
+  post<OrderDelivery | undefined>(`delivery/deliveries/${id}/${step}`, undefined, { token });

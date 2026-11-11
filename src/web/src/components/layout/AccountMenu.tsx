@@ -16,6 +16,12 @@ export function AccountMenu({ user }: { user: Claims }) {
         <ChevronDownIcon className="size-4 text-muted transition-transform group-open:rotate-180" />
       </summary>
       <div className="absolute right-0 z-30 mt-2 w-52 rounded-xl border border-line bg-white p-2 shadow-lg">
+        <Link href="/rider" className="block rounded-lg px-3 py-2 text-sm font-semibold hover:bg-brand-50">
+          Ride with us
+        </Link>
+        <Link href="/vendor" className="block rounded-lg px-3 py-2 text-sm font-semibold hover:bg-brand-50">
+          Your restaurant
+        </Link>
         {isAdmin(user) && (
           <Link href="/admin" className="block rounded-lg px-3 py-2 text-sm font-semibold hover:bg-brand-50">
             Admin console

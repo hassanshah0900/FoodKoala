@@ -28,6 +28,11 @@ export function Footer() {
             <li>Cash on delivery</li>
             <li>Live rider tracking</li>
             <li>
+              <Link href="/rider" className="font-semibold text-white hover:underline">
+                Ride with us
+              </Link>
+            </li>
+            <li>
               <Link href="/vendor" className="font-semibold text-white hover:underline">
                 For restaurants
               </Link>
