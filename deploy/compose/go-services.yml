@@ -29,6 +29,34 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
     restart: "no"
+  chat-service:
+    build: ../../src/chat-service
+    image: foodkoala/chat-service:local
+    ports: ["8083:8083"]
+    environment:
+      # Chats and messages, in the database `chat`
+      MONGO_URL: mongodb://mongo:27017
+      # Live messages between replicas; its own database number
+      REDIS_URL: redis://redis:6379/3
+      # delivery.assigned opens a chat; delivery.delivered and order.status_changed close it
+      KAFKA_BROKERS: kafka:29092
+      # Photos, in a private bucket made on start
+      S3_ENDPOINT: s3:8333
+      S3_ACCESS_KEY: foodkoala
+      S3_SECRET_KEY: foodkoala-secret
+    depends_on:
+      mongo: { condition: service_started }
+      redis: { condition: service_healthy }
+      kafka: { condition: service_started }
+      s3: { condition: service_started }
+    restart: on-failure # the S3 server may take a few seconds longer than us to answer
+    healthcheck:
+      test: ["CMD", "/server", "healthcheck"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
   tracking-service:
     build: ../../src/tracking-service
     image: foodkoala/tracking-service:local
