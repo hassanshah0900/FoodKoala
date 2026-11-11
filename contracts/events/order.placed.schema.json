@@ -55,6 +55,7 @@
       }
     },
     "estimatedDeliveryAt": { "type": "string", "format": "date-time" },
+    "scheduledFor": { "type": ["string", "null"], "format": "date-time", "description": "When the customer wants it at the door; null or absent for as soon as possible" },
     "placedAt": { "type": "string", "format": "date-time" }
   }
 }

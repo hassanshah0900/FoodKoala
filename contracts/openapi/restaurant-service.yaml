@@ -416,12 +416,49 @@ paths:
       parameters:
         - $ref: '#/components/parameters/Lat'
         - $ref: '#/components/parameters/Lng'
+        - name: at
+          in: query
+          description: For an order scheduled ahead, `acceptingOrders` is for this time instead of now
+          schema: { type: string, format: date-time }
       responses:
         '200':
           description: Quote
           content:
             application/json:
               schema: { $ref: '#/components/schemas/DeliveryQuote' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /{id}/open-slots:
+    parameters:
+      - $ref: '#/components/parameters/RestaurantId'
+    get:
+      tags: [browse]
+      operationId: listOpenSlots
+      summary: When an approved restaurant takes orders, for scheduling one
+      description: |
+        The times on the clock in [from, to], every `step` minutes, when the
+        restaurant is approved, inside its opening hours (Pakistan time) and
+        not paused. At most 8 days at a time.
+      security: [{}, { bearerAuth: [] }]
+      parameters:
+        - { name: from, in: query, required: true, schema: { type: string, format: date-time } }
+        - { name: to, in: query, required: true, schema: { type: string, format: date-time } }
+        - name: step
+          in: query
+          schema: { type: integer, enum: [15, 30, 60], default: 15 }
+      responses:
+        '200':
+          description: Open slots, earliest first
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [slots]
+                properties:
+                  slots:
+                    type: array
+                    items: { type: string, format: date-time }
         '400': { $ref: '#/components/responses/BadRequest' }
         '404': { $ref: '#/components/responses/NotFound' }
 
