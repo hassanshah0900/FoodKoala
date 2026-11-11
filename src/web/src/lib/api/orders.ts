@@ -1,6 +1,7 @@
 import { get, orNull, patch, post } from './http';
 import type {
   Order,
+  OrderReview,
   OrderStatus,
   Page,
   SalesReport,
@@ -31,6 +32,19 @@ export const getOrder = (token: string, id: string) => orNull(get<Order>(`orders
 /** What the code takes off the caller's cart now; 422 with the reason if nothing. */
 export const voucherDiscount = (token: string, code: string) =>
   get<VoucherDiscount>(`orders/vouchers/${encodeURIComponent(code)}/discount`, { token });
+
+/** The caller's orders, newest first. */
+export const myOrders = (token: string, page = 1) => get<Page<Order>>('orders', { token, query: { page, limit: 10 } });
+
+/** The order's review, or null until it is rated. */
+export const orderReview = (token: string, id: string) => orNull(get<OrderReview>(`orders/${id}/review`, { token }));
+
+/** Rates a delivered order, once; the rider only when a rider delivered it. */
+export const reviewOrder = (
+  token: string,
+  id: string,
+  review: { restaurantRating: number; riderRating: number | null; comment: string | null },
+) => post<OrderReview>(`orders/${id}/review`, review, { token });
 
 /**
  * Moves an order on (or stops it); order-service decides who may make which change.
