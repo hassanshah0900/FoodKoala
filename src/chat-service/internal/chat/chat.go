@@ -46,6 +46,104 @@ type Chat struct {
 	// When each side last read the chat: the other side's read receipts.
 	CustomerReadAt *time.Time `json:"customerReadAt" bson:"customerReadAt,omitempty"`
 	RiderReadAt    *time.Time `json:"riderReadAt" bson:"riderReadAt,omitempty"`
+	// For texting each side when a message waits too long (Nudge). Never shown.
+	CustomerPhone string `json:"-" bson:"customerPhone,omitempty"`
+	RiderPhone    string `json:"-" bson:"riderPhone,omitempty"`
+	// Since when each side has an unread message, and whether they were told about it.
+	CustomerWaiting *Waiting `json:"-" bson:"customerWaiting,omitempty"`
+	RiderWaiting    *Waiting `json:"-" bson:"riderWaiting,omitempty"`
+}
+
+// Waiting is an unread streak: messages to one side since they last read the chat.
+type Waiting struct {
+	Since  time.Time `bson:"since"`
+	Nudged bool      `bson:"nudged"`
+}
+
+// NudgeAfter is how long a message waits unread before its reader is told by SMS and in their inbox.
+// Someone with the chat open reads it at once, so they are never told.
+const NudgeAfter = time.Minute
+
+// Other is the other side of the chat.
+func Other(role string) string {
+	if role == Customer {
+		return Rider
+	}
+	return Customer
+}
+
+// Due lists the sides waiting at least NudgeAfter at `now` and not yet told, while the chat is open.
+func (c *Chat) Due(now time.Time) []string {
+	if !c.Open(now) {
+		return nil
+	}
+	var due []string
+	for role, w := range map[string]*Waiting{Customer: c.CustomerWaiting, Rider: c.RiderWaiting} {
+		if w != nil && !w.Nudged && !now.Before(w.Since.Add(NudgeAfter)) {
+			due = append(due, role)
+		}
+	}
+	slices.Sort(due)
+	return due
+}
+
+// Nudge is the data of a chat.message_waiting event (contracts/events/chat.message_waiting.schema.json).
+type Nudge struct {
+	OrderID        string `json:"orderId"`
+	RecipientID    string `json:"recipientId"`
+	RecipientRole  string `json:"recipientRole"`
+	RecipientPhone string `json:"recipientPhone"`
+	SenderRole     string `json:"senderRole"`
+	// The rider's name when the rider wrote; null when the customer did (riders don't learn customers' names).
+	SenderName     *string `json:"senderName"`
+	RestaurantName string  `json:"restaurantName"`
+	Unread         int     `json:"unread"`
+	// The latest unread message, cut to NudgePreview characters; "" for a photo without a caption.
+	Preview string    `json:"preview"`
+	Photo   bool      `json:"photo"`
+	Since   time.Time `json:"since"`
+}
+
+// NudgePreview is how much of the message an SMS repeats.
+const NudgePreview = 80
+
+// NudgeFor is the event telling `role` about the messages waiting for them; nil when there are none.
+func (c *Chat) NudgeFor(role string, msgs []Message) *Nudge {
+	w, id, phone := c.CustomerWaiting, c.CustomerID, c.CustomerPhone
+	if role == Rider {
+		w, id, phone = c.RiderWaiting, c.RiderID, c.RiderPhone
+	}
+	if w == nil || id == "" || phone == "" {
+		return nil
+	}
+	var waiting []Message
+	for _, m := range msgs {
+		if m.From != role && !m.SentAt.Before(w.Since) {
+			waiting = append(waiting, m)
+		}
+	}
+	if len(waiting) == 0 {
+		return nil
+	}
+	last := waiting[len(waiting)-1]
+	n := &Nudge{
+		OrderID: c.OrderID, RecipientID: id, RecipientRole: role, RecipientPhone: phone,
+		SenderRole: Other(role), RestaurantName: c.RestaurantName, Unread: len(waiting),
+		Preview: preview(last.Text), Photo: last.Photo != nil, Since: w.Since,
+	}
+	if n.SenderRole == Rider {
+		name := c.RiderName
+		n.SenderName = &name
+	}
+	return n
+}
+
+func preview(text string) string {
+	if utf8.RuneCountInString(text) <= NudgePreview {
+		return text
+	}
+	r := []rune(text)
+	return strings.TrimSpace(string(r[:NudgePreview-1])) + "…"
 }
 
 // RoleOf is the caller's part in the chat, or "" when they have none.
@@ -139,7 +237,9 @@ type Change struct {
 // Assignment opens the chat (or hands it to another rider).
 type Assignment struct {
 	CustomerID     string
+	CustomerPhone  string
 	RiderID        string
+	RiderPhone     string
 	RiderName      string
 	RestaurantName string
 	At             time.Time
@@ -151,7 +251,9 @@ func ChangeOf(env Envelope) (*Change, error) {
 	var e struct {
 		OrderID        string    `json:"orderId"`
 		CustomerID     string    `json:"customerId"`
+		CustomerPhone  string    `json:"customerPhone"`
 		RiderID        string    `json:"riderId"`
+		RiderPhone     string    `json:"riderPhone"`
 		RiderName      string    `json:"riderName"`
 		RestaurantName string    `json:"restaurantName"`
 		To             string    `json:"to"`
@@ -175,7 +277,8 @@ func ChangeOf(env Envelope) (*Change, error) {
 			return nil, fmt.Errorf("%w: delivery.assigned without customerId or riderId", ErrMalformed)
 		}
 		return &Change{OrderID: e.OrderID, Assign: &Assignment{
-			CustomerID: e.CustomerID, RiderID: e.RiderID, RiderName: e.RiderName,
+			CustomerID: e.CustomerID, CustomerPhone: e.CustomerPhone, RiderID: e.RiderID, RiderPhone: e.RiderPhone,
+			RiderName:      e.RiderName,
 			RestaurantName: e.RestaurantName, At: e.At,
 		}}, nil
 	case "delivery.delivered":

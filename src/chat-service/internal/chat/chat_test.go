@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 )
 
 var at = time.Date(2026, 11, 11, 12, 0, 0, 0, time.UTC)
@@ -120,5 +121,54 @@ func TestViewFor(t *testing.T) {
 	b, _ := json.Marshal(v)
 	if strings.Contains(string(b), "c1") || strings.Contains(string(b), "riderId") {
 		t.Fatalf("user ids stay private: %s", b)
+	}
+}
+
+func TestDue(t *testing.T) {
+	c := &Chat{OrderID: "o1", CustomerID: "c1", RiderID: "r1",
+		CustomerWaiting: &Waiting{Since: at}, RiderWaiting: &Waiting{Since: at.Add(30 * time.Second)}}
+	if got := c.Due(at.Add(59 * time.Second)); len(got) != 0 {
+		t.Fatalf("nobody waited a minute yet: %v", got)
+	}
+	if got := c.Due(at.Add(NudgeAfter)); len(got) != 1 || got[0] != Customer {
+		t.Fatalf("the customer is due: %v", got)
+	}
+	if got := c.Due(at.Add(2 * time.Minute)); len(got) != 2 {
+		t.Fatalf("both are due: %v", got)
+	}
+	c.CustomerWaiting.Nudged = true
+	if got := c.Due(at.Add(2 * time.Minute)); len(got) != 1 || got[0] != Rider {
+		t.Fatalf("told once: %v", got)
+	}
+	closed := at
+	c.ClosesAt = &closed
+	if got := c.Due(at.Add(2 * time.Minute)); len(got) != 0 {
+		t.Fatal("not after the chat closed")
+	}
+}
+
+func TestNudgeFor(t *testing.T) {
+	c := &Chat{OrderID: "o1", CustomerID: "c1", CustomerPhone: "+923000000023", RiderID: "r1", RiderPhone: "+923000000031",
+		RiderName: "Imran Ali", RestaurantName: "Karahi Darbar", CustomerWaiting: &Waiting{Since: at}}
+	msgs := []Message{
+		{From: Rider, Text: "old, read already", SentAt: at.Add(-time.Minute)},
+		{From: Customer, Text: "mine", SentAt: at.Add(time.Second)},
+		{From: Rider, Text: "Two minutes away", SentAt: at},
+		{From: Rider, Text: strings.Repeat("a", 100), Photo: &Photo{ID: "p1"}, SentAt: at.Add(2 * time.Second)},
+	}
+	n := c.NudgeFor(Customer, msgs)
+	if n == nil || n.RecipientID != "c1" || n.RecipientPhone != "+923000000023" || n.SenderRole != Rider ||
+		n.SenderName == nil || *n.SenderName != "Imran Ali" || n.Unread != 2 || !n.Photo || !n.Since.Equal(at) {
+		t.Fatalf("got %+v", n)
+	}
+	if utf8.RuneCountInString(n.Preview) != NudgePreview || !strings.HasSuffix(n.Preview, "…") {
+		t.Fatalf("preview cut to %d: %q", NudgePreview, n.Preview)
+	}
+	c.RiderWaiting = &Waiting{Since: at}
+	if r := c.NudgeFor(Rider, msgs); r == nil || r.SenderName != nil || r.Preview != "mine" || r.Unread != 1 {
+		t.Fatalf("riders don't learn the customer's name: %+v", r)
+	}
+	if (&Chat{CustomerID: "c1", CustomerWaiting: &Waiting{Since: at}}).NudgeFor(Customer, msgs) != nil {
+		t.Fatal("no phone, nothing to send")
 	}
 }

@@ -197,3 +197,68 @@ func TestEventsOpenHandOverAndCloseTheChat(t *testing.T) {
 		t.Fatalf("sockets reload on each real change: %v", got)
 	}
 }
+
+func TestTellingSomeoneAboutWaitingMessages(t *testing.T) {
+	s := newSetup()
+	ctx := context.Background()
+	clock := now
+	s.svc.Now = func() time.Time { return clock }
+	if _, _, err := s.svc.Send(ctx, rider, "o1", "client-0001", "Two minutes away"); err != nil {
+		t.Fatal(err)
+	}
+	clock = now.Add(30 * time.Second)
+	if n, _ := s.svc.NudgeDue(ctx); n != 0 {
+		t.Fatal("not before a minute")
+	}
+	clock = now.Add(chat.NudgeAfter)
+	if n, err := s.svc.NudgeDue(ctx); err != nil || n != 1 {
+		t.Fatalf("told the customer: %d %v", n, err)
+	}
+	if n, _ := s.svc.NudgeDue(ctx); n != 0 || len(s.repo.Outbox) != 1 {
+		t.Fatal("once per unread streak")
+	}
+	e := s.repo.Outbox[0]
+	var env struct {
+		ID   string     `json:"id"`
+		Type string     `json:"type"`
+		Data chat.Nudge `json:"data"`
+	}
+	if err := json.Unmarshal(e.Payload, &env); err != nil {
+		t.Fatal(err)
+	}
+	if e.Topic != service.NudgeTopic || e.Key != "o1" || env.ID != e.ID || env.Type != service.NudgeTopic ||
+		env.Data.RecipientID != "c1" || env.Data.Preview != "Two minutes away" || *env.Data.SenderName != "Imran Ali" {
+		t.Fatalf("got %+v %+v", e, env)
+	}
+
+	// Reading ends the streak; the next message starts a new one, told about separately.
+	if err := s.svc.Read(ctx, customer, "o1"); err != nil {
+		t.Fatal(err)
+	}
+	clock = now.Add(2 * time.Minute)
+	if _, _, err := s.svc.Send(ctx, rider, "o1", "client-0002", "I'm outside"); err != nil {
+		t.Fatal(err)
+	}
+	clock = now.Add(4 * time.Minute)
+	if n, _ := s.svc.NudgeDue(ctx); n != 1 || len(s.repo.Outbox) != 2 || s.repo.Outbox[1].ID == e.ID {
+		t.Fatalf("a new streak, a new event: %d", len(s.repo.Outbox))
+	}
+}
+
+func TestNobodyIsToldWhoReadInTime(t *testing.T) {
+	s := newSetup()
+	ctx := context.Background()
+	clock := now
+	s.svc.Now = func() time.Time { return clock }
+	if _, _, err := s.svc.Send(ctx, customer, "o1", "client-0001", "Ring the bell twice"); err != nil {
+		t.Fatal(err)
+	}
+	clock = now.Add(20 * time.Second)
+	if err := s.svc.Read(ctx, rider, "o1"); err != nil {
+		t.Fatal(err)
+	}
+	clock = now.Add(5 * time.Minute)
+	if n, _ := s.svc.NudgeDue(ctx); n != 0 || len(s.repo.Outbox) != 0 {
+		t.Fatal("the rider read it")
+	}
+}

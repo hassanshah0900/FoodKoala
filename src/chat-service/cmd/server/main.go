@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/redis/go-redis/v9"
+	"github.com/twmb/franz-go/pkg/kgo"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
@@ -24,6 +25,7 @@ import (
 	"github.com/hassanshah0900/FoodKoala/src/chat-service/internal/config"
 	"github.com/hassanshah0900/FoodKoala/src/chat-service/internal/consumer"
 	"github.com/hassanshah0900/FoodKoala/src/chat-service/internal/live"
+	"github.com/hassanshah0900/FoodKoala/src/chat-service/internal/outbox"
 	"github.com/hassanshah0900/FoodKoala/src/chat-service/internal/photos"
 	"github.com/hassanshah0900/FoodKoala/src/chat-service/internal/service"
 	"github.com/hassanshah0900/FoodKoala/src/chat-service/internal/store"
@@ -106,6 +108,16 @@ func run() error {
 		defer c.Client.Close()
 		deps.ConsumerAlive = c.Alive
 		start(func() { c.Run(ctx) })
+
+		// Telling people about messages waiting for them: found every 15 s, sent through the outbox.
+		producer, err := kgo.NewClient(kgo.SeedBrokers(cfg.KafkaBrokers...), kgo.AllowAutoTopicCreation())
+		if err != nil {
+			return err
+		}
+		defer producer.Close()
+		relay := outbox.Relay{Store: st, Publisher: outbox.KafkaPublisher{Client: producer}, Batch: 100, Every: time.Second}
+		start(func() { relay.Run(ctx) })
+		start(func() { svc.RunNudges(ctx, 15*time.Second) })
 	} else {
 		slog.Warn("KAFKA_BROKERS is not set: no events are consumed, so no chat ever opens")
 	}
