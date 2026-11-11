@@ -159,6 +159,38 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
 
+  /lookup:
+    get:
+      tags: [orders]
+      operationId: findOrdersByCode
+      summary: Orders by their short code (admin)
+      description: |
+        The short code is the first 8 hex digits of the order id in capitals
+        (`950C29C4`), as customers, restaurants and riders see it. A leading
+        `#` and any case are accepted. Codes rarely collide, so the answer
+        is a list of at most 10 orders, newest first.
+      parameters:
+        - name: code
+          in: query
+          required: true
+          schema: { type: string, examples: ['950C29C4'] }
+      responses:
+        '200':
+          description: Matching orders
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    maxItems: 10
+                    items: { $ref: '#/components/schemas/Order' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
   /restaurants/{restaurantId}/orders:
     parameters:
       - name: restaurantId

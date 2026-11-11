@@ -1,4 +1,14 @@
-import { checkoutSchema, idempotencyKeySchema, restaurantOrdersQuerySchema } from './orders.dto';
+import { checkoutSchema, codeQuerySchema, idempotencyKeySchema, restaurantOrdersQuerySchema } from './orders.dto';
+
+describe('codeQuerySchema', () => {
+  it.each(['950C29C4', '#950c29c4', ' 950c29C4 '])('reads %s as lower-case hex', (code) => {
+    expect(codeQuerySchema.parse({ code }).code).toBe('950c29c4');
+  });
+
+  it.each(['950C29C', '950C29C4A', 'ZZZZZZZZ', ''])('rejects %s', (code) => {
+    expect(codeQuerySchema.safeParse({ code }).success).toBe(false);
+  });
+});
 
 describe('idempotencyKeySchema', () => {
   it.each(['3f1c2b8a-9d10-4c55', 'checkout_12345678'])('accepts %s', (key) => {

@@ -26,6 +26,10 @@ export interface PlaceOrder {
 export const placeOrder = (token: string, key: string, order: PlaceOrder) =>
   post<Order>('orders', order, { token, headers: { 'Idempotency-Key': key } });
 
+/** Orders whose id starts with the short code people read out, newest first, at most 10 (admins). */
+export const findOrdersByCode = (token: string, code: string) =>
+  get<{ items: Order[] }>('orders/lookup', { token, query: { code } });
+
 /** The order, or null if it isn't one the caller may see. */
 export const getOrder = (token: string, id: string) => orNull(get<Order>(`orders/${id}`, { token }));
 

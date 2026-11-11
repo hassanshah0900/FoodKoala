@@ -9,6 +9,7 @@ import { deliveryOfOrder } from '@/lib/api/delivery';
 import { getOrder } from '@/lib/api/orders';
 import { paymentOfOrder } from '@/lib/api/payments';
 import { dateTime, rupees } from '@/lib/format';
+import { orderCode } from '@/lib/order-code';
 import { isUuid } from '@/lib/params';
 import { formatPhone } from '@/lib/phone';
 import { DELIVERY_STATUSES, labelOf, ORDER_EVENTS, ORDER_STATUSES, orderActions, PAYMENT_STATUSES } from '@/lib/review';
@@ -36,7 +37,7 @@ export default async function AdminOrder({ params }: { params: Promise<{ id: str
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-4">
         <div>
-          <h1 className="text-2xl font-extrabold">Order #{order.id.slice(0, 8).toUpperCase()}</h1>
+          <h1 className="text-2xl font-extrabold">Order #{orderCode(order.id)}</h1>
           <p className="text-muted">
             {order.restaurant.name} · placed {dateTime(order.placedAt)} · {formatPhone(order.customerPhone)}
           </p>

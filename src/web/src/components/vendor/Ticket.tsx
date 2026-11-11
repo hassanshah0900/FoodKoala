@@ -2,6 +2,7 @@ import { StatusBadge } from '@/components/console/StatusBadge';
 import type { Order } from '@/lib/api/types';
 import { ago, clockTime, rupees } from '@/lib/format';
 import { minutesToAnswer, readyBy } from '@/lib/kitchen';
+import { orderCode } from '@/lib/order-code';
 import { formatPhone } from '@/lib/phone';
 
 /** One order on the kitchen board: what to cook, for whom, and how long there is. */
@@ -12,7 +13,7 @@ export function Ticket({ order, now, children }: { order: Order; now: number; ch
     <article className="space-y-3 rounded-xl bg-white p-4 shadow-sm">
       <header className="flex items-start justify-between gap-2">
         <div>
-          <h3 className="font-mono font-bold">#{order.id.slice(0, 8).toUpperCase()}</h3>
+          <h3 className="font-mono font-bold">#{orderCode(order.id)}</h3>
           <p className="text-xs text-muted">
             {ago(order.placedAt, now)} · {formatPhone(order.customerPhone)}
           </p>

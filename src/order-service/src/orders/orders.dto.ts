@@ -32,6 +32,16 @@ export const statusChangeSchema = z.strictObject({
 });
 export type StatusChangeDto = z.output<typeof statusChangeSchema>;
 
+/** `?code=950C29C4` (a leading # and any case are fine), as 8 lower-case hex digits. */
+export const codeQuerySchema = z.object({
+  code: z
+    .string()
+    .trim()
+    .transform((c) => c.replace(/^#/, '').toLowerCase())
+    .pipe(z.string().regex(/^[0-9a-f]{8}$/, 'An order code is 8 letters and digits, like 950C29C4')),
+});
+export type CodeQuery = z.output<typeof codeQuerySchema>;
+
 export const pageQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(50).default(20),

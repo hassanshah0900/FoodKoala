@@ -4,6 +4,7 @@ import { StatusBadge } from '@/components/console/StatusBadge';
 import { Table } from '@/components/console/Table';
 import { restaurantOrders } from '@/lib/api/orders';
 import { dateTime, rupees } from '@/lib/format';
+import { orderCode } from '@/lib/order-code';
 import { requireOwner } from '@/lib/owner';
 import { pageParam } from '@/lib/paging';
 import { one, type Params } from '@/lib/params';
@@ -40,7 +41,7 @@ export default async function PastOrders({
           const reason = o.timeline.find((t) => t.status === o.status)?.reason;
           return (
             <tr key={o.id}>
-              <td className="font-mono font-bold">#{o.id.slice(0, 8).toUpperCase()}</td>
+              <td className="font-mono font-bold">#{orderCode(o.id)}</td>
               <td className="whitespace-nowrap text-muted">{dateTime(o.placedAt)}</td>
               <td>{o.lines.map((l) => `${l.quantity} × ${l.name}`).join(', ')}</td>
               <td className="whitespace-nowrap font-semibold">{rupees(o.subtotalPaisa)}</td>
