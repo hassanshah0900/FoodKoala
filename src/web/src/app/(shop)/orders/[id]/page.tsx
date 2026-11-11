@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { AutoRefresh } from '@/components/orders/AutoRefresh';
+import { CancelOrder } from '@/components/orders/CancelOrder';
 import { LiveTracking } from '@/components/orders/LiveTracking';
 import { OrderAgain } from '@/components/orders/OrderAgain';
 import { OrderLines } from '@/components/orders/OrderLines';
@@ -18,7 +19,7 @@ import { isUuid } from '@/lib/params';
 import { canReview, riderDelivered } from '@/lib/reviews';
 import { accessToken, requireUser } from '@/lib/session';
 import { showTracking } from '@/lib/tracking';
-import { orderAgain, rateOrder } from '../actions';
+import { cancelOrder, orderAgain, rateOrder } from '../actions';
 
 export const metadata: Metadata = { title: 'Your order' };
 
@@ -44,6 +45,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
         {!isFinal(order.status) && <AutoRefresh seconds={15} />}
         <StatusTracker order={order} withArrival={!live?.eta} />
         {live && <LiveTracking initial={live} />}
+        {order.status === 'placed' && <CancelOrder action={cancelOrder.bind(null, order.id)} />}
         {order.status === 'delivered' && (
           <section id="rate" className="space-y-4 rounded-xl bg-white p-6 shadow-sm">
             {review ? (

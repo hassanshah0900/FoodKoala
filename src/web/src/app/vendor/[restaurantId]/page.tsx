@@ -8,9 +8,10 @@ import { restaurantOrders } from '@/lib/api/orders';
 import { restaurantZones } from '@/lib/api/restaurants';
 import type { ManagedRestaurant } from '@/lib/api/types';
 import { clockTime } from '@/lib/format';
-import { board, type Column, PAUSES } from '@/lib/kitchen';
+import { board, type Column, held, isHeld, PAUSES } from '@/lib/kitchen';
 import { requireOwner } from '@/lib/owner';
 import { setupSteps } from '@/lib/restaurant-form';
+import { dayName } from '@/lib/schedule';
 import { answerOrder, setPause } from '../actions';
 
 const COLUMNS: { column: Column; title: string; empty: string }[] = [
@@ -37,8 +38,9 @@ export default async function VendorOrders({ params }: { params: Promise<{ resta
               items: menu.categories.reduce((n, c) => n + c.items.length, 0),
             }),
         );
-  const columns = board(live.items);
   const now = Date.now();
+  const columns = board(live.items.filter((o) => !isHeld(o, now)));
+  const later = held(live.items, now);
 
   return (
     <div className="space-y-6">
@@ -75,6 +77,26 @@ export default async function VendorOrders({ params }: { params: Promise<{ resta
           </section>
         ))}
       </div>
+      {later.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="flex items-center gap-2 font-bold">
+            Scheduled
+            <span className="rounded-full bg-white px-2 text-sm text-muted">{later.length}</span>
+          </h2>
+          <p className="text-sm text-muted">
+            Each one moves to New 45 minutes before it is due, and you accept it then.
+          </p>
+          <div className="grid items-start gap-6 lg:grid-cols-3">
+            {later.map((o) => (
+              <Ticket key={o.id} order={o} now={now}>
+                <p className="rounded-lg bg-brand-50 px-3 py-2 text-sm text-brand-800">
+                  To accept from {dayName(o.releaseAt, now)}, {clockTime(o.releaseAt)}
+                </p>
+              </Ticket>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

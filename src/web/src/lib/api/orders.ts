@@ -15,6 +15,8 @@ export interface PlaceOrder {
   addressId: string;
   paymentMethod: 'cod';
   note: string | null;
+  /** When it should arrive; null for as soon as possible. */
+  scheduledFor: string | null;
   voucherCode: string | null;
   tipPaisa: number;
 }

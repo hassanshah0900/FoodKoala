@@ -8,16 +8,18 @@ import { PlaceOrderForm } from '@/components/checkout/PlaceOrderForm';
 import { Section } from '@/components/checkout/Section';
 import { TipPicker } from '@/components/checkout/TipPicker';
 import { VoucherBox } from '@/components/checkout/VoucherBox';
+import { WhenPicker } from '@/components/checkout/WhenPicker';
 import { ApiError } from '@/lib/api/http';
 import { voucherDiscount } from '@/lib/api/orders';
-import { deliveryQuote, getRestaurant } from '@/lib/api/restaurants';
+import { deliveryQuote, getRestaurant, openSlots } from '@/lib/api/restaurants';
 import type { VoucherDiscount } from '@/lib/api/types';
 import { myAddresses } from '@/lib/api/users';
 import { currentCart } from '@/lib/cart';
 import { summarize } from '@/lib/cart-summary';
 import { parseCheckout } from '@/lib/checkout';
 import { currentLocation } from '@/lib/current-location';
-import { rupees } from '@/lib/format';
+import { deliveryWindow, rupees } from '@/lib/format';
+import { SLOT_STEP_MINUTES, slotWindow, whenLabel } from '@/lib/schedule';
 import { accessToken, requireUser } from '@/lib/session';
 
 export const metadata: Metadata = { title: 'Checkout' };
@@ -46,11 +48,18 @@ export default async function Checkout({
 
   const address =
     addresses.find((a) => a.id === choices.addressId) ?? addresses.find((a) => a.isDefault) ?? addresses[0];
-  const [restaurant, quote, voucher] = await Promise.all([
+  const now = Date.now();
+  const { from, to } = slotWindow(now);
+  const [restaurant, quote, voucher, slots] = await Promise.all([
     getRestaurant(cart.restaurantId),
-    address ? deliveryQuote(cart.restaurantId, address.location) : null,
+    address ? deliveryQuote(cart.restaurantId, address.location, choices.at) : null,
     checkVoucher(token, choices.voucher),
+    // Scheduling is extra: without the slots the customer can still order for now.
+    openSlots(cart.restaurantId, from, to, SLOT_STEP_MINUTES)
+      .then((r) => r?.slots ?? null)
+      .catch(() => null),
   ]);
+  const name = restaurant?.name ?? 'This restaurant';
   const delivery = quote?.deliverable ? quote.delivery : null;
   const s = summarize(cart, delivery, {
     discountPaisa: (voucher.applied as VoucherDiscount | null)?.discountPaisa,
@@ -61,12 +70,18 @@ export default async function Checkout({
   const blocked = !address
     ? 'Add an address to deliver to.'
     : !delivery
-      ? `${restaurant?.name ?? 'This restaurant'} doesn't deliver to ${address.area}.`
-      : cart.problems.length
-        ? 'Some items in your cart changed. Fix them in your cart first.'
-        : s.shortOfMinimumPaisa > 0
-          ? `Add ${rupees(s.shortOfMinimumPaisa)} more to reach the minimum order.`
-          : null;
+      ? `${name} doesn't deliver to ${address.area}.`
+      : choices.at && slots && !slots.includes(choices.at)
+        ? 'That time is no longer available. Pick another one.'
+        : quote && !quote.acceptingOrders
+          ? choices.at
+            ? `${name} isn't taking orders then. Pick another time.`
+            : `${name} isn't taking orders right now. Schedule your order for later.`
+          : cart.problems.length
+            ? 'Some items in your cart changed. Fix them in your cart first.'
+            : s.shortOfMinimumPaisa > 0
+              ? `Add ${rupees(s.shortOfMinimumPaisa)} more to reach the minimum order.`
+              : null;
 
   return (
     <div className="bg-canvas">
@@ -75,6 +90,18 @@ export default async function Checkout({
           <h1 className="text-3xl font-extrabold">Checkout</h1>
           <Section title="Delivery address">
             <AddressPicker addresses={addresses} choices={choices} selectedId={address?.id} location={location} />
+          </Section>
+          <Section title="Delivery time">
+            <WhenPicker
+              choices={choices}
+              slots={slots}
+              asap={
+                delivery && quote?.acceptingOrders !== false && !choices.at
+                  ? deliveryWindow(delivery.deliveryTimeMinutes)
+                  : null
+              }
+              now={now}
+            />
           </Section>
           <Section title="Voucher">
             <VoucherBox choices={choices} applied={voucher.applied} error={voucher.error} />
@@ -88,6 +115,8 @@ export default async function Checkout({
               addressId={address?.id}
               voucher={voucher.applied?.code ?? null}
               tipPaisa={choices.tipPaisa}
+              scheduledFor={choices.at ?? null}
+              scheduledLabel={choices.at ? whenLabel(choices.at, now) : null}
               totalPaisa={s.totalPaisa}
               blocked={blocked}
             />
