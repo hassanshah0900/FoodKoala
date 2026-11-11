@@ -1,0 +1,45 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "018b096b-5191-4825-b394-cdbf0cd81238",
+  "prevIds": [
+    "bb5d6d9d-6b42-4126-9e0a-e1fc5aef6c7d"
+  ],
+  "footprints": [
+    {
+      "statementType": "alter_enum",
+      "statementTarget": [
+        "enum",
+        "notifications",
+        "notification_kind"
+      ],
+      "writes": [
+        "s|enum|notifications.notification_kind"
+      ],
+      "reads": [
+        "n|sch|notifications"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "alter",
+      "key": "enums\u0000[\"notifications\",\"notification_kind\"]",
+      "set": {
+        "values": [
+          "order_placed",
+          "order_accepted",
+          "order_ready",
+          "order_picked_up",
+          "order_delivered",
+          "order_rejected",
+          "order_cancelled",
+          "rider_assigned",
+          "delivery_assigned",
+          "chat_message"
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+ALTER TYPE "notifications"."notification_kind" ADD VALUE 'chat_message';

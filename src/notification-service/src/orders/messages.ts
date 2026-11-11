@@ -39,6 +39,7 @@ const VEHICLE: Record<string, string> = { motorbike: 'on a motorbike', bicycle: 
  * the rider's too. Empty when there is nothing to say.
  */
 export function messagesFor(event: OrderEvent): Message[] {
+  if (event.type === 'chat.message_waiting') return [chatMessage(event.data)];
   if (event.type === 'delivery.assigned') {
     const d = event.data;
     const order = ref(d.orderId);
@@ -69,7 +70,34 @@ export function messagesFor(event: OrderEvent): Message[] {
   return m ? [m] : [];
 }
 
-function customerMessage(event: Exclude<OrderEvent, { type: 'delivery.assigned' }>): Message | null {
+type ChatWaiting = Extract<OrderEvent, { type: 'chat.message_waiting' }>['data'];
+
+/**
+ * A chat message waiting unread (chat-service only says so when the person isn't looking): an inbox
+ * entry and a text, since they may not have the app open. The customer hears the rider's name;
+ * riders hear "the customer" and the order, as they never learn customers' names.
+ */
+export function chatMessage(c: ChatWaiting): Message {
+  const order = ref(c.orderId);
+  const who = c.senderName ? c.senderName.split(' ')[0] : 'The customer';
+  const what = c.preview ? `"${c.preview}"` : c.photo ? 'a photo' : 'a message';
+  const more = c.unread > 1 ? ` (${c.unread} new messages)` : '';
+  const toRider = c.recipientRole === 'rider';
+  const sender = toRider ? `the customer of order ${order}` : `${who}, your rider,`;
+  const app = toRider ? 'the rider app' : 'the FoodKoala app';
+  return {
+    userId: c.recipientId,
+    kind: 'chat_message',
+    title: toRider ? `Message about order ${order}` : `Message from ${who}`,
+    body: `${toRider ? 'The customer' : who}: ${what}${more}`,
+    data: { orderId: c.orderId, chat: c.recipientRole },
+    sms: { phone: c.recipientPhone, body: `FoodKoala: ${sender} sent you ${what}${more}. Reply in ${app}.` },
+  };
+}
+
+function customerMessage(
+  event: Exclude<OrderEvent, { type: 'delivery.assigned' | 'chat.message_waiting' }>,
+): Message | null {
   const d = event.data;
   const base = { userId: d.customerId, data: { orderId: d.orderId } };
   const order = ref(d.orderId);

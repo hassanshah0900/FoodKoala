@@ -39,6 +39,18 @@ const assignedData = z.object({
   restaurantName: z.string().min(1),
 });
 
+/** contracts/events/chat.message_waiting.schema.json, the fields we use. */
+const chatWaitingData = z.object({
+  orderId: z.uuid(),
+  recipientId: z.uuid(),
+  recipientRole: z.enum(['customer', 'rider']),
+  recipientPhone: z.string().regex(/^\+\d{8,15}$/),
+  senderName: z.string().min(1).nullable(),
+  unread: z.int().positive(),
+  preview: z.string(),
+  photo: z.boolean(),
+});
+
 /** The envelope of contracts/README.md#event-envelope, by type. */
 export const orderEventSchema = z.discriminatedUnion('type', [
   z.object({
@@ -59,7 +71,14 @@ export const orderEventSchema = z.discriminatedUnion('type', [
     occurredAt: z.iso.datetime({ offset: true }),
     data: assignedData,
   }),
+  z.object({
+    id: z.uuid(),
+    type: z.literal('chat.message_waiting'),
+    occurredAt: z.iso.datetime({ offset: true }),
+    data: chatWaitingData,
+  }),
 ]);
 export type OrderEvent = z.infer<typeof orderEventSchema>;
 
-export const ORDER_TOPICS = ['order.placed', 'order.status_changed', 'delivery.assigned'];
+/** Everything about an order someone should hear of: its steps, its rider, and chat messages they haven't seen. */
+export const ORDER_TOPICS = ['order.placed', 'order.status_changed', 'delivery.assigned', 'chat.message_waiting'];

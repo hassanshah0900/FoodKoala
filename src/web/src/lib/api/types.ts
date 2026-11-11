@@ -401,3 +401,53 @@ export interface Tracking {
   version: number;
   updatedAt: string;
 }
+
+/** chat-service: one line of an order's chat. */
+export interface ChatMessage {
+  id: string;
+  from: 'customer' | 'rider';
+  clientId: string;
+  /** The message, or a photo's caption ('' for none). */
+  text: string;
+  photo: { id: string; contentType: string; size: number } | null;
+  sentAt: string;
+}
+
+/** chat-service: the chat between an order's customer and rider, as the caller sees it. */
+export interface ChatView {
+  orderId: string;
+  riderName: string;
+  restaurantName: string;
+  /** Set once the order is finished; it can be read but not written after. */
+  closesAt: string | null;
+  /** How far each side has read: the other side's read receipts. */
+  customerReadAt: string | null;
+  riderReadAt: string | null;
+  /** The caller's role; '' for an admin reading along. */
+  me: 'customer' | 'rider' | '';
+  open: boolean;
+  messages: ChatMessage[];
+}
+
+/** chat-service: what the chat's live socket sends. */
+export type ChatEvent =
+  | { type: 'snapshot'; chat: ChatView }
+  | { type: 'message'; message: ChatMessage }
+  | { type: 'read'; role: 'customer' | 'rider'; readAt: string };
+
+/** notification-service: one entry of the signed-in user's inbox. */
+export interface Notification {
+  id: string;
+  kind: string;
+  title: string;
+  body: string;
+  /** What to link to, e.g. `{ orderId }`; chat messages add `chat`, the reader's role. */
+  data: Record<string, string>;
+  read: boolean;
+  createdAt: string;
+}
+
+export interface NotificationPage extends Page<Notification> {
+  /** All unread notifications, not just this page's. */
+  unreadCount: number;
+}

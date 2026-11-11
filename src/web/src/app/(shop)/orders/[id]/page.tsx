@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { ChatPanel } from '@/components/chat/ChatPanel';
 import { AutoRefresh } from '@/components/orders/AutoRefresh';
 import { CancelOrder } from '@/components/orders/CancelOrder';
 import { LiveTracking } from '@/components/orders/LiveTracking';
@@ -10,6 +11,7 @@ import { ReviewForm } from '@/components/orders/ReviewForm';
 import { Stars } from '@/components/orders/Stars';
 import { StatusTracker } from '@/components/orders/StatusTracker';
 import { addressTitle } from '@/lib/addresses';
+import { getChat } from '@/lib/api/chat';
 import { getOrder, orderReview } from '@/lib/api/orders';
 import { getTracking } from '@/lib/api/tracking';
 import { rupees } from '@/lib/format';
@@ -28,11 +30,12 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   await requireUser(`/orders/${id}`);
   if (!isUuid(id)) notFound();
   const token = (await accessToken())!;
-  const [order, review, tracking] = await Promise.all([
+  const [order, review, tracking, chat] = await Promise.all([
     getOrder(token, id),
     orderReview(token, id),
-    // The map is extra: if tracking-service is down the order page still shows.
+    // The map and the chat are extra: if their services are down the order page still shows.
     getTracking(token, id).catch(() => null),
+    getChat(token, id).catch(() => null),
   ]);
   if (!order) notFound();
   const a = order.deliveryAddress;
@@ -45,6 +48,9 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
         {!isFinal(order.status) && <AutoRefresh seconds={15} />}
         <StatusTracker order={order} withArrival={!live?.eta} />
         {live && <LiveTracking initial={live} />}
+        {chat && (chat.open || chat.messages.length > 0) && (
+          <ChatPanel initial={chat} title={`Chat with ${chat.riderName.split(' ')[0]}`} />
+        )}
         {order.status === 'placed' && <CancelOrder action={cancelOrder.bind(null, order.id)} />}
         {order.status === 'delivered' && (
           <section id="rate" className="space-y-4 rounded-xl bg-white p-6 shadow-sm">

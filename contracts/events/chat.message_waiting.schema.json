@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "chat.message_waiting",
+  "title": "ChatMessageWaiting",
+  "description": "`data` of the chat.message_waiting event: someone has had a chat message from the other side of their order unread for a minute. Sent once per unread streak (until they read the chat), never to someone who has the chat open. notification-service tells them in their inbox and by SMS. Keyed by orderId.",
+  "type": "object",
+  "required": [
+    "orderId",
+    "recipientId",
+    "recipientRole",
+    "recipientPhone",
+    "senderRole",
+    "senderName",
+    "restaurantName",
+    "unread",
+    "preview",
+    "photo",
+    "since"
+  ],
+  "properties": {
+    "orderId": { "type": "string", "format": "uuid" },
+    "recipientId": { "type": "string", "format": "uuid" },
+    "recipientRole": { "type": "string", "enum": ["customer", "rider"] },
+    "recipientPhone": { "type": "string", "description": "E.164" },
+    "senderRole": { "type": "string", "enum": ["customer", "rider"] },
+    "senderName": {
+      "type": ["string", "null"],
+      "description": "The rider's name when the rider wrote; null when the customer did (riders don't learn customers' names)"
+    },
+    "restaurantName": { "type": "string" },
+    "unread": { "type": "integer", "minimum": 1, "description": "Messages waiting" },
+    "preview": {
+      "type": "string",
+      "maxLength": 80,
+      "description": "The latest waiting message, cut to 80 characters; empty for a photo without a caption"
+    },
+    "photo": { "type": "boolean", "description": "The latest waiting message is a photo" },
+    "since": { "type": "string", "format": "date-time", "description": "When the first waiting message was sent" }
+  }
+}

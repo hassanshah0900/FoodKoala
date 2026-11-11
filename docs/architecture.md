@@ -36,6 +36,7 @@ user roles.
 | `notification-service` | NestJS | 3007 | SMS, WhatsApp, push, email (Urdu / English) | MongoDB |
 | `delivery-service` | Go | 8081 | Rider shifts, availability, assignment, COD cash ledger | PostgreSQL, Redis (geo) |
 | `tracking-service` | Go | 8082 | Live rider location over WebSockets, ETA | Redis |
+| `chat-service` | Go | 8083 | Customer–rider chat with photos and read receipts, live over WebSockets | MongoDB, Redis, S3 |
 | `payment-service` | FastAPI | 8001 | COD, JazzCash, Easypaisa, cards, refunds, wallet | PostgreSQL |
 | `search-service` | FastAPI | 8002 | Restaurant and dish search, ranking | Elasticsearch |
 
