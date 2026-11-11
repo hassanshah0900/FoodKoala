@@ -11,7 +11,14 @@ export function AddableItem({ item, restaurantId }: { item: MenuItem; restaurant
   if (!item.isAvailable) return <MenuItemCard item={item} />;
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className="block w-full text-left" aria-haspopup="dialog">
+      {/* Named outright: a button's name isn't taken from the card's article, so it would be read as just "button". */}
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="block w-full text-left"
+        aria-haspopup="dialog"
+        aria-label={`Add ${item.name}`}
+      >
         <MenuItemCard item={item} addable />
       </button>
       {open && <ItemSheet item={item} restaurantId={restaurantId} onClose={() => setOpen(false)} />}
