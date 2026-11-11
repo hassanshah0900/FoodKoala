@@ -1,0 +1,345 @@
+openapi: 3.1.0
+info:
+  title: chat-service
+  version: 0.1.0
+  description: |
+    The customer and the rider bringing their order talk: text, photos
+    ("left it at the gate") and read receipts, live.
+
+    **When a chat exists.** It opens when a rider is assigned
+    (`delivery.assigned`). If the delivery is handed to another rider, the
+    new rider takes over the chat and the first one loses it. It closes an
+    hour after the order is delivered, rejected or cancelled
+    (`delivery.delivered`, `order.status_changed`), and can be read
+    but not written after that. An order called off before any rider has
+    no chat.
+
+    **Who sees what.** The customer and the current rider read and write.
+    Admins can read along (to help when something went wrong) but not
+    write. Anyone else gets 404, as for an order with no chat.
+
+    **Sending twice.** Each message carries a `clientId` the app chooses.
+    Sending the same `clientId` again (a retry after a lost answer)
+    returns the first message with 200 instead of adding another.
+
+    **Photos** are JPEG, PNG or WebP up to 5 MB, kept in a private bucket
+    and served only through `GET /orders/{orderId}/photos/{photoId}` to
+    the people who may read the chat.
+
+    **Live.** `GET /orders/{orderId}/live` is a WebSocket (subprotocol
+    `foodkoala.chat.v1`). It sends a `snapshot` (the whole chat) first,
+    then each `message` and `read` as it happens, and a new `snapshot`
+    whenever it has to catch up (after a handover, the chat closing, or
+    falling behind). Clients send through the HTTP API, not the socket.
+    A rider who loses the chat has their socket closed with 1008.
+    Through api-gateway, send the access token as the subprotocol
+    `bearer.<token>` next to `foodkoala.chat.v1`
+    (contracts/README.md#websockets).
+servers:
+  - url: http://localhost:8080/api/v1/chat
+    description: Through api-gateway
+  - url: http://localhost:8083
+    description: Service directly (send the identity headers yourself)
+security:
+  - bearerAuth: []
+tags:
+  - name: chat
+    description: Messages between a customer and their rider
+  - name: health
+    description: Liveness and readiness probes
+paths:
+  /orders/{orderId}:
+    parameters:
+      - $ref: '#/components/parameters/OrderId'
+    get:
+      tags: [chat]
+      operationId: getChat
+      summary: The chat and its latest 200 messages
+      responses:
+        '200':
+          description: Chat
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Chat' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /orders/{orderId}/messages:
+    parameters:
+      - $ref: '#/components/parameters/OrderId'
+    post:
+      tags: [chat]
+      operationId: sendMessage
+      summary: Send a text message (customer or rider)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [clientId, text]
+              additionalProperties: false
+              properties:
+                clientId: { $ref: '#/components/schemas/ClientId' }
+                text: { type: string, minLength: 1, maxLength: 1000, description: Trimmed; at most 1000 characters }
+      responses:
+        '201': { $ref: '#/components/responses/Sent' }
+        '200': { $ref: '#/components/responses/Resent' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/AdminsRead' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Closed' }
+  /orders/{orderId}/photos:
+    parameters:
+      - $ref: '#/components/parameters/OrderId'
+    post:
+      tags: [chat]
+      operationId: sendPhoto
+      summary: Send a photo, with an optional caption (customer or rider)
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [clientId, photo]
+              properties:
+                clientId: { $ref: '#/components/schemas/ClientId' }
+                caption: { type: string, maxLength: 1000 }
+                photo: { type: string, format: binary, description: 'JPEG, PNG or WebP, up to 5 MB' }
+      responses:
+        '201': { $ref: '#/components/responses/Sent' }
+        '200': { $ref: '#/components/responses/Resent' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/AdminsRead' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Closed' }
+        '413':
+          description: Over 5 MB
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '503':
+          description: Photos are turned off (no storage configured)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /orders/{orderId}/photos/{photoId}:
+    parameters:
+      - $ref: '#/components/parameters/OrderId'
+      - name: photoId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [chat]
+      operationId: getPhoto
+      summary: A photo of the chat (anyone who may read it)
+      responses:
+        '200':
+          description: The image, cacheable privately
+          content:
+            image/jpeg: { schema: { type: string, format: binary } }
+            image/png: { schema: { type: string, format: binary } }
+            image/webp: { schema: { type: string, format: binary } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /orders/{orderId}/read:
+    parameters:
+      - $ref: '#/components/parameters/OrderId'
+    post:
+      tags: [chat]
+      operationId: markRead
+      summary: I have read the chat up to now (the other side sees it as read)
+      description: Sending a message marks the chat read too. Admins leave no mark.
+      responses:
+        '204': { description: Marked }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /orders/{orderId}/live:
+    parameters:
+      - $ref: '#/components/parameters/OrderId'
+    get:
+      tags: [chat]
+      operationId: watchChat
+      summary: WebSocket of the chat's events
+      description: |
+        Upgrade with subprotocol `foodkoala.chat.v1`. Every text message is
+        a `ChatEvent` as JSON. The server pings every 30 seconds. The checks
+        below are answered before the upgrade, as plain HTTP.
+      responses:
+        '101':
+          description: Switching to the WebSocket; messages are ChatEvent
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ChatEvent' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '426':
+          description: Not a WebSocket upgrade
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /healthz:
+    get:
+      tags: [health]
+      operationId: healthz
+      summary: Liveness
+      security: []
+      responses:
+        '200': { $ref: '#/components/responses/Ok' }
+  /readyz:
+    get:
+      tags: [health]
+      operationId: readyz
+      summary: Readiness (MongoDB, Redis and photo storage answer; the event consumer runs)
+      security: []
+      responses:
+        '200': { $ref: '#/components/responses/Ok' }
+        '503':
+          description: Not ready
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Access token from auth-service, verified by api-gateway.
+  parameters:
+    OrderId:
+      name: orderId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+  responses:
+    Ok:
+      description: OK
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              status: { type: string, const: ok }
+    Sent:
+      description: Sent
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Message' }
+    Resent:
+      description: A retry of a message already sent (same clientId); the first one
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Message' }
+    BadRequest:
+      description: A malformed id, clientId or body, an empty or too long message, or a file that isn't a photo
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unauthorized:
+      description: No authenticated user
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: No chat for this order, or not one the caller can see
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    AdminsRead:
+      description: Admins read chats but don't write in them
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Closed:
+      description: The chat has closed
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+  schemas:
+    ClientId:
+      type: string
+      pattern: '^[A-Za-z0-9_-]{8,64}$'
+      description: Chosen by the app per message, reused when retrying it
+    Role:
+      type: string
+      enum: [customer, rider]
+    Photo:
+      type: object
+      required: [id, contentType, size]
+      properties:
+        id: { type: string, format: uuid }
+        contentType: { type: string, enum: [image/jpeg, image/png, image/webp] }
+        size: { type: integer, description: Bytes }
+    Message:
+      type: object
+      required: [id, from, clientId, text, photo, sentAt]
+      properties:
+        id: { type: string, format: uuid }
+        from: { $ref: '#/components/schemas/Role' }
+        clientId: { $ref: '#/components/schemas/ClientId' }
+        text: { type: string, description: "The message, or a photo's caption (empty for none)" }
+        photo:
+          oneOf:
+            - $ref: '#/components/schemas/Photo'
+            - type: 'null'
+        sentAt: { type: string, format: date-time }
+    Chat:
+      type: object
+      required: [orderId, riderName, restaurantName, closesAt, customerReadAt, riderReadAt, me, open, messages]
+      properties:
+        orderId: { type: string, format: uuid }
+        riderName: { type: string }
+        restaurantName: { type: string }
+        closesAt:
+          type: [string, 'null']
+          format: date-time
+          description: Set once the order is finished; null while it is under way
+        customerReadAt:
+          type: [string, 'null']
+          format: date-time
+          description: How far the customer has read (the rider's read receipt)
+        riderReadAt:
+          type: [string, 'null']
+          format: date-time
+          description: How far the rider has read (the customer's read receipt)
+        me:
+          type: string
+          enum: [customer, rider, '']
+          description: The caller's role; '' for an admin reading along
+        open: { type: boolean, description: Messages can be sent now }
+        messages:
+          type: array
+          description: The latest 200, oldest first
+          items: { $ref: '#/components/schemas/Message' }
+    ChatEvent:
+      type: object
+      required: [type]
+      properties:
+        type: { type: string, enum: [snapshot, message, read] }
+        chat:
+          description: With `snapshot`
+          $ref: '#/components/schemas/Chat'
+        message:
+          description: With `message`
+          $ref: '#/components/schemas/Message'
+        role:
+          description: With `read`, whose mark moved
+          $ref: '#/components/schemas/Role'
+        readAt:
+          type: string
+          format: date-time
+          description: With `read`
+    Error:
+      type: object
+      required: [statusCode, message]
+      properties:
+        statusCode: { type: integer }
+        error: { type: string }
+        message: { type: string }
