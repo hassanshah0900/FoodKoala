@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { AutoRefresh } from '@/components/orders/AutoRefresh';
+import { LiveTracking } from '@/components/orders/LiveTracking';
 import { OrderAgain } from '@/components/orders/OrderAgain';
 import { OrderLines } from '@/components/orders/OrderLines';
 import { ReviewForm } from '@/components/orders/ReviewForm';
@@ -9,11 +10,13 @@ import { Stars } from '@/components/orders/Stars';
 import { StatusTracker } from '@/components/orders/StatusTracker';
 import { addressTitle } from '@/lib/addresses';
 import { getOrder, orderReview } from '@/lib/api/orders';
+import { getTracking } from '@/lib/api/tracking';
 import { rupees } from '@/lib/format';
 import { isFinal } from '@/lib/order-status';
 import { isUuid } from '@/lib/params';
 import { canReview, riderDelivered } from '@/lib/reviews';
 import { accessToken, requireUser } from '@/lib/session';
+import { showTracking } from '@/lib/tracking';
 import { orderAgain, rateOrder } from '../actions';
 
 export const metadata: Metadata = { title: 'Your order' };
@@ -23,16 +26,23 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   await requireUser(`/orders/${id}`);
   if (!isUuid(id)) notFound();
   const token = (await accessToken())!;
-  const [order, review] = await Promise.all([getOrder(token, id), orderReview(token, id)]);
+  const [order, review, tracking] = await Promise.all([
+    getOrder(token, id),
+    orderReview(token, id),
+    // The map is extra: if tracking-service is down the order page still shows.
+    getTracking(token, id).catch(() => null),
+  ]);
   if (!order) notFound();
   const a = order.deliveryAddress;
   const withRider = riderDelivered(order);
+  const live = !isFinal(order.status) && tracking && showTracking(tracking) ? tracking : null;
 
   return (
     <div className="bg-canvas">
       <div className="mx-auto max-w-3xl space-y-6 px-4 py-8">
         {!isFinal(order.status) && <AutoRefresh seconds={15} />}
-        <StatusTracker order={order} />
+        <StatusTracker order={order} withArrival={!live?.eta} />
+        {live && <LiveTracking initial={live} />}
         {order.status === 'delivered' && (
           <section id="rate" className="space-y-4 rounded-xl bg-white p-6 shadow-sm">
             {review ? (

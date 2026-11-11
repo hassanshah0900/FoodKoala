@@ -62,6 +62,16 @@ export const patch = <T>(path: string, body: unknown, opts?: Omit<RequestOptions
 export const refusal = (err: unknown): string | null =>
   err instanceof ApiError && err.status < 500 ? err.message : null;
 
+/**
+ * Opens a WebSocket to /api/v1/<path> as the user. The token goes as the subprotocol `bearer.<token>`
+ * next to the real one, which is how the gateway takes it on sockets (contracts/README.md#websockets).
+ */
+export function socket(path: string, protocol: string, token: string): WebSocket {
+  const url = new URL(`/api/v1/${path}`, API_URL);
+  url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+  return new WebSocket(url, [protocol, `bearer.${token}`]);
+}
+
 /** The value, or null when the gateway says 404. */
 export async function orNull<T>(pending: Promise<T>): Promise<T | null> {
   try {

@@ -106,6 +106,10 @@ or about to expire it trades the refresh token for a new pair, setting the cooki
 render already uses them) and the response. A refresh token that auth-service refuses signs the user out.
 `lib/session.ts` gives pages `currentUser()`, `accessToken()`, `requireUser()` and `requireAdmin()`.
 
+**Live tracking.** The order page's map listens to `/orders/<id>/live`, a route that holds the WebSocket to
+tracking-service on the server and passes each update on as a Server-Sent Event. The token goes no further than
+the Next.js server, so it stays out of the page's scripts. The map is Leaflet with OpenStreetMap tiles, loaded only in the browser.
+
 ## Layout
 
 | Folder            | What it holds                                                                                                     |

@@ -380,3 +380,20 @@ export interface Favourite {
   addedAt: string;
   restaurant: Restaurant | null;
 }
+
+/** tracking-service: where the order is now. */
+export interface Tracking {
+  orderId: string;
+  status: 'waiting_for_rider' | 'to_restaurant' | 'to_customer' | 'delivered' | 'cancelled';
+  restaurant: Point | null;
+  dropoff: Point | null;
+  rider: { id: string; name: string; phone: string; vehicle: Rider['vehicle'] } | null;
+  riderLocation: (Point & { at: string }) | null;
+  /** Road distance the rider still has to ride; null before their first position. */
+  remainingMeters: number | null;
+  /** When the rider should reach the door; null before their first position and once finished. */
+  eta: string | null;
+  /** Goes up with every change; a lower one is stale. */
+  version: number;
+  updatedAt: string;
+}
