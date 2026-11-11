@@ -16,7 +16,8 @@
 
    Example: `feat/order-place-order`, `fix/cart-total-rounding`.
 3. Commit using Conventional Commits (below), push, and open a pull request.
-4. CI must pass (see [docs/ci.md](docs/ci.md)). The PR is reviewed and **squash-merged** by the maintainer.
+4. CI must pass (see [docs/ci.md](docs/ci.md)). The PR is reviewed and merged by the maintainer with a
+   **merge commit**, which keeps the branch's commits (one per service) in the history.
 5. Delete the branch after merging.
 
 ## Conventional Commits

@@ -1,0 +1,102 @@
+name: e2e
+
+# The main journeys through the whole stack, in a real browser: every service
+# built from this commit, started with compose, driven by Playwright (e2e/).
+# Runs whenever anything that can break a journey changes.
+
+on:
+  pull_request:
+    branches: [main]
+    paths: &paths
+      - src/**
+      - deploy/compose/**
+      - e2e/**
+      - Makefile
+      - .github/workflows/e2e.yml
+  push:
+    branches: [main]
+    paths: *paths
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NO_UPDATE_NOTIFIER: '1'
+  npm_config_fund: 'false'
+
+jobs:
+  check:
+    name: Format, lint, types
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: e2e
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: e2e/package-lock.json
+      - run: npm ci
+      - run: npm run format:check
+      - run: npm run lint
+      - run: npm run typecheck
+
+  journeys:
+    name: Journeys
+    needs: check
+    runs-on: ubuntu-latest
+    # Building every image is most of it; the tests themselves take a few minutes.
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: e2e/package-lock.json
+
+      - name: Install Playwright and Chromium
+        working-directory: e2e
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      # The same command as locally; --wait returns once every service is healthy.
+      - name: Start the stack
+        run: make e2e-up
+
+      - name: Run the journeys
+        working-directory: e2e
+        run: npx playwright test
+
+      # Traces and screenshots of what failed; open with `npx playwright show-report`.
+      - name: Keep the report
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: playwright-report
+          path: |
+            e2e/playwright-report
+            e2e/test-results
+          retention-days: 7
+
+      - name: Service logs
+        if: failure()
+        run: make e2e-logs > services.log 2>&1 || true
+
+      - name: Keep the service logs
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: service-logs
+          path: services.log
+          retention-days: 7

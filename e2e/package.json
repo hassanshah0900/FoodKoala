@@ -1,0 +1,19 @@
+{
+  "name": "e2e",
+  "private": true,
+  "description": "End-to-end tests: the main journeys through the whole stack, in a real browser.",
+  "type": "module",
+  "scripts": {
+    "test": "playwright test",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome lint .",
+    "format": "biome check --write .",
+    "format:check": "biome check --linter-enabled=false ."
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.6",
+    "@playwright/test": "1.65.0",
+    "@types/node": "24.19.2",
+    "typescript": "7.0.2"
+  }
+}

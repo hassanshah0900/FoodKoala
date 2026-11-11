@@ -5,6 +5,7 @@
     "includes": [
       "src/*-service/**",
       "src/web/**",
+      "e2e/**",
       "!**/node_modules",
       "!**/dist",
       "!**/.next",

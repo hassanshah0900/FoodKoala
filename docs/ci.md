@@ -13,6 +13,7 @@ and so does `main` itself after a merge. All of it lives in `.github/workflows/`
 ├── ci-order-service.yml  ┐  one per service: *when* to run and *what the tests need*,
 ├── ci-...-service.yml    │  then `uses:` the language file with those inputs
 ├── contracts.yml            OpenAPI documents and event schemas in contracts/
+├── e2e.yml                  the main journeys, in a browser, on the whole stack
 └── commitlint.yml           commit messages of the PR
 ```
 
@@ -90,6 +91,21 @@ document against the spec and its recommended rules (errors fail, warnings
 are printed), and `check-jsonschema` checks each event schema against the
 JSON Schema metaschema. Both catch what a YAML or JSON parser lets through,
 like an unquoted `description: a, b` in `{ ... }`, which becomes two keys.
+
+## End-to-end journeys
+
+`e2e.yml` runs whenever anything under `src/`, `deploy/compose/` or `e2e/`
+changes. Its first job checks the tests' own code (format, lint, types). The
+second builds every service from the commit and starts the stack with
+`make e2e-up`, exactly as locally. That is the everyday compose stack with
+`e2e/compose.yml` on top, which swaps Twilio for a fake SMS service the tests
+read login codes from. Then Playwright drives Chromium through the journeys in
+`e2e/tests/`.
+
+Building every image takes most of the time, so this is the slowest check. When
+a journey fails, the run keeps the Playwright report (a trace and a screenshot
+of each failure, opened with `npx playwright show-report`) and every service's
+logs as artifacts.
 
 ## Tools and their config
 
