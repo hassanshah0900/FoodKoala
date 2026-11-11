@@ -13,6 +13,13 @@ export class ApiError extends Error {
   }
 }
 
+/** A non-2xx answer as an ApiError, with the service's message. */
+async function failure(res: Response): Promise<ApiError> {
+  const body = (await res.json().catch(() => null)) as { message?: string | string[] } | null;
+  const message = Array.isArray(body?.message) ? body.message.join('; ') : (body?.message ?? res.statusText);
+  return new ApiError(res.status, message);
+}
+
 type Query = Record<string, string | number | undefined>;
 
 export interface RequestOptions {
@@ -40,12 +47,27 @@ export async function request<T>(method: string, path: string, opts: RequestOpti
     body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
     ...(cacheable ? { next: { revalidate: opts.revalidate } } : { cache: 'no-store' }),
   });
-  if (!res.ok) {
-    const body = (await res.json().catch(() => null)) as { message?: string | string[] } | null;
-    const message = Array.isArray(body?.message) ? body.message.join('; ') : (body?.message ?? res.statusText);
-    throw new ApiError(res.status, message);
-  }
+  if (!res.ok) throw await failure(res);
   return res.status === 204 ? (undefined as T) : ((await res.json()) as T);
+}
+
+/**
+ * Calls /api/v1/<path> with a body as it is (e.g. FormData for an upload) and returns the raw
+ * answer, for bodies that aren't JSON either way (photos). Non-2xx answers throw ApiError.
+ */
+export async function requestRaw(
+  method: string,
+  path: string,
+  opts: { token: string; body?: BodyInit },
+): Promise<Response> {
+  const res = await fetch(new URL(`/api/v1/${path}`, API_URL), {
+    method,
+    headers: { authorization: `Bearer ${opts.token}` },
+    body: opts.body,
+    cache: 'no-store',
+  });
+  if (!res.ok) throw await failure(res);
+  return res;
 }
 
 export const get = <T>(path: string, opts?: Omit<RequestOptions, 'body'>) => request<T>('GET', path, opts);

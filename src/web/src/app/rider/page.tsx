@@ -1,9 +1,11 @@
 import type { Metadata } from 'next';
+import { ChatPanel } from '@/components/chat/ChatPanel';
 import { AutoRefresh } from '@/components/orders/AutoRefresh';
 import { ApplyForm } from '@/components/rider/ApplyForm';
 import { DeliveryCard } from '@/components/rider/DeliveryCard';
 import { LocationBeacon } from '@/components/rider/LocationBeacon';
 import { ShiftSwitch } from '@/components/rider/ShiftSwitch';
+import { getChat } from '@/lib/api/chat';
 import { myDelivery, myRider } from '@/lib/api/delivery';
 import { accessToken, requireUser } from '@/lib/session';
 
@@ -48,6 +50,8 @@ export default async function RiderHome() {
   }
 
   const delivery = rider.online ? await myDelivery(token) : null;
+  // The chat is extra: if chat-service is down the delivery still shows.
+  const chat = delivery ? await getChat(token, delivery.orderId).catch(() => null) : null;
   return (
     <>
       {rider.online && <LocationBeacon />}
@@ -64,7 +68,10 @@ export default async function RiderHome() {
         />
       </div>
       {delivery ? (
-        <DeliveryCard delivery={delivery} />
+        <>
+          <DeliveryCard delivery={delivery} />
+          {chat && <ChatPanel key={chat.orderId} initial={chat} title="Chat with the customer" />}
+        </>
       ) : (
         rider.online && (
           <section className="rounded-2xl bg-white p-8 text-center shadow-sm">

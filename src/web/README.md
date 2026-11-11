@@ -110,6 +110,12 @@ render already uses them) and the response. A refresh token that auth-service re
 tracking-service on the server and passes each update on as a Server-Sent Event. The token goes no further than
 the Next.js server, so it stays out of the page's scripts. The map is Leaflet with OpenStreetMap tiles, loaded only in the browser.
 
+**Chat.** The order page and the rider app show the chat between the customer and the rider (chat-service).
+The browser talks only to the app's routes under `/chat/<orderId>/`: `live` relays the chat's WebSocket as
+Server-Sent Events, the same way tracking does (`lib/socket-relay.ts`), and `messages`, `photos`, `photos/<id>`
+and `read` pass on to chat-service with the token from the cookie. Photos are shrunk in the browser to at most
+1600 px (JPEG) before they are sent, and are only ever served through the app to the people in the chat.
+
 **Address pins.** New addresses get a map pin the customer drags to their door, a "Use my location" button, and a
 search for a street or block. Searches go through `/places`, which asks a Nominatim geocoder: the public
 OpenStreetMap one by default, or the one `GEOCODER_URL` points at. The public one allows about a search a second,
