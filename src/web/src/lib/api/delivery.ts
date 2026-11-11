@@ -66,3 +66,10 @@ export const myDelivery = (token: string) => orNull(get<OrderDelivery>('delivery
 /** I have the food, I've handed it over, or I hand an assigned delivery back. */
 export const deliveryStep = (token: string, id: string, step: 'pickup' | 'dropoff' | 'decline') =>
   post<OrderDelivery | undefined>(`delivery/deliveries/${id}/${step}`, undefined, { token });
+
+/** What the rider earned in [from, to), and their balance with FoodKoala now. */
+export const myEarnings = (token: string, from: string, to: string) =>
+  get<Earnings>('delivery/riders/me/earnings', { token, query: { from, to } });
+
+export const mySettlements = (token: string, page = 1) =>
+  get<Page<Settlement>>('delivery/riders/me/settlements', { token, query: { page } });

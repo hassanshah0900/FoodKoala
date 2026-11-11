@@ -20,7 +20,7 @@ export const pktDate = (ms: number) => new Date(ms + PKT).toISOString().slice(0,
  * Today and the days before it, `days` in all, from midnight in Pakistan to now;
  * and the stretch of the same length just before, to compare with.
  */
-export function periodOf(days: PeriodDays, now = Date.now()) {
+export function periodOf(days: number, now = Date.now()) {
   const from = Date.parse(`${pktDate(now)}T00:00:00+05:00`) - (days - 1) * DAY;
   const length = now - from;
   const iso = (ms: number) => new Date(ms).toISOString();

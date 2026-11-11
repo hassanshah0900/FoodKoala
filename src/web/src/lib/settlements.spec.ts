@@ -20,5 +20,7 @@ describe('settling with a rider', () => {
     expect(netText(25000)).toBe('FoodKoala owes the rider Rs 250');
     expect(netText(-90000)).toBe('The rider owes FoodKoala Rs 900');
     expect(netText(0)).toBe('All settled');
+    expect(netText(25000, 'rider')).toBe('FoodKoala owes you Rs 250');
+    expect(netText(-90000, 'rider')).toBe('You owe FoodKoala Rs 900');
   });
 });
