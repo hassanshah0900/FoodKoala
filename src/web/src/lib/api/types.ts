@@ -364,3 +364,19 @@ export interface OrderReview {
   comment: string | null;
   createdAt: string;
 }
+
+/** Profile in user-service.yaml. */
+export interface Profile {
+  id: string;
+  phone: string;
+  name: string | null;
+  email: string | null;
+  preferredLanguage: 'en' | 'ur';
+}
+
+/** Favourite in user-service.yaml; `restaurant` is null while it isn't listed (e.g. suspended). */
+export interface Favourite {
+  restaurantId: string;
+  addedAt: string;
+  restaurant: Restaurant | null;
+}

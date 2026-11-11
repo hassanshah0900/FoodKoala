@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { FavouriteButton } from '@/components/account/FavouriteButton';
 import { BikeIcon, ChevronRightIcon, ClockIcon, MapIcon } from '@/components/icons';
 import { Cover } from '@/components/restaurants/Cover';
 import { RatingLabel } from '@/components/restaurants/RatingLabel';
@@ -53,6 +54,8 @@ export function RestaurantHeader(props: {
   restaurant: Restaurant;
   quote: DeliveryQuote | null;
   location: DeliveryLocation | null;
+  /** Whether it is among the customer's favourites; null for a guest. */
+  favourite: boolean | null;
 }) {
   const { restaurant: r } = props;
   return (
@@ -73,7 +76,7 @@ export function RestaurantHeader(props: {
           cuisine={r.cuisines[0]}
           className="size-24 shrink-0 rounded-xl text-4xl md:size-28"
         />
-        <div className="min-w-0 space-y-2">
+        <div className="min-w-0 flex-1 space-y-2">
           <p className="text-sm text-muted">{r.cuisines.map(cuisineLabel).join(' · ')}</p>
           <h1 className="text-3xl font-extrabold md:text-4xl">{r.name}</h1>
           <div className="flex flex-wrap items-center gap-3 text-sm">
@@ -83,6 +86,7 @@ export function RestaurantHeader(props: {
             </span>
           </div>
         </div>
+        <FavouriteButton restaurantId={r.id} favourite={props.favourite} />
       </div>
       {r.description && <p className="max-w-3xl text-sm text-muted">{r.description}</p>}
       <DeliveryFacts quote={props.quote} location={props.location} />
