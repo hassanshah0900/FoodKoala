@@ -1,6 +1,6 @@
 import { ConflictException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectDrizzle } from '@nestjs/drizzle';
-import { and, asc, desc, eq, inArray, lt, type SQL } from 'drizzle-orm';
+import { and, asc, between, desc, eq, inArray, lt, type SQL } from 'drizzle-orm';
 import { CartClient, RestaurantClient, UserClient } from '../clients/clients';
 import { APP_CONFIG, type AppConfig } from '../config/config';
 import type { Database, Tx } from '../db/database';
@@ -22,7 +22,11 @@ import { checkCart, draftOrder, withDiscount } from './checkout';
 import { orderPlaced, orderStatusChanged } from './events';
 import { decide, estimateOnAccept, LABEL, needsOwnership, ruleFor } from './lifecycle';
 import { type Order, type Page, toOrder } from './order.view';
+import { codeRange } from './order-code';
 import type { CheckoutDto, PageQuery, RestaurantOrdersQuery, StatusChangeDto } from './orders.dto';
+
+/** At most this many orders share a code in the answer; with 8 hex digits two are already rare. */
+export const CODE_MATCHES = 10;
 
 /** How many unanswered orders one transaction rejects. */
 export const REJECT_BATCH = 50;
@@ -128,6 +132,17 @@ export class OrdersService {
       query.status ? inArray(orders.status, query.status) : undefined,
     );
     return this.page(where!, query.page, query.limit);
+  }
+
+  /** The orders whose id starts with `code` (admins), newest first. */
+  async findByCode(code: string): Promise<{ items: Order[] }> {
+    const rows = await this.db
+      .select()
+      .from(orders)
+      .where(between(orders.id, ...codeRange(code)))
+      .orderBy(desc(orders.placedAt))
+      .limit(CODE_MATCHES);
+    return { items: await this.views(this.db, rows) };
   }
 
   /** The order, if the caller placed it, owns its restaurant or is an admin; 404 otherwise. */

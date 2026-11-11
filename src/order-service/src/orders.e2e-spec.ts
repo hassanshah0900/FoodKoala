@@ -161,6 +161,27 @@ describe('order-service (e2e)', () => {
     expect(mine.body).toMatchObject({ items: [{ id: order.id }], page: 1, hasMore: false });
   });
 
+  it('finds orders by their short code for admins only', async () => {
+    const s = scenario();
+    const order = await place(s);
+    const code = order.id.slice(0, 8).toUpperCase();
+
+    const found = await http
+      .get('/lookup')
+      .query({ code: `#${code}` })
+      .set(admin)
+      .expect(200);
+    expect(found.body.items.map((o: { id: string }) => o.id)).toEqual([order.id]);
+    const none = await http
+      .get('/lookup')
+      .query({ code: code === 'FFFFFFFF' ? '00000000' : 'FFFFFFFF' })
+      .set(admin);
+    expect(none.body.items.every((o: { id: string }) => !o.id.startsWith(order.id.slice(0, 8)))).toBe(true);
+
+    await http.get('/lookup').query({ code }).set(s.customer).expect(403);
+    await http.get('/lookup').query({ code: 'nope' }).set(admin).expect(400);
+  });
+
   it('lists a restaurant’s orders by status for its owner', async () => {
     const s = scenario();
     const first = await place(s);

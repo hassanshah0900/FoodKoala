@@ -13,10 +13,12 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import type { Response } from 'express';
-import { CurrentUser, type Identity, IdentityGuard } from '../identity/identity';
+import { AdminGuard, CurrentUser, type Identity, IdentityGuard } from '../identity/identity';
 import {
   type CheckoutDto,
+  type CodeQuery,
   checkoutSchema,
+  codeQuerySchema,
   idempotencyKeySchema,
   idSchema,
   type PageQuery,
@@ -28,7 +30,7 @@ import {
 } from './orders.dto';
 import { OrdersService } from './orders.service';
 
-// Static routes (restaurants/...) are declared before `:id` so they win.
+// Static routes (lookup, restaurants/...) are declared before `:id` so they win.
 @Controller()
 @UseGuards(IdentityGuard)
 export class OrdersController {
@@ -54,6 +56,13 @@ export class OrdersController {
   @Get()
   mine(@CurrentUser() me: Identity, @Query({ schema: pageQuerySchema }) query: PageQuery) {
     return this.orders.listMine(me, query);
+  }
+
+  /** Orders by the short code people read out (admins). */
+  @Get('lookup')
+  @UseGuards(AdminGuard)
+  lookup(@Query({ schema: codeQuerySchema }) query: CodeQuery) {
+    return this.orders.findByCode(query.code);
   }
 
   @Get('restaurants/:restaurantId/orders')
