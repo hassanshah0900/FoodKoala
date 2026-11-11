@@ -7,7 +7,7 @@ module.exports = {
       'always',
       [
         // apps
-        'web',
+        'web', 'e2e',
         // go
         'api-gateway', 'delivery', 'tracking', 'chat',
         // nestjs
