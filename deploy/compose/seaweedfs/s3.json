@@ -1,0 +1,9 @@
+{
+  "identities": [
+    {
+      "name": "chat-service",
+      "credentials": [{ "accessKey": "foodkoala", "secretKey": "foodkoala-secret" }],
+      "actions": ["Admin", "Read", "Write", "List", "Tagging"]
+    }
+  ]
+}

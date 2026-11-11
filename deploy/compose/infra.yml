@@ -30,6 +30,17 @@ services:
     ports: ["27017:27017"]
     volumes: [mongo-data:/data/db]
 
+  # S3-compatible storage for files (chat photos). SeaweedFS, since MinIO no
+  # longer publishes free images. Only the identities in seaweedfs/s3.json may
+  # use it; buckets are private. Any S3 works in production.
+  s3:
+    image: chrislusf/seaweedfs:4.53
+    command: server -s3 -s3.config=/etc/seaweedfs/s3.json -dir=/data
+    ports: ["8333:8333"]
+    volumes:
+      - ./seaweedfs/s3.json:/etc/seaweedfs/s3.json:ro
+      - s3-data:/data
+
   kafka:
     image: apache/kafka:3.8.1
     ports: ["9092:9092"]
@@ -64,3 +75,4 @@ services:
 volumes:
   postgres-data:
   mongo-data:
+  s3-data:

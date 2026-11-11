@@ -17,6 +17,13 @@ on:
       kafka:
         type: boolean
         default: false
+      mongo:
+        type: boolean
+        default: false
+      # S3-compatible storage (SeaweedFS, as in deploy/compose/infra.yml).
+      s3:
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -89,6 +96,12 @@ jobs:
         options: >-
           --health-cmd "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092"
           --health-interval 5s --health-timeout 10s --health-retries 30
+      mongo:
+        image: ${{ inputs.mongo && 'mongo:7.0' || '' }}
+        ports: ['27017:27017']
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.adminCommand({ping: 1})'"
+          --health-interval 5s --health-timeout 5s --health-retries 20
 
     steps:
       - uses: actions/checkout@v7
@@ -98,6 +111,21 @@ jobs:
           go-version-file: src/${{ inputs.service }}/go.mod
           cache-dependency-path: src/${{ inputs.service }}/go.sum
 
+      # A service container can't be given a command, and SeaweedFS needs one.
+      - name: Start S3 storage
+        if: inputs.s3
+        working-directory: .
+        run: |
+          docker run -d --name s3 -p 8333:8333 \
+            -v "$PWD/deploy/compose/seaweedfs/s3.json:/etc/seaweedfs/s3.json:ro" \
+            chrislusf/seaweedfs:4.53 server -s3 -s3.config=/etc/seaweedfs/s3.json -dir=/data
+          for i in $(seq 1 60); do
+            curl -s -o /dev/null http://localhost:8333 && exit 0
+            sleep 1
+          done
+          docker logs s3
+          exit 1
+
       # Integration tests skip when their variable is unset, so set only the
       # ones whose container is running.
       - name: Point the tests at the containers
@@ -105,6 +133,11 @@ jobs:
           if ${{ inputs.postgres }}; then echo "DATABASE_URL=postgres://foodkoala:foodkoala@localhost:5432/foodkoala" >> "$GITHUB_ENV"; fi
           if ${{ inputs.redis }}; then echo "REDIS_URL=redis://localhost:6379" >> "$GITHUB_ENV"; fi
           if ${{ inputs.kafka }}; then echo "KAFKA_BROKERS=localhost:9092" >> "$GITHUB_ENV"; fi
+          if ${{ inputs.mongo }}; then echo "MONGO_URL=mongodb://localhost:27017" >> "$GITHUB_ENV"; fi
+          if ${{ inputs.s3 }}; then
+            # The development credentials of deploy/compose/seaweedfs/s3.json.
+            { echo "S3_ENDPOINT=localhost:8333"; echo "S3_ACCESS_KEY=foodkoala"; echo "S3_SECRET_KEY=foodkoala-secret"; } >> "$GITHUB_ENV"
+          fi
 
       # -p 1: packages share one database and would migrate and empty it at once.
       - name: Tests

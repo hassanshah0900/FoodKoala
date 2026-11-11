@@ -9,7 +9,7 @@ module.exports = {
         // apps
         'web',
         // go
-        'api-gateway', 'delivery', 'tracking',
+        'api-gateway', 'delivery', 'tracking', 'chat',
         // nestjs
         'auth', 'user', 'restaurant', 'menu', 'cart', 'order', 'notification',
         // fastapi

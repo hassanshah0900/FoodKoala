@@ -1,0 +1,31 @@
+name: chat-service
+
+on:
+  pull_request:
+    branches: [main]
+    paths: &paths
+      - src/chat-service/**
+      - .github/workflows/ci-chat-service.yml
+      - .github/workflows/go-service.yml
+      - .golangci.yml
+      - deploy/compose/seaweedfs/s3.json
+  push:
+    branches: [main]
+    paths: *paths
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    uses: ./.github/workflows/go-service.yml
+    with:
+      service: chat-service
+      redis: true
+      mongo: true
+      s3: true

@@ -26,6 +26,7 @@ var Upstreams = map[string]string{
 	"notifications": "http://notification-service:3007",
 	"delivery":      "http://delivery-service:8081",
 	"tracking":      "http://tracking-service:8082",
+	"chat":          "http://chat-service:8083",
 	"payments":      "http://payment-service:8001",
 	"search":        "http://search-service:8002",
 }
@@ -33,7 +34,7 @@ var Upstreams = map[string]string{
 var envNames = map[string]string{
 	"auth": "AUTH", "users": "USER", "restaurants": "RESTAURANT", "menus": "MENU",
 	"cart": "CART", "orders": "ORDER", "notifications": "NOTIFICATION",
-	"delivery": "DELIVERY", "tracking": "TRACKING", "payments": "PAYMENT", "search": "SEARCH",
+	"delivery": "DELIVERY", "tracking": "TRACKING", "chat": "CHAT", "payments": "PAYMENT", "search": "SEARCH",
 }
 
 type Config struct {
