@@ -1,7 +1,20 @@
 services:
   api-gateway:
     build: ../../src/api-gateway
+    image: foodkoala/api-gateway:local
     ports: ["8080:8080"]
+    # No environment: every upstream URL defaults to its compose service name.
+    depends_on:
+      # Its signing keys (JWKS) are what the gateway checks tokens with; it's
+      # not ready until it has fetched them once.
+      auth-service: { condition: service_started }
+    healthcheck:
+      # The distroless image has no shell or wget; the binary checks its own /readyz.
+      test: ["CMD", "/server", "healthcheck"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
   delivery-service:
     build: ../../src/delivery-service
     image: foodkoala/delivery-service:local
