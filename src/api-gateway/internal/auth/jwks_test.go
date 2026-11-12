@@ -101,3 +101,35 @@ func TestJWKSIgnoresUnusableKeys(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestJWKSReadyOnceKeysAreFetched(t *testing.T) {
+	srv := newJWKSServer(t, newKey(t, "k1"))
+	srv.down.Store(true)
+	clock := &fakeClock{t: time.Unix(1_800_000_000, 0)}
+	j := newTestJWKS(srv.URL, clock)
+
+	if err := j.Ready(context.Background()); err == nil {
+		t.Fatal("ready without any keys")
+	}
+	// A probe right after a failed fetch doesn't try again.
+	if err := j.Ready(context.Background()); err == nil || srv.hits.Load() != 1 {
+		t.Fatalf("want a throttled failure after 1 hit, got err=%v hits=%d", err, srv.hits.Load())
+	}
+
+	srv.down.Store(false)
+	clock.Advance(j.MinRefresh)
+	if err := j.Ready(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	// The keys it fetched are the ones tokens are checked with.
+	if _, err := j.Key(context.Background(), "k1"); err != nil || srv.hits.Load() != 2 {
+		t.Fatalf("want the cached key, got err=%v hits=%d", err, srv.hits.Load())
+	}
+
+	// Once it has keys, an auth-service outage doesn't make it unready.
+	srv.down.Store(true)
+	clock.Advance(time.Hour)
+	if err := j.Ready(context.Background()); err != nil {
+		t.Fatalf("stale keys should keep it ready: %v", err)
+	}
+}

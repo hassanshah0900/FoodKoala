@@ -2,6 +2,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -42,6 +43,8 @@ type Config struct {
 	Upstreams map[string]*url.URL
 	// Verifier checks access tokens; LoadConfig builds one backed by the auth-service JWKS.
 	Verifier auth.TokenVerifier
+	// Ready is /readyz: nil once tokens can be checked. Nil means always ready.
+	Ready func(ctx context.Context) error
 }
 
 func LoadConfig() Config {
@@ -56,9 +59,10 @@ func LoadConfig() Config {
 		cfg.Upstreams[name] = u
 	}
 
-	jwksURL := getenv("AUTH_JWKS_URL", cfg.Upstreams["auth"].JoinPath(".well-known", "jwks.json").String())
+	jwks := auth.NewJWKS(getenv("AUTH_JWKS_URL", cfg.Upstreams["auth"].JoinPath(".well-known", "jwks.json").String()))
+	cfg.Ready = jwks.Ready
 	cfg.Verifier = &auth.Verifier{
-		Keys:     auth.NewJWKS(jwksURL),
+		Keys:     jwks,
 		Issuer:   getenv("JWT_ISSUER", "foodkoala-auth"),
 		Audience: getenv("JWT_AUDIENCE", "foodkoala"),
 		Leeway:   30 * time.Second,
@@ -72,7 +76,7 @@ func LoadConfig() Config {
 func New(cfg Config) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", ok)
-	mux.HandleFunc("GET /readyz", ok)
+	mux.HandleFunc("GET /readyz", readiness(cfg.Ready))
 
 	for name, target := range cfg.Upstreams {
 		prefix := "/api/v1/" + name
@@ -97,6 +101,23 @@ func New(cfg Config) http.Handler {
 
 func ok(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+// readiness answers 503 until auth-service's signing keys are in hand. It
+// doesn't check the upstream services: one of them being down shouldn't take
+// the whole gateway out of rotation, and that route already answers 502.
+func readiness(ready func(ctx context.Context) error) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if ready != nil {
+			ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+			defer cancel()
+			if err := ready(ctx); err != nil {
+				writeJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "unavailable", "jwks": err.Error()})
+				return
+			}
+		}
+		ok(w, r)
+	}
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
