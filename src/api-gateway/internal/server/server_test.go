@@ -42,7 +42,7 @@ func TestHealth(t *testing.T) {
 }
 
 func TestReadyzWaitsForSigningKeys(t *testing.T) {
-	var keysErr error = errors.New("jwks: no signing keys yet")
+	keysErr := errors.New("jwks: no signing keys yet")
 	h := New(Config{Upstreams: map[string]*url.URL{}, Verifier: nobody{}, Ready: func(context.Context) error { return keysErr }})
 	check := func(want int) {
 		t.Helper()
