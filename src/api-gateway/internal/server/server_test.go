@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -38,6 +39,22 @@ func TestHealth(t *testing.T) {
 			t.Fatalf("%s: got %d", p, rec.Code)
 		}
 	}
+}
+
+func TestReadyzWaitsForSigningKeys(t *testing.T) {
+	keysErr := errors.New("jwks: no signing keys yet")
+	h := New(Config{Upstreams: map[string]*url.URL{}, Verifier: nobody{}, Ready: func(context.Context) error { return keysErr }})
+	check := func(want int) {
+		t.Helper()
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/readyz", nil))
+		if rec.Code != want {
+			t.Fatalf("got %d, want %d", rec.Code, want)
+		}
+	}
+	check(http.StatusServiceUnavailable)
+	keysErr = nil
+	check(http.StatusOK)
 }
 
 func TestProxyStripsPrefix(t *testing.T) {

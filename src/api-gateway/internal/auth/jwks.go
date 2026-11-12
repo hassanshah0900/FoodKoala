@@ -75,6 +75,30 @@ func (j *JWKS) Key(ctx context.Context, kid string) (*rsa.PublicKey, error) {
 	return key, nil
 }
 
+// Ready reports whether tokens can be checked: keys are cached (stale ones
+// still count, as in Key), or fetching them now works. Until the first fetch
+// succeeds, every token would be rejected, so the gateway isn't ready. Fetches
+// are throttled by MinRefresh like Key's, so probes can't hammer auth-service.
+func (j *JWKS) Ready(ctx context.Context) error {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+
+	if len(j.keys) > 0 {
+		return nil
+	}
+	now := j.Now()
+	if now.Sub(j.lastAttempt) < j.MinRefresh {
+		return errors.New("jwks: no signing keys yet")
+	}
+	j.lastAttempt = now
+	keys, err := j.fetch(ctx)
+	if err != nil {
+		return err
+	}
+	j.keys, j.fetchedAt = keys, now
+	return nil
+}
+
 type jwk struct {
 	Kty string `json:"kty"`
 	Kid string `json:"kid"`
