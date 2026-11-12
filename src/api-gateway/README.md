@@ -13,6 +13,12 @@ Per [ADR 0005](../../docs/adr/0005-gateway-authenticates-services-authorize.md),
 - `auth`, `restaurants`, `menus` and `search` are public. Every other route returns 401 without a valid token. `auth` ignores the `Authorization` header entirely.
 - WebSockets (browsers can't set `Authorization` on them) may send the token as the subprotocol `bearer.<token>` instead ([contracts](../../contracts/README.md#websockets)). The gateway always removes it from `Sec-WebSocket-Protocol` before proxying; the upgrade itself passes through.
 
+## Slow and unreachable services
+
+- A service that can't be reached gives **502** `{"error":"upstream unavailable"}`. Only that service's routes are affected.
+- A service that doesn't start answering within `UPSTREAM_TIMEOUT` (default `30s`, a Go duration) gives **504** `{"error":"upstream timed out"}`, so a hung service can't hold requests open forever.
+- The timeout covers only the wait for the response headers, starting once the request body has been sent. Slow uploads, long downloads and WebSockets (which answer 101 at once) aren't cut short.
+
 ## Health
 
 - `GET /healthz` answers 200 while the process runs.

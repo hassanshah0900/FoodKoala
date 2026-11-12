@@ -4,7 +4,9 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -38,9 +40,17 @@ var envNames = map[string]string{
 	"delivery": "DELIVERY", "tracking": "TRACKING", "chat": "CHAT", "payments": "PAYMENT", "search": "SEARCH",
 }
 
+// DefaultUpstreamTimeout is how long a service may take to start answering.
+const DefaultUpstreamTimeout = 30 * time.Second
+
 type Config struct {
 	Port      string
 	Upstreams map[string]*url.URL
+	// UpstreamTimeout limits the wait for a service's response headers, from
+	// when the request (body included) has been sent; past it the caller gets
+	// 504. Once the headers arrive nothing is timed, so a WebSocket (101) or a
+	// long download stays open. Zero means DefaultUpstreamTimeout.
+	UpstreamTimeout time.Duration
 	// Verifier checks access tokens; LoadConfig builds one backed by the auth-service JWKS.
 	Verifier auth.TokenVerifier
 	// Ready is /readyz: nil once tokens can be checked. Nil means always ready.
@@ -49,6 +59,14 @@ type Config struct {
 
 func LoadConfig() Config {
 	cfg := Config{Port: getenv("PORT", "8080"), Upstreams: map[string]*url.URL{}}
+	if raw := os.Getenv("UPSTREAM_TIMEOUT"); raw != "" {
+		d, err := time.ParseDuration(raw)
+		if err != nil || d <= 0 {
+			slog.Error("invalid UPSTREAM_TIMEOUT, expected a positive duration like 30s", "value", raw)
+			os.Exit(1)
+		}
+		cfg.UpstreamTimeout = d
+	}
 	for name, def := range Upstreams {
 		raw := getenv(envNames[name]+"_SERVICE_URL", def)
 		u, err := url.Parse(raw)
@@ -78,9 +96,18 @@ func New(cfg Config) http.Handler {
 	mux.HandleFunc("GET /healthz", ok)
 	mux.HandleFunc("GET /readyz", readiness(cfg.Ready))
 
+	timeout := cfg.UpstreamTimeout
+	if timeout == 0 {
+		timeout = DefaultUpstreamTimeout
+	}
+	// One transport, so every route shares its pool of upstream connections.
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.ResponseHeaderTimeout = timeout
+
 	for name, target := range cfg.Upstreams {
 		prefix := "/api/v1/" + name
 		proxy := &httputil.ReverseProxy{
+			Transport: transport,
 			Rewrite: func(r *httputil.ProxyRequest) {
 				r.SetURL(target)
 				r.SetXForwarded()
@@ -89,6 +116,10 @@ func New(cfg Config) http.Handler {
 			},
 			ErrorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
 				slog.Warn("upstream error", "upstream", name, "err", err)
+				if isTimeout(err) {
+					writeJSON(w, http.StatusGatewayTimeout, map[string]string{"error": "upstream timed out"})
+					return
+				}
 				writeJSON(w, http.StatusBadGateway, map[string]string{"error": "upstream unavailable"})
 			},
 		}
@@ -97,6 +128,13 @@ func New(cfg Config) http.Handler {
 	}
 	// TODO(api-gateway): rate limiting middleware.
 	return auth.Middleware(cfg.Verifier, auth.DefaultPolicy, mux)
+}
+
+// isTimeout is true when the service didn't answer in time (or couldn't be
+// reached in time), as opposed to refusing or dropping the connection.
+func isTimeout(err error) bool {
+	var ne net.Error
+	return errors.Is(err, context.DeadlineExceeded) || (errors.As(err, &ne) && ne.Timeout())
 }
 
 func ok(w http.ResponseWriter, _ *http.Request) {
