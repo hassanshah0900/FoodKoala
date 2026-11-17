@@ -1,5 +1,3 @@
-# yaml-language-server: $schema=https://raw.githubusercontent.com/compose-spec/compose-spec/main/schema/compose-spec.json
-# ^ Completion and checks in the editor: it only recognises compose.yml-style names on its own.
 services:
   api-gateway:
     build: ../../src/api-gateway

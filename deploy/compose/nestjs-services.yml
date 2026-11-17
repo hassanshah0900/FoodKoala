@@ -1,5 +1,3 @@
-# yaml-language-server: $schema=https://raw.githubusercontent.com/compose-spec/compose-spec/main/schema/compose-spec.json
-# ^ Completion and checks in the editor: it only recognises compose.yml-style names on its own.
 # NestJS services. Each one that owns a Postgres schema has a one-shot
 # `<name>-migrate` container that applies its migrations (the release step)
 # and must finish before the service starts. It runs the service's own image.
