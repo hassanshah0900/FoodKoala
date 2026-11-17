@@ -1,3 +1,5 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/compose-spec/compose-spec/main/schema/compose-spec.json
+# ^ Completion and checks in the editor: it only recognises compose.yml-style names on its own.
 # FastAPI services. Like the NestJS ones, a service that owns a Postgres
 # schema has a one-shot `<name>-migrate` container (Alembic) that must finish
 # before it starts, running the service's own image.
