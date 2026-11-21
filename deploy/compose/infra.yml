@@ -13,7 +13,11 @@ services:
     ports: ["5432:5432"]
     volumes: [postgres-data:/var/lib/postgresql/data]
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-foodkoala}"]
+      # Over TCP, not the default Unix socket: on a new volume the image first
+      # runs a temporary server on the socket only, to create the database, and
+      # then restarts. Checking the socket passed during that, and migrations
+      # (which connect over TCP) failed with "connection refused".
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U $${POSTGRES_USER:-foodkoala}"]
       interval: 5s
       retries: 10
 
