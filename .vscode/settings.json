@@ -1,0 +1,10 @@
+{
+  // The compose files in deploy/compose/ aren't named compose.yml, so VS Code
+  // doesn't recognise them as Compose. This gives them the Compose schema:
+  // completion, hover docs and checks (needs the YAML extension, redhat.vscode-yaml).
+  "yaml.schemas": {
+    "https://raw.githubusercontent.com/compose-spec/compose-spec/main/schema/compose-spec.json": [
+      "deploy/compose/*.yml"
+    ]
+  }
+}
