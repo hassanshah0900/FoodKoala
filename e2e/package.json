@@ -8,7 +8,9 @@
     "typecheck": "tsc --noEmit",
     "lint": "biome lint .",
     "format": "biome check --write .",
-    "format:check": "biome check --linter-enabled=false ."
+    "format:check": "biome check --linter-enabled=false .",
+    "seed": "node seed/seed.ts",
+    "tour": "node tour/tour.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.6",

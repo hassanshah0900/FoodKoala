@@ -34,3 +34,35 @@ It also makes `+923009999999` an admin and loosens the OTP limits.
 - Tests run one at a time (`workers: 1`) for the same reason.
 - What arrives through Kafka (an order's status after a pickup, a new restaurant
   in search) shows after a moment: `reloadUntilVisible` waits for it.
+
+## Demo data and a video tour
+
+```sh
+make e2e-up
+cd e2e && npm ci && npx playwright install chromium
+npm run seed   # restaurants, riders, a voucher and a customer with past orders
+npm run tour   # records tour/out/foodkoala-tour.webm (and .mp4 with ffmpeg)
+```
+
+`seed/seed.ts` builds a demo around Gulberg, Lahore through the API, from what
+`seed/catalogue.ts` lists: seven restaurants with menus, hours and zones, one
+more waiting for approval, an approved rider on shift and one waiting, the
+voucher `KOALA20`, and Ayesha, a customer with four delivered and rated orders.
+It's safe to run again; what exists is left alone. Pick "Gulberg, Lahore" on
+the landing page and sign in as:
+
+| Who               | Number                                                             |
+| ----------------- | ------------------------------------------------------------------ |
+| Customer (Ayesha) | `03001000001`                                                      |
+| Rider (Bilal)     | `03003000001`                                                      |
+| Admin             | `03009999999`                                                      |
+| Restaurant owners | `03002000001` (Lahori Biryani House) to `03002000008` (Chai Khana) |
+
+Login codes are at `localhost:4010/messages?to=+92…`.
+
+`tour/tour.ts` plays one order from browsing to rating, as customer, kitchen
+and rider in turn, then walks the partner and admin consoles, with captions.
+Start from a fresh seed for the full story: its first run also approves the
+waiting restaurant and rider. For an empty database, start the stack under its
+own project name, e.g. `docker compose -p foodkoala-demo … up`, which gets its
+own volumes.
